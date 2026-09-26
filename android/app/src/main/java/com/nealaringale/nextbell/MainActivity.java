@@ -253,8 +253,13 @@ public class MainActivity extends Activity {
         brand.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         headerText.addView(brand);
 
-        TextView subtitle = text("NMIET · FE Div B · 2026–27", 11, MUTED);
-        subtitle.setPadding(0, dp(3), 0, 0);
+        greetingText = text("Hi, " + getName() + " 👋", 12, TEXT);
+        greetingText.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        greetingText.setPadding(0, dp(4), 0, 0);
+        headerText.addView(greetingText);
+
+        TextView subtitle = text("NMIET · FE Div B · 2026–27", 10, MUTED);
+        subtitle.setPadding(0, dp(2), 0, 0);
         headerText.addView(subtitle);
 
         header.addView(headerText, headerTextParams);
@@ -274,7 +279,7 @@ public class MainActivity extends Activity {
 
         header.addView(liveInfo);
 
-        profileChip = text("Div B · " + getBatch() + "\nRoll " + getRollNumber(), 10, MUTED);
+        profileChip = text(getName() + "\n" + getBatch() + " · Roll " + getRollNumber(), 9, MUTED);
         profileChip.setGravity(Gravity.CENTER);
         profileChip.setPadding(dp(10), dp(7), dp(10), dp(7));
         profileChip.setBackground(round(SURFACE_2, BORDER, 999));
@@ -317,6 +322,19 @@ public class MainActivity extends Activity {
 
         daysScroll.addView(dayRow);
         root.addView(daysScroll);
+
+        TextView guideButton = text("📍  Campus Guide", 11, TEXT);
+        guideButton.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        guideButton.setGravity(Gravity.CENTER);
+        guideButton.setPadding(dp(14), dp(11), dp(14), dp(11));
+        guideButton.setBackground(round(SURFACE_2, BORDER, 13));
+        guideButton.setClickable(true);
+        guideButton.setFocusable(true);
+        guideButton.setContentDescription("Campus Guide");
+        guideButton.setOnClickListener(v -> showCampusGuide(""));
+        LinearLayout.LayoutParams guideParams = new LinearLayout.LayoutParams(-1, -2);
+        guideParams.setMargins(dp(16), 0, dp(16), dp(10));
+        root.addView(guideButton, guideParams);
 
         LinearLayout hero = new LinearLayout(this);
         hero.setOrientation(LinearLayout.VERTICAL);
@@ -422,40 +440,200 @@ public class MainActivity extends Activity {
     }
 
     private void showRollSettings() {
-        final EditText input = new EditText(this);
-        input.setSingleLine(true);
-        input.setInputType(InputType.TYPE_CLASS_NUMBER);
-        input.setText(String.valueOf(getRollNumber()));
-        input.setSelectAllOnFocus(true);
-        input.setTextSize(17);
-        input.setPadding(dp(6), 0, dp(6), 0);
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(dp(4), 0, dp(4), 0);
+
+        final EditText nameInput = new EditText(this);
+        nameInput.setSingleLine(true);
+        nameInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_WORDS);
+        nameInput.setText(getName());
+        nameInput.setTextSize(17);
+        nameInput.setHint("Your name");
+        nameInput.setPadding(dp(6), 0, dp(6), 0);
+
+        final EditText rollInput = new EditText(this);
+        rollInput.setSingleLine(true);
+        rollInput.setInputType(InputType.TYPE_CLASS_NUMBER);
+        rollInput.setText(String.valueOf(getRollNumber()));
+        rollInput.setSelectAllOnFocus(true);
+        rollInput.setTextSize(17);
+        rollInput.setHint("Roll number");
+        rollInput.setPadding(dp(6), 0, dp(6), 0);
+
+        TextView nameLabel = text("NAME", 9, MUTED);
+        nameLabel.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        TextView rollLabel = text("ROLL NUMBER", 9, MUTED);
+        rollLabel.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+
+        box.addView(nameLabel);
+        box.addView(nameInput, new LinearLayout.LayoutParams(-1, dp(46)));
+        box.addView(rollLabel);
+        box.addView(rollInput, new LinearLayout.LayoutParams(-1, dp(46)));
 
         AlertDialog dialog = new AlertDialog.Builder(this)
                 .setTitle("Profile settings")
-                .setMessage("Roll number controls your B1/B2/B3 timetable and roll-range tutorials.\n\nB1: 1–25\nB2: 26–50\nB3: 51 onwards")
-                .setView(input)
+                .setMessage("Your name is shown on the home screen. Your roll number controls your B1/B2/B3 timetable.")
+                .setView(box)
                 .setNegativeButton("Cancel", null)
                 .setPositiveButton("Save", null)
                 .create();
 
         dialog.setOnShowListener(v -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(view -> {
+            String name = nameInput.getText().toString().trim();
+            if (name.isEmpty()) {
+                nameInput.setError("Enter your name.");
+                return;
+            }
+
             try {
-                int roll = Integer.parseInt(input.getText().toString().trim());
+                int roll = Integer.parseInt(rollInput.getText().toString().trim());
                 if (roll < 1 || roll > 999) {
-                    input.setError("Enter a valid roll number.");
+                    rollInput.setError("Enter a valid roll number.");
                     return;
                 }
 
-                saveRollNumber(roll);
-                profileChip.setText("Div B · " + getBatch() + "\nRoll " + roll);
+                saveProfile(name, roll);
+                if (profileChip != null) {
+                    profileChip.setText(name + "\n" + getBatch() + " · Roll " + roll);
+                }
+                if (greetingText != null) {
+                    greetingText.setText("Hi, " + name + " 👋");
+                }
+
+                NotificationScheduler.scheduleUpcoming(this);
                 refreshSchedule();
                 dialog.dismiss();
             } catch (NumberFormatException e) {
-                input.setError("Enter your roll number.");
+                rollInput.setError("Enter your roll number.");
             }
         }));
 
         dialog.show();
+    }
+
+    private void requestNotificationPermissionIfNeeded() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            NotificationScheduler.scheduleUpcoming(this);
+            return;
+        }
+
+        if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
+                == PackageManager.PERMISSION_GRANTED) {
+            NotificationScheduler.scheduleUpcoming(this);
+            return;
+        }
+
+        if (preferences.getBoolean(KEY_NOTIFICATION_PROMPTED, false)) {
+            return;
+        }
+
+        preferences.edit().putBoolean(KEY_NOTIFICATION_PROMPTED, true).apply();
+
+        new AlertDialog.Builder(this)
+                .setTitle("Enable class reminders?")
+                .setMessage("NextBell can remind you 15 minutes before your personalized classes, including the correct room and wing.")
+                .setNegativeButton("Not now", null)
+                .setPositiveButton("Enable", (dialog, which) -> {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        requestPermissions(
+                                new String[]{Manifest.permission.POST_NOTIFICATIONS},
+                                7001
+                        );
+                    }
+                })
+                .show();
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == 7001) {
+            NotificationScheduler.scheduleUpcoming(this);
+        }
+    }
+
+    private void showCampusGuide(String highlightRoom) {
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setPadding(dp(4), 0, dp(4), 0);
+
+        TextView intro = text(
+                highlightRoom.isEmpty()
+                        ? "Quick directions for the buildings and rooms currently appearing in your timetable."
+                        : "Your selected room: " + highlightRoom,
+                12,
+                MUTED
+        );
+        intro.setPadding(0, 0, 0, dp(13));
+        root.addView(intro);
+
+        root.addView(guideCard(
+                "WING B",
+                "Known timetable rooms: 109, 115, 312",
+                "Rooms 109/115 are used by first-year sessions; 312 appears for Engineering Graphics.",
+                highlightRoom.contains("Wing B") ? "THIS IS YOUR DESTINATION" : ""
+        ));
+
+        root.addView(guideCard(
+                "WING C",
+                "Known timetable rooms: 101, 310",
+                "Room 101 and room 310 are explicitly listed as Wing C locations in the timetable.",
+                highlightRoom.contains("Wing C") ? "THIS IS YOUR DESTINATION" : ""
+        ));
+
+        root.addView(guideCard(
+                "OTHER / THIRD CAMPUS BUILDING",
+                "Map not configured yet",
+                "The current timetable does not identify the third campus building by name or room list. We can add its exact map once those room/building details are provided.",
+                highlightRoom.isEmpty() ? "" : "ROOM: " + highlightRoom
+        ));
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle("📍 Campus Guide")
+                .setView(root)
+                .setPositiveButton("Done", null)
+                .create();
+
+        dialog.show();
+    }
+
+    private View guideCard(String title, String rooms, String detail, String badgeText) {
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setPadding(dp(14), dp(13), dp(14), dp(13));
+        card.setBackground(round(SURFACE, BORDER, 14));
+
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
+        params.setMargins(0, 0, 0, dp(9));
+        card.setLayoutParams(params);
+
+        LinearLayout titleRow = new LinearLayout(this);
+        titleRow.setOrientation(LinearLayout.HORIZONTAL);
+        titleRow.setGravity(Gravity.CENTER_VERTICAL);
+
+        TextView titleText = text(title, 12, TEXT);
+        titleText.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        titleRow.addView(titleText, new LinearLayout.LayoutParams(0, -2, 1f));
+
+        if (!badgeText.isEmpty()) {
+            TextView badge = text(badgeText, 8, ACCENT);
+            badge.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+            badge.setGravity(Gravity.CENTER);
+            titleRow.addView(badge);
+        }
+
+        card.addView(titleRow);
+
+        TextView roomText = text(rooms, 10, MUTED);
+        roomText.setPadding(0, dp(5), 0, 0);
+        card.addView(roomText);
+
+        TextView detailsText = text(detail, 10, SUBTLE);
+        detailsText.setPadding(0, dp(3), 0, 0);
+        card.addView(detailsText);
+
+        return card;
     }
 
     private void refreshSchedule() {
@@ -724,6 +902,9 @@ public class MainActivity extends Activity {
         if (!item.room.isEmpty()) {
             TextView room = text("⌖ " + item.room, 10, MUTED);
             room.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
+            room.setClickable(true);
+            room.setFocusable(true);
+            room.setOnClickListener(v -> showCampusGuide(item.room));
             card.addView(room, new LinearLayout.LayoutParams(dp(78), -2));
         }
 
