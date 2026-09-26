@@ -91,12 +91,25 @@ public class MainActivity extends Activity {
             "Midnight", "Ocean", "Sakura", "Forest", "Solar"
     };
 
+    private static final String[] THEME_TAGS = {
+            "NEO GLASS", "FLOW", "EDITORIAL", "ORGANIC", "STUDIO"
+    };
+
+    private static final String[] THEME_DESCRIPTIONS = {
+            "Dark glass, luminous edges, soft depth",
+            "Cool gradients, fluid controls, crisp focus",
+            "Soft editorial cards, refined contrast, calm motion",
+            "Natural surfaces, spacious rhythm, grounded controls",
+            "Warm studio contrast, sharper geometry, bold hierarchy"
+    };
+
+    // BG, SURFACE, SURFACE_2, BORDER, TEXT, MUTED, ACCENT, ACCENT_BG, ACCENT_2
     private static final int[][] THEMES = {
-            {Color.rgb(10, 12, 17), Color.rgb(17, 20, 27), Color.rgb(24, 28, 37), Color.rgb(42, 48, 59), Color.rgb(245, 247, 251), Color.rgb(148, 157, 175), Color.rgb(112, 233, 130), Color.rgb(31, 58, 39)},
-            {Color.rgb(7, 13, 24), Color.rgb(12, 22, 37), Color.rgb(18, 32, 51), Color.rgb(32, 54, 76), Color.rgb(241, 248, 255), Color.rgb(151, 174, 201), Color.rgb(88, 201, 255), Color.rgb(17, 52, 72)},
-            {Color.rgb(20, 12, 20), Color.rgb(31, 18, 32), Color.rgb(43, 23, 44), Color.rgb(66, 38, 66), Color.rgb(255, 246, 252), Color.rgb(187, 158, 181), Color.rgb(255, 132, 193), Color.rgb(70, 31, 56)},
-            {Color.rgb(8, 16, 14), Color.rgb(13, 26, 22), Color.rgb(20, 38, 31), Color.rgb(38, 61, 50), Color.rgb(239, 251, 245), Color.rgb(153, 185, 170), Color.rgb(101, 220, 163), Color.rgb(24, 65, 47)},
-            {Color.rgb(18, 15, 10), Color.rgb(29, 23, 14), Color.rgb(42, 32, 17), Color.rgb(70, 53, 28), Color.rgb(255, 250, 238), Color.rgb(193, 177, 145), Color.rgb(255, 184, 77), Color.rgb(78, 53, 18)}
+            {Color.rgb(7, 9, 13), Color.rgb(14, 18, 24), Color.rgb(21, 27, 37), Color.rgb(43, 51, 66), Color.rgb(246, 248, 252), Color.rgb(145, 155, 173), Color.rgb(139, 255, 176), Color.rgb(19, 57, 36), Color.rgb(99, 230, 255)},
+            {Color.rgb(5, 11, 20), Color.rgb(10, 19, 32), Color.rgb(17, 30, 48), Color.rgb(31, 53, 76), Color.rgb(241, 248, 255), Color.rgb(146, 169, 199), Color.rgb(84, 209, 255), Color.rgb(12, 52, 76), Color.rgb(124, 111, 255)},
+            {Color.rgb(19, 10, 18), Color.rgb(31, 17, 29), Color.rgb(45, 23, 42), Color.rgb(69, 38, 64), Color.rgb(255, 247, 252), Color.rgb(188, 158, 181), Color.rgb(255, 130, 194), Color.rgb(77, 29, 58), Color.rgb(255, 194, 102)},
+            {Color.rgb(6, 15, 12), Color.rgb(11, 25, 20), Color.rgb(19, 39, 31), Color.rgb(38, 64, 51), Color.rgb(240, 252, 245), Color.rgb(151, 184, 169), Color.rgb(103, 231, 170), Color.rgb(21, 69, 49), Color.rgb(120, 221, 255)},
+            {Color.rgb(18, 13, 7), Color.rgb(31, 22, 12), Color.rgb(45, 32, 16), Color.rgb(72, 53, 29), Color.rgb(255, 250, 238), Color.rgb(193, 175, 140), Color.rgb(255, 191, 77), Color.rgb(80, 52, 15), Color.rgb(255, 119, 86)}
     };
 
     private int BG;
@@ -108,6 +121,13 @@ public class MainActivity extends Activity {
     private int SUBTLE;
     private int ACCENT;
     private int ACCENT_BG;
+    private int ACCENT_2;
+    private int CARD_RADIUS;
+    private int BUTTON_RADIUS;
+    private int SMALL_RADIUS;
+    private int NAV_RADIUS;
+    private int CARD_ELEVATION;
+    private int CONTROL_HEIGHT;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -180,6 +200,50 @@ public class MainActivity extends Activity {
         SUBTLE = blend(MUTED, BG, 0.55f);
         ACCENT = palette[6];
         ACCENT_BG = palette[7];
+        ACCENT_2 = palette[8];
+
+        switch (themeIndex) {
+            case 1: // Ocean — flowing, slightly tighter geometry.
+                CARD_RADIUS = 21;
+                BUTTON_RADIUS = 18;
+                SMALL_RADIUS = 15;
+                NAV_RADIUS = 24;
+                CARD_ELEVATION = 7;
+                CONTROL_HEIGHT = 48;
+                break;
+            case 2: // Sakura — editorial, calmer and less rounded.
+                CARD_RADIUS = 16;
+                BUTTON_RADIUS = 12;
+                SMALL_RADIUS = 11;
+                NAV_RADIUS = 18;
+                CARD_ELEVATION = 3;
+                CONTROL_HEIGHT = 46;
+                break;
+            case 3: // Forest — organic, roomy, soft geometry.
+                CARD_RADIUS = 27;
+                BUTTON_RADIUS = 20;
+                SMALL_RADIUS = 17;
+                NAV_RADIUS = 30;
+                CARD_ELEVATION = 5;
+                CONTROL_HEIGHT = 50;
+                break;
+            case 4: // Solar — studio, defined edges, flatter surfaces.
+                CARD_RADIUS = 15;
+                BUTTON_RADIUS = 10;
+                SMALL_RADIUS = 9;
+                NAV_RADIUS = 18;
+                CARD_ELEVATION = 2;
+                CONTROL_HEIGHT = 46;
+                break;
+            default: // Midnight — neo-glass.
+                CARD_RADIUS = 24;
+                BUTTON_RADIUS = 15;
+                SMALL_RADIUS = 13;
+                NAV_RADIUS = 28;
+                CARD_ELEVATION = 9;
+                CONTROL_HEIGHT = 48;
+                break;
+        }
 
         Window window = getWindow();
         window.setStatusBarColor(BG);
@@ -435,6 +499,12 @@ public class MainActivity extends Activity {
         page.addView(privacy);
 
         setContentView(page);
+        animatePageIn(page);
+        logo.animate().rotationBy(360f)
+                .setDuration(700)
+                .setStartDelay(120)
+                .setInterpolator(new DecelerateInterpolator())
+                .start();
     }
 
     private void buildHomeScreen() {
@@ -518,8 +588,8 @@ public class MainActivity extends Activity {
         homeHero = new LinearLayout(this);
         homeHero.setOrientation(LinearLayout.VERTICAL);
         homeHero.setPadding(dp(19), dp(18), dp(19), dp(18));
-        homeHero.setElevation(dp(10));
-        homeHero.setBackground(gradientRound(SURFACE, SURFACE_2, BORDER, 24,
+        homeHero.setElevation(dp(CARD_ELEVATION + 1));
+        homeHero.setBackground(gradientRound(SURFACE, SURFACE_2, BORDER, CARD_RADIUS,
                 GradientDrawable.Orientation.TL_BR));
 
         LinearLayout heroTop = new LinearLayout(this);
@@ -689,7 +759,7 @@ public class MainActivity extends Activity {
     private void buildSettingsScreen() {
         LinearLayout page = scrollPage();
 
-        TextView eyebrow = sectionLabel("PERSONALISE");
+        TextView eyebrow = sectionLabel(THEME_TAGS[themeIndex] + "  •  PERSONALISE");
         eyebrow.setTextColor(ACCENT);
         page.addView(eyebrow);
 
@@ -698,11 +768,15 @@ public class MainActivity extends Activity {
         title.setPadding(0, dp(5), 0, 0);
         page.addView(title);
 
-        TextView subtitle = text("Make NextBell feel like yours.", 12, MUTED);
-        subtitle.setPadding(0, dp(5), 0, dp(18));
+        TextView subtitle = text(
+                "Your profile, visual system and reminders — all in one place.",
+                12,
+                MUTED
+        );
+        subtitle.setPadding(0, dp(5), 0, dp(21));
         page.addView(subtitle);
 
-        page.addView(sectionLabel("PROFILE"));
+        page.addView(sectionLabel("PROFILE"), sectionParams(0, 9));
 
         LinearLayout profileCard = cardColumn();
         profileCard.setOrientation(LinearLayout.HORIZONTAL);
@@ -726,29 +800,30 @@ public class MainActivity extends Activity {
         batch.setPadding(0, dp(4), 0, 0);
         profileText.addView(batch);
 
-        LinearLayout.LayoutParams profileTextParams = new LinearLayout.LayoutParams(0, -2, 1f);
+        LinearLayout.LayoutParams profileTextParams =
+                new LinearLayout.LayoutParams(0, -2, 1f);
         profileTextParams.setMargins(dp(12), 0, dp(8), 0);
         profileCard.addView(profileText, profileTextParams);
 
         TextView edit = actionButton("Edit", false);
-        profileCard.addView(edit, new LinearLayout.LayoutParams(dp(76), dp(42)));
+        profileCard.addView(edit, new LinearLayout.LayoutParams(dp(76), CONTROL_HEIGHT_DP()));
         edit.setOnClickListener(v -> {
             tap(v);
             showEditProfile();
         });
 
         LinearLayout.LayoutParams profileParams = new LinearLayout.LayoutParams(-1, -2);
-        profileParams.setMargins(0, dp(9), 0, dp(20));
+        profileParams.setMargins(0, 0, 0, dp(21));
         page.addView(profileCard, profileParams);
 
-        page.addView(sectionLabel("APPEARANCE"));
+        page.addView(sectionLabel("APPEARANCE"), sectionParams(0, 6));
 
         TextView appearanceHint = text(
-                "A different mood for every kind of day.",
+                THEME_DESCRIPTIONS[themeIndex] + ".",
                 10,
                 MUTED
         );
-        appearanceHint.setPadding(0, dp(5), 0, dp(10));
+        appearanceHint.setPadding(0, dp(4), 0, dp(10));
         page.addView(appearanceHint);
 
         HorizontalScrollView themeScroller = new HorizontalScrollView(this);
@@ -757,18 +832,16 @@ public class MainActivity extends Activity {
 
         LinearLayout themeRow = new LinearLayout(this);
         for (int i = 0; i < THEME_NAMES.length; i++) {
-            LinearLayout card = themeCard(i);
-            themeRow.addView(card, new LinearLayout.LayoutParams(dp(132), dp(108)));
-            if (i < THEME_NAMES.length - 1) themeRow.addView(spacer(dp(9), 1));
+            themeRow.addView(themeCard(i), new LinearLayout.LayoutParams(dp(148), dp(128)));
+            if (i < THEME_NAMES.length - 1) themeRow.addView(spacer(dp(10), 1));
         }
         themeScroller.addView(themeRow);
-        LinearLayout.LayoutParams themeParams = new LinearLayout.LayoutParams(-1, dp(108));
-        themeParams.setMargins(0, 0, 0, dp(21));
-        page.addView(themeScroller, themeParams);
+        page.addView(themeScroller, sectionParams(0, 22));
 
-        page.addView(sectionLabel("NOTIFICATIONS"));
+        page.addView(sectionLabel("NOTIFICATIONS"), sectionParams(0, 7));
 
         LinearLayout notificationCard = settingRow(R.drawable.ic_calendar, ACCENT);
+
         LinearLayout notifText = new LinearLayout(this);
         notifText.setOrientation(LinearLayout.VERTICAL);
 
@@ -783,14 +856,14 @@ public class MainActivity extends Activity {
                 10,
                 MUTED
         );
-        notifDescription.setPadding(0, dp(3), 0, 0);
+        notifDescription.setPadding(0, dp(4), 0, 0);
         notifText.addView(notifDescription);
 
         notificationCard.addView(notifText, new LinearLayout.LayoutParams(0, -2, 1f));
 
         if (!isNotificationGranted() && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             TextView enable = actionButton("Enable", false);
-            notificationCard.addView(enable, new LinearLayout.LayoutParams(dp(82), dp(40)));
+            notificationCard.addView(enable, new LinearLayout.LayoutParams(dp(84), CONTROL_HEIGHT_DP()));
             enable.setOnClickListener(v -> {
                 tap(v);
                 requestNotificationAccess();
@@ -800,15 +873,13 @@ public class MainActivity extends Activity {
             status.setGravity(Gravity.CENTER);
             status.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
             status.setPadding(dp(10), 0, dp(10), 0);
-            status.setBackground(round(ACCENT_BG, Color.TRANSPARENT, 999));
-            notificationCard.addView(status, new LinearLayout.LayoutParams(dp(46), dp(32)));
+            status.setBackground(round(ACCENT_BG, Color.TRANSPARENT, PILL_RADIUS()));
+            notificationCard.addView(status, new LinearLayout.LayoutParams(dp(48), dp(32)));
         }
 
-        LinearLayout.LayoutParams notifParams = new LinearLayout.LayoutParams(-1, -2);
-        notifParams.setMargins(0, dp(9), 0, dp(20));
-        page.addView(notificationCard, notifParams);
+        page.addView(notificationCard, sectionParams(0, 22));
 
-        page.addView(sectionLabel("ABOUT & FEEDBACK"));
+        page.addView(sectionLabel("ABOUT & FEEDBACK"), sectionParams(0, 7));
 
         LinearLayout aboutCard = cardColumn();
 
@@ -873,9 +944,9 @@ public class MainActivity extends Activity {
         footer.setPadding(0, dp(10), 0, 0);
         aboutCard.addView(footer);
 
-        LinearLayout aboutParams = new LinearLayout(this);
-        aboutParams.setLayoutParams(new LinearLayout.LayoutParams(-1, -2));
-        page.addView(aboutCard, new LinearLayout.LayoutParams(-1, -2));
+        LinearLayout.LayoutParams aboutParams = new LinearLayout.LayoutParams(-1, -2);
+        aboutParams.setMargins(0, 0, 0, dp(8));
+        page.addView(aboutCard, aboutParams);
 
         addBottomSpace(page);
     }
@@ -889,7 +960,7 @@ public class MainActivity extends Activity {
 
         LinearLayout body = new LinearLayout(this);
         body.setOrientation(LinearLayout.VERTICAL);
-        body.setPadding(dp(19), dp(22), dp(19), dp(30));
+        body.setPadding(dp(20), dp(18), dp(20), dp(30));
         scroll.addView(body);
 
         contentHost.removeAllViews();
@@ -898,8 +969,16 @@ public class MainActivity extends Activity {
     }
 
     private void addBottomSpace(LinearLayout page) {
-        page.addView(spacer(1, dp(42)));
+        page.addView(spacer(1, dp(48)));
     }
+
+    private LinearLayout.LayoutParams sectionParams(int top, int bottom) {
+        LinearLayout.LayoutParams params =
+                new LinearLayout.LayoutParams(-1, -2);
+        params.setMargins(0, dp(top), 0, dp(bottom));
+        return params;
+    }
+
 
     private LinearLayout cardColumn() {
         LinearLayout card = new LinearLayout(this);
@@ -909,10 +988,10 @@ public class MainActivity extends Activity {
                 SURFACE,
                 SURFACE_2,
                 BORDER,
-                22,
+                CARD_RADIUS,
                 GradientDrawable.Orientation.TL_BR
         ));
-        card.setElevation(dp(5));
+        card.setElevation(dp(CARD_ELEVATION));
         return card;
     }
 
@@ -920,17 +999,28 @@ public class MainActivity extends Activity {
         LinearLayout card = new LinearLayout(this);
         card.setOrientation(LinearLayout.HORIZONTAL);
         card.setGravity(Gravity.CENTER_VERTICAL);
-        card.setPadding(dp(13), dp(13), dp(13), dp(13));
-        card.setBackground(ripple(SURFACE, blend(SURFACE, BG, 0.25f), BORDER, 20));
-        card.setElevation(dp(3));
+        card.setPadding(dp(13), dp(12), dp(13), dp(12));
+        card.setBackground(ripple(
+                SURFACE,
+                blend(SURFACE, BG, 0.24f),
+                BORDER,
+                CARD_RADIUS
+        ));
+        card.setElevation(dp(Math.max(1, CARD_ELEVATION - 2)));
 
         ImageView icon = new ImageView(this);
         icon.setImageResource(iconRes);
         icon.setColorFilter(iconColor);
         icon.setPadding(dp(7), dp(7), dp(7), dp(7));
-        icon.setBackground(round(ACCENT_BG, Color.TRANSPARENT, 15));
+        icon.setBackground(round(ACCENT_BG, Color.TRANSPARENT, SMALL_RADIUS));
         card.addView(icon, new LinearLayout.LayoutParams(dp(46), dp(46)));
         return card;
+    }
+
+    private LinearLayout.LayoutParams cardMargin() {
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
+        params.setMargins(0, dp(9), 0, dp(20));
+        return params;
     }
 
     private LinearLayout.LayoutParams cardMargin() {
@@ -945,50 +1035,79 @@ public class MainActivity extends Activity {
 
         LinearLayout card = new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
-        card.setGravity(Gravity.CENTER_VERTICAL);
-        card.setPadding(dp(10), dp(10), dp(10), dp(10));
+        card.setGravity(Gravity.TOP);
+        card.setPadding(dp(11), dp(11), dp(11), dp(10));
         card.setBackground(ripple(
                 selected ? palette[7] : palette[1],
-                blend(palette[7], palette[0], 0.25f),
+                blend(palette[7], palette[0], 0.22f),
                 selected ? palette[6] : palette[3],
-                19
+                themeRadius(index)
         ));
-        card.setElevation(selected ? dp(5) : dp(2));
+        card.setElevation(selected ? dp(7) : dp(2));
         card.setClickable(true);
         card.setFocusable(true);
         card.setContentDescription(
-                "Theme " + THEME_NAMES[index] + (selected ? ", selected" : "")
+                "Theme " + THEME_NAMES[index] + " — " + THEME_DESCRIPTIONS[index] +
+                        (selected ? ", selected" : "")
         );
 
-        LinearLayout swatches = new LinearLayout(this);
-        swatches.setOrientation(LinearLayout.HORIZONTAL);
+        LinearLayout preview = new LinearLayout(this);
+        preview.setOrientation(LinearLayout.VERTICAL);
+        preview.setPadding(dp(8), dp(8), dp(8), dp(8));
+        preview.setBackground(round(palette[0], Color.TRANSPARENT, Math.max(8, themeRadius(index) - 4)));
 
-        int[] swatchColors = {palette[0], palette[1], palette[6], Color.WHITE};
-        for (int i = 0; i < swatchColors.length; i++) {
-            View swatch = new View(this);
-            swatch.setBackground(round(
-                    swatchColors[i],
-                    Color.TRANSPARENT,
-                    999
-            ));
-            LinearLayout.LayoutParams swatchParams = new LinearLayout.LayoutParams(dp(23), dp(23));
-            if (i > 0) swatchParams.setMargins(dp(-4), 0, 0, 0);
-            swatches.addView(swatch, swatchParams);
-        }
-        card.addView(swatches);
+        View accentBar = new View(this);
+        accentBar.setBackground(round(palette[6], Color.TRANSPARENT, 999));
+        preview.addView(accentBar, new LinearLayout.LayoutParams(dp(52), dp(6)));
 
-        TextView title = text(THEME_NAMES[index], 12, palette[6]);
-        title.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
-        title.setPadding(0, dp(10), 0, 0);
+        LinearLayout previewRow = new LinearLayout(this);
+        previewRow.setGravity(Gravity.CENTER_VERTICAL);
+        View block1 = new View(this);
+        block1.setBackground(round(palette[1], Color.TRANSPARENT, themeControlRadius(index)));
+        LinearLayout.LayoutParams b1 = new LinearLayout.LayoutParams(0, dp(24), 1f);
+        b1.setMargins(0, dp(7), dp(5), 0);
+        previewRow.addView(block1, b1);
+
+        View block2 = new View(this);
+        block2.setBackground(round(palette[6], Color.TRANSPARENT, 999));
+        LinearLayout.LayoutParams b2 = new LinearLayout.LayoutParams(dp(32), dp(10));
+        b2.setMargins(0, dp(7), 0, 0);
+        previewRow.addView(block2, b2);
+        preview.addView(previewRow);
+
+        View footerLine = new View(this);
+        footerLine.setBackground(round(palette[3], Color.TRANSPARENT, 999));
+        LinearLayout.LayoutParams footerParams = new LinearLayout.LayoutParams(dp(70), dp(3));
+        footerParams.setMargins(0, dp(7), 0, 0);
+        preview.addView(footerLine, footerParams);
+
+        card.addView(preview, new LinearLayout.LayoutParams(-1, dp(54)));
+
+        TextView tag = text(THEME_TAGS[index], 8, palette[6]);
+        tag.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
+        tag.setLetterSpacing(0.13f);
+        tag.setPadding(0, dp(9), 0, 0);
+        card.addView(tag);
+
+        TextView title = text(THEME_NAMES[index], 13, palette[4]);
+        title.setTypeface(Typeface.DEFAULT_BOLD);
+        title.setPadding(0, dp(2), 0, 0);
         card.addView(title);
 
-        TextView status = text(
-                selected ? "Selected  ✓" : "Tap to apply",
-                8,
-                selected ? palette[4] : palette[5]
+        TextView description = text(THEME_DESCRIPTIONS[index], 8, palette[5]);
+        description.setMaxLines(2);
+        description.setPadding(0, dp(3), 0, 0);
+        card.addView(description);
+
+        TextView selectedText = text(
+                selected ? "ACTIVE  ✓" : "TAP TO APPLY",
+                7,
+                selected ? palette[6] : palette[5]
         );
-        status.setPadding(0, dp(3), 0, 0);
-        card.addView(status);
+        selectedText.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
+        selectedText.setLetterSpacing(0.08f);
+        selectedText.setPadding(0, dp(5), 0, 0);
+        card.addView(selectedText);
 
         card.setOnClickListener(v -> {
             tap(v);
@@ -1005,6 +1124,26 @@ public class MainActivity extends Activity {
         });
 
         return card;
+    }
+
+    private int themeRadius(int index) {
+        switch (index) {
+            case 1: return 21;
+            case 2: return 16;
+            case 3: return 27;
+            case 4: return 15;
+            default: return 24;
+        }
+    }
+
+    private int themeControlRadius(int index) {
+        switch (index) {
+            case 1: return 13;
+            case 2: return 8;
+            case 3: return 16;
+            case 4: return 7;
+            default: return 14;
+        }
     }
 
     private void showEditProfile() {
@@ -1096,7 +1235,7 @@ public class MainActivity extends Activity {
                     SURFACE,
                     ACCENT_BG,
                     ACCENT,
-                    24,
+                    CARD_RADIUS,
                     GradientDrawable.Orientation.TL_BR
             ));
             heroLabel.setText("HAPPENING NOW");
@@ -1240,10 +1379,11 @@ public class MainActivity extends Activity {
                     Typeface.create("sans-serif-medium",
                             selected ? Typeface.BOLD : Typeface.NORMAL)
             );
-            chip.setBackground(round(
-                    selected ? TEXT : SURFACE,
-                    Color.TRANSPARENT,
-                    16
+            chip.setBackground(ripple(
+                    selected ? ACCENT_BG : SURFACE,
+                    blend(ACCENT_BG, BG, 0.30f),
+                    selected ? ACCENT : Color.TRANSPARENT,
+                    SMALL_RADIUS
             ));
 
             chip.setOnClickListener(v -> {
@@ -1266,7 +1406,7 @@ public class MainActivity extends Activity {
                 selected ? ACCENT_BG : SURFACE,
                 blend(ACCENT_BG, BG, 0.35f),
                 selected ? ACCENT : Color.TRANSPARENT,
-                18
+                SMALL_RADIUS
         ));
         chip.setClickable(true);
         chip.setFocusable(true);
@@ -1299,11 +1439,14 @@ public class MainActivity extends Activity {
 
         View dot = new View(this);
         dot.setBackground(round(
-                isCurrent ? ACCENT : (isDone ? BORDER : ACCENT),
+                isCurrent ? ACCENT : (isDone ? BORDER : ACCENT_2),
                 Color.TRANSPARENT,
                 999
         ));
-        LinearLayout.LayoutParams dotParams = new LinearLayout.LayoutParams(dp(isCurrent ? 10 : 7), dp(isCurrent ? 10 : 7));
+        LinearLayout.LayoutParams dotParams = new LinearLayout.LayoutParams(
+                dp(isCurrent ? 10 : 7),
+                dp(isCurrent ? 10 : 7)
+        );
         dotParams.setMargins(0, dp(7), 0, dp(6));
         timeline.addView(dot, dotParams);
 
@@ -1311,7 +1454,8 @@ public class MainActivity extends Activity {
         line.setBackground(round(BORDER, Color.TRANSPARENT, 999));
         timeline.addView(line, new LinearLayout.LayoutParams(dp(2), dp(44)));
 
-        LinearLayout.LayoutParams timelineParams = new LinearLayout.LayoutParams(dp(64), -1);
+        LinearLayout.LayoutParams timelineParams =
+                new LinearLayout.LayoutParams(dp(64), -1);
         timelineParams.setMargins(0, 0, dp(8), 0);
         outer.addView(timeline, timelineParams);
 
@@ -1323,19 +1467,21 @@ public class MainActivity extends Activity {
                 isCurrent ? ACCENT_BG : SURFACE,
                 isCurrent ? blend(ACCENT_BG, SURFACE, 0.60f) : SURFACE_2,
                 isCurrent ? ACCENT : Color.TRANSPARENT,
-                19,
+                CARD_RADIUS,
                 GradientDrawable.Orientation.LEFT_RIGHT
         ));
-        card.setElevation(isCurrent ? dp(6) : dp(2));
+        card.setElevation(isCurrent ? dp(CARD_ELEVATION + 1) : dp(Math.max(1, CARD_ELEVATION - 2)));
 
         LinearLayout main = new LinearLayout(this);
         main.setOrientation(LinearLayout.VERTICAL);
 
         TextView subject = text(item.subject, 13, isDone ? MUTED : TEXT);
         subject.setTypeface(Typeface.DEFAULT_BOLD);
+        subject.setMaxLines(2);
         main.addView(subject);
 
         TextView details = text(detailsFor(item), 9, MUTED);
+        details.setMaxLines(2);
         details.setPadding(0, dp(4), 0, 0);
         main.addView(details);
 
@@ -1373,7 +1519,7 @@ public class MainActivity extends Activity {
         }
 
         LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(0, -2, 1f);
-        cardParams.setMargins(0, 0, 0, dp(8));
+        cardParams.setMargins(0, 0, 0, dp(9));
         outer.addView(card, cardParams);
 
         outer.setAlpha(isDone ? 0.50f : 1f);
@@ -1381,29 +1527,68 @@ public class MainActivity extends Activity {
     }
 
     private LinearLayout breakRow(TimetableData.ClassItem item) {
+        boolean lunch = item.kind == TimetableData.Kind.LUNCH;
+        int accent = lunch ? ACCENT_2 : ACCENT;
+        int fill = blend(BG, accent, themeIndex == 4 ? 0.10f : 0.08f);
+
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setPadding(dp(5), dp(5), dp(5), dp(5));
+        row.setPadding(dp(11), dp(8), dp(12), dp(8));
+        row.setBackground(round(fill, Color.TRANSPARENT, SMALL_RADIUS));
 
-        TextView dash = text("—", 13, MUTED);
-        row.addView(dash, new LinearLayout.LayoutParams(dp(34), -2));
+        ImageView icon = new ImageView(this);
+        icon.setImageResource(lunch ? R.drawable.ic_lunch : R.drawable.ic_coffee);
+        icon.setColorFilter(accent);
+        icon.setPadding(dp(7), dp(7), dp(7), dp(7));
+        icon.setBackground(round(
+                blend(ACCENT_BG, accent, 0.20f),
+                Color.TRANSPARENT,
+                SMALL_RADIUS
+        ));
+        row.addView(icon, new LinearLayout.LayoutParams(dp(38), dp(38)));
 
-        TextView time = text(
-                formatTime(item.start) + " – " + formatTime(item.end),
+        LinearLayout copy = new LinearLayout(this);
+        copy.setOrientation(LinearLayout.VERTICAL);
+        copy.setPadding(dp(10), 0, 0, 0);
+
+        TextView title = text(
+                lunch ? "LUNCH BREAK" : "SHORT BREAK",
+                10,
+                accent
+        );
+        title.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
+        title.setLetterSpacing(0.08f);
+        copy.addView(title);
+
+        int minutes = (toSeconds(item.end) - toSeconds(item.start)) / 60;
+        TextView info = text(
+                formatTime(item.start) + "  →  " + formatTime(item.end) +
+                        "  •  " + minutes + " min",
                 9,
                 MUTED
         );
-        row.addView(time, new LinearLayout.LayoutParams(dp(122), -2));
+        info.setPadding(0, dp(3), 0, 0);
+        copy.addView(info);
 
-        TextView label = text(item.subject, 10, MUTED);
-        label.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
-        row.addView(label);
+        LinearLayout.LayoutParams copyParams = new LinearLayout.LayoutParams(0, -2, 1f);
+        row.addView(copy, copyParams);
 
-        LinearLayout.LayoutParams params =
-                new LinearLayout.LayoutParams(-1, -2);
-        params.setMargins(0, 0, 0, dp(5));
-        row.setLayoutParams(params);
+        TextView badge = text(lunch ? "MEAL" : "RECHARGE", 7, accent);
+        badge.setGravity(Gravity.CENTER);
+        badge.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
+        badge.setLetterSpacing(0.07f);
+        badge.setPadding(dp(7), dp(6), dp(7), dp(6));
+        badge.setBackground(round(
+                blend(ACCENT_BG, accent, 0.16f),
+                Color.TRANSPARENT,
+                999
+        ));
+        row.addView(badge);
+
+        LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(-1, -2);
+        rowParams.setMargins(0, 0, 0, dp(8));
+        row.setLayoutParams(rowParams);
         return row;
     }
 
@@ -1710,22 +1895,25 @@ public class MainActivity extends Activity {
     private LinearLayout.LayoutParams contactParams() {
         LinearLayout.LayoutParams params =
                 new LinearLayout.LayoutParams(-1, dp(62));
-        params.setMargins(0, 0, 0, dp(8));
+        params.height = dp(Math.max(64, CONTROL_HEIGHT + 16));
+        params.setMargins(0, 0, 0, dp(9));
         return params;
     }
 
     private TextView actionButton(String label, boolean primary) {
-        TextView button = text(
-                label,
-                11,
-                primary ? BG : TEXT
-        );
+        int fill = primary ? ACCENT : SURFACE_2;
+        int textColor = primary ? BG : TEXT;
+
+        TextView button = text(label, 10, textColor);
         button.setGravity(Gravity.CENTER);
         button.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
-        button.setBackground(round(
-                primary ? ACCENT : SURFACE_2,
-                Color.TRANSPARENT,
-                14
+        button.setLetterSpacing(0.05f);
+        button.setMinHeight(dp(CONTROL_HEIGHT));
+        button.setBackground(ripple(
+                fill,
+                blend(fill, BG, 0.28f),
+                primary ? ACCENT : BORDER,
+                BUTTON_RADIUS
         ));
         button.setClickable(true);
         button.setFocusable(true);
@@ -1960,6 +2148,12 @@ public class MainActivity extends Activity {
                 Math.round(ab + (bb - ab) * amount)
         );
     }
+
+
+    private int CARD_RADIUS() { return CARD_RADIUS; }
+    private int BUTTON_RADIUS() { return BUTTON_RADIUS; }
+    private int PILL_RADIUS() { return 999; }
+    private int CONTROL_HEIGHT_DP() { return CONTROL_HEIGHT; }
 
     private int dp(int value) {
         return Math.round(value * getResources().getDisplayMetrics().density);
