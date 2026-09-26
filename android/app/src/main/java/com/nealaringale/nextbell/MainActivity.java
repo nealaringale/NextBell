@@ -21,6 +21,7 @@ import android.view.Window;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.HorizontalScrollView;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -821,35 +822,37 @@ public class MainActivity extends Activity {
         contactHint.setPadding(0, dp(5), 0, dp(12));
         aboutText.addView(contactHint);
 
-        LinearLayout feedbackRow = new LinearLayout(this);
-        feedbackRow.setOrientation(LinearLayout.HORIZONTAL);
-        feedbackRow.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout feedback = new LinearLayout(this);
+        feedback.setOrientation(LinearLayout.VERTICAL);
 
-        TextView whatsappButton = contactButton(
+        LinearLayout whatsappButton = contactButton(
+                R.drawable.ic_whatsapp,
                 "WhatsApp",
-                "7499517574",
-                ACCENT_BG,
-                ACCENT
+                "Chat with Neal",
+                "7499517574"
         );
-        feedbackRow.addView(
-                whatsappButton,
-                new LinearLayout.LayoutParams(0, dp(48), 1f)
-        );
+        feedback.addView(whatsappButton, contactParams());
         whatsappButton.setOnClickListener(v -> openWhatsApp());
 
-        TextView emailButton = contactButton(
+        LinearLayout emailButton = contactButton(
+                R.drawable.ic_gmail,
                 "Gmail",
-                "nealaringale@gmail.com",
-                SURFACE_2,
-                TEXT
+                "Email for feedback & bugs",
+                "nealaringale@gmail.com"
         );
-        LinearLayout.LayoutParams emailButtonParams =
-                new LinearLayout.LayoutParams(0, dp(48), 1f);
-        emailButtonParams.setMargins(dp(8), 0, 0, 0);
-        feedbackRow.addView(emailButton, emailButtonParams);
+        feedback.addView(emailButton, contactParams());
         emailButton.setOnClickListener(v -> openEmail());
 
-        aboutText.addView(feedbackRow);
+        LinearLayout callButton = contactButton(
+                R.drawable.ic_call,
+                "Call",
+                "Call Neal directly",
+                "7499517574"
+        );
+        feedback.addView(callButton, contactParams());
+        callButton.setOnClickListener(v -> openCall());
+
+        aboutText.addView(feedback);
 
         aboutCard.addView(aboutText);
         page.addView(aboutCard, cardMargin());
@@ -1437,6 +1440,16 @@ public class MainActivity extends Activity {
         }
     }
 
+    private void openCall() {
+        Intent intent = new Intent(Intent.ACTION_DIAL);
+        intent.setData(Uri.parse("tel:7499517574"));
+        try {
+            startActivity(intent);
+        } catch (Exception ignored) {
+            // No dialer available; keep the screen unchanged.
+        }
+    }
+
     private void openEmail() {
         Uri uri = Uri.parse(
                 "mailto:nealaringale@gmail.com?subject=" +
@@ -1479,21 +1492,58 @@ public class MainActivity extends Activity {
         return chip;
     }
 
-    private TextView contactButton(
-            String label,
-            String detail,
-            int fill,
-            int textColor
+    private LinearLayout contactButton(
+            int iconRes,
+            String title,
+            String subtitle,
+            String detail
     ) {
-        TextView button = text(label + "\n" + detail, 10, textColor);
+        LinearLayout button = new LinearLayout(this);
+        button.setOrientation(LinearLayout.HORIZONTAL);
         button.setGravity(Gravity.CENTER_VERTICAL);
-        button.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
-        button.setPadding(dp(14), 0, dp(10), 0);
-        button.setBackground(round(fill, Color.TRANSPARENT, 15));
+        button.setPadding(dp(12), dp(10), dp(14), dp(10));
+        button.setBackground(round(SURFACE_2, BORDER, 16));
         button.setClickable(true);
         button.setFocusable(true);
-        button.setContentDescription(label + " contact: " + detail);
+        button.setContentDescription(title + ": " + detail);
+
+        ImageView icon = new ImageView(this);
+        icon.setImageResource(iconRes);
+        icon.setContentDescription(title + " logo");
+        button.addView(icon, new LinearLayout.LayoutParams(dp(32), dp(32)));
+
+        LinearLayout copy = new LinearLayout(this);
+        copy.setOrientation(LinearLayout.VERTICAL);
+
+        TextView titleText = text(title, 12, TEXT);
+        titleText.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
+        copy.addView(titleText);
+
+        TextView subtitleText = text(subtitle, 9, MUTED);
+        subtitleText.setPadding(0, dp(2), 0, 0);
+        copy.addView(subtitleText);
+
+        TextView detailText = text(detail, 9, SUBTLE);
+        detailText.setPadding(0, dp(2), 0, 0);
+        copy.addView(detailText);
+
+        LinearLayout.LayoutParams copyParams =
+                new LinearLayout.LayoutParams(0, -2, 1f);
+        copyParams.setMargins(dp(11), 0, 0, 0);
+        button.addView(copy, copyParams);
+
+        TextView arrow = text("›", 25, MUTED);
+        arrow.setGravity(Gravity.CENTER);
+        button.addView(arrow, new LinearLayout.LayoutParams(dp(22), dp(32)));
+
         return button;
+    }
+
+    private LinearLayout.LayoutParams contactParams() {
+        LinearLayout.LayoutParams params =
+                new LinearLayout.LayoutParams(-1, dp(62));
+        params.setMargins(0, 0, 0, dp(8));
+        return params;
     }
 
     private TextView actionButton(String label, boolean primary) {
