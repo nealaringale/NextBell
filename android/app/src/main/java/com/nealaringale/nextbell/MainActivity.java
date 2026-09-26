@@ -11,7 +11,6 @@ import android.os.Handler;
 import android.os.Looper;
 import android.text.InputType;
 import android.view.Gravity;
-import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.HorizontalScrollView;
@@ -77,6 +76,10 @@ public class MainActivity extends Activity {
         return preferences.getInt(KEY_ROLL_NUMBER, 34);
     }
 
+    private String getBatch() {
+        return TimetableData.batchForRoll(getRollNumber());
+    }
+
     private void saveRollNumber(int rollNumber) {
         preferences.edit().putInt(KEY_ROLL_NUMBER, rollNumber).apply();
     }
@@ -85,6 +88,10 @@ public class MainActivity extends Activity {
         selectedDay = todayNameOrMonday();
         buildUi();
         refreshSchedule();
+
+        if (refreshRunnable != null) {
+            handler.removeCallbacks(refreshRunnable);
+        }
 
         refreshRunnable = new Runnable() {
             @Override
@@ -111,8 +118,7 @@ public class MainActivity extends Activity {
         TextView mark = text("⌁", 34, TEXT);
         mark.setGravity(Gravity.CENTER);
         mark.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        LinearLayout.LayoutParams markParams = new LinearLayout.LayoutParams(-1, -2);
-        card.addView(mark, markParams);
+        card.addView(mark);
 
         TextView title = text("Welcome to NextBell", 25, TEXT);
         title.setGravity(Gravity.CENTER);
@@ -120,9 +126,9 @@ public class MainActivity extends Activity {
         title.setPadding(0, dp(8), 0, 0);
         card.addView(title);
 
-        TextView subtitle = text("Let's personalize your timetable.", 13, MUTED);
+        TextView subtitle = text("Enter your roll number and we'll build your personal timetable.", 13, MUTED);
         subtitle.setGravity(Gravity.CENTER);
-        subtitle.setPadding(0, dp(7), 0, dp(22));
+        subtitle.setPadding(0, dp(7), 0, dp(20));
         card.addView(subtitle);
 
         TextView label = text("ROLL NUMBER", 10, MUTED);
@@ -140,13 +146,13 @@ public class MainActivity extends Activity {
         rollInput.setPadding(dp(14), dp(10), dp(14), dp(10));
         rollInput.setBackground(round(SURFACE_2, BORDER, 12));
         LinearLayout.LayoutParams inputParams = new LinearLayout.LayoutParams(-1, dp(52));
-        inputParams.setMargins(0, dp(8), 0, dp(14));
+        inputParams.setMargins(0, dp(8), 0, dp(12));
         card.addView(rollInput, inputParams);
 
-        TextView note = text("We'll remember this on this phone. You can change it anytime from ⚙ Settings.", 11, SUBTLE);
-        note.setGravity(Gravity.CENTER);
-        note.setPadding(0, 0, 0, dp(17));
-        card.addView(note);
+        TextView batchHint = text("B1: 1–25  ·  B2: 26–50  ·  B3: 51 onwards", 10, SUBTLE);
+        batchHint.setGravity(Gravity.CENTER);
+        batchHint.setPadding(0, 0, 0, dp(17));
+        card.addView(batchHint);
 
         Button continueButton = new Button(this);
         continueButton.setText("Continue");
@@ -195,13 +201,13 @@ public class MainActivity extends Activity {
         brand.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         headerText.addView(brand);
 
-        TextView subtitle = text("NMIET · FE 2026–27", 12, MUTED);
+        TextView subtitle = text("NMIET · FE Div B · 2026–27", 11, MUTED);
         subtitle.setPadding(0, dp(3), 0, 0);
         headerText.addView(subtitle);
 
         header.addView(headerText, headerTextParams);
 
-        profileChip = text("B · B2\nRoll " + getRollNumber(), 11, MUTED);
+        profileChip = text("Div B · " + getBatch() + "\nRoll " + getRollNumber(), 10, MUTED);
         profileChip.setGravity(Gravity.CENTER);
         profileChip.setPadding(dp(10), dp(7), dp(10), dp(7));
         profileChip.setBackground(round(SURFACE_2, BORDER, 999));
@@ -209,12 +215,12 @@ public class MainActivity extends Activity {
 
         TextView settingsButton = text("⚙", 22, TEXT);
         settingsButton.setGravity(Gravity.CENTER);
-        settingsButton.setPadding(dp(10), dp(8), dp(6), dp(8));
+        settingsButton.setPadding(dp(9), dp(8), dp(6), dp(8));
         settingsButton.setContentDescription("Settings");
         settingsButton.setClickable(true);
         settingsButton.setFocusable(true);
         settingsButton.setOnClickListener(v -> showRollSettings());
-        header.addView(settingsButton, new LinearLayout.LayoutParams(dp(52), dp(52)));
+        header.addView(settingsButton, new LinearLayout.LayoutParams(dp(50), dp(50)));
 
         root.addView(header);
 
@@ -283,13 +289,13 @@ public class MainActivity extends Activity {
         LinearLayout statC = statBlock();
 
         dayPulse = statValue(statA, "—");
-        addStatLabel(statA, "classes today");
+        addStatLabel(statA, "scheduled");
 
         completedText = statValue(statB, "—");
         addStatLabel(statB, "completed");
 
         freePeriodsText = statValue(statC, "—");
-        addStatLabel(statC, "free periods");
+        addStatLabel(statC, "open gaps");
 
         pulse.addView(statA, new LinearLayout.LayoutParams(0, -2, 1f));
         pulse.addView(statB, new LinearLayout.LayoutParams(0, -2, 1f));
@@ -321,13 +327,11 @@ public class MainActivity extends Activity {
         input.setText(String.valueOf(getRollNumber()));
         input.setSelectAllOnFocus(true);
         input.setTextSize(17);
-
-        int padding = dp(6);
-        input.setPadding(padding, 0, padding, 0);
+        input.setPadding(dp(6), 0, dp(6), 0);
 
         AlertDialog dialog = new AlertDialog.Builder(this)
                 .setTitle("Profile settings")
-                .setMessage("Change your roll number for this phone.")
+                .setMessage("Roll number controls your B1/B2/B3 timetable and roll-range tutorials.\n\nB1: 1–25\nB2: 26–50\nB3: 51 onwards")
                 .setView(input)
                 .setNegativeButton("Cancel", null)
                 .setPositiveButton("Save", null)
@@ -342,9 +346,8 @@ public class MainActivity extends Activity {
                 }
 
                 saveRollNumber(roll);
-                if (profileChip != null) {
-                    profileChip.setText("B · B2\nRoll " + roll);
-                }
+                profileChip.setText("Div B · " + getBatch() + "\nRoll " + roll);
+                refreshSchedule();
                 dialog.dismiss();
             } catch (NumberFormatException e) {
                 input.setError("Enter your roll number.");
@@ -355,64 +358,139 @@ public class MainActivity extends Activity {
     }
 
     private void refreshSchedule() {
-        List<TimetableData.ClassItem> classes = TimetableData.forDay(selectedDay);
-        int nowMinutes = nowMinutes();
+        int rollNumber = getRollNumber();
+        String batch = TimetableData.batchForRoll(rollNumber);
+        List<TimetableData.ClassItem> entries =
+                TimetableData.forRollAndDay(rollNumber, selectedDay);
+
+        boolean viewingToday = selectedDay.equals(todayName());
+        int nowMinutes = viewingToday ? nowMinutes() : 0;
 
         TimetableData.ClassItem current = null;
         TimetableData.ClassItem next = null;
         int completed = 0;
+        int scheduled = 0;
 
-        for (TimetableData.ClassItem item : classes) {
+        for (TimetableData.ClassItem item : entries) {
+            if (!item.isBreak()) {
+                scheduled++;
+            }
+
             int start = toMinutes(item.start);
             int end = toMinutes(item.end);
-            if (end <= nowMinutes) completed++;
-            if (start <= nowMinutes && nowMinutes < end) {
-                current = item;
-            } else if (start > nowMinutes && next == null) {
-                next = item;
+
+            if (viewingToday && item.isAcademic() && end <= nowMinutes) {
+                completed++;
+            }
+
+            if (item.isAcademic()) {
+                if (viewingToday && start <= nowMinutes && nowMinutes < end) {
+                    current = item;
+                } else if ((!viewingToday || start > nowMinutes) && next == null) {
+                    next = item;
+                }
             }
         }
 
         TimetableData.ClassItem focus = current != null ? current : next;
+
         if (focus == null) {
             focusLabel.setText("DAY COMPLETE");
-            focusSubject.setText("You’re done for today 🎉");
-            focusMeta.setText("No more scheduled classes.");
+            focusSubject.setText("Nothing else scheduled 🎉");
+            focusMeta.setText(selectedDay + " · " + batch);
             focusMinutes.setText("");
         } else {
-            focusLabel.setText(current != null ? "HAPPENING NOW" : "NEXT CLASS");
+            boolean focusIsCurrent = current != null;
+            focusLabel.setText(focusIsCurrent ? "HAPPENING NOW" : "NEXT UP");
             focusSubject.setText(focus.subject);
-            String batch = focus.batch.isEmpty() ? "" : " · " + focus.batch;
-            focusMeta.setText(formatTime(focus.start) + " – " + formatTime(focus.end)
-                    + "  ·  " + focus.room + "  ·  " + focus.type + batch);
 
-            int remaining = current != null
+            String teacher = focus.teacher.isEmpty() ? "" : "  ·  " + focus.teacher;
+            String room = focus.room.isEmpty() ? "" : "  ·  " + focus.room;
+            String batchText = focus.batch.isEmpty() ? "" : "  ·  " + focus.batch;
+
+            focusMeta.setText(
+                    formatTime(focus.start) + " – " + formatTime(focus.end)
+                            + room + batchText + teacher
+            );
+
+            int remaining = focusIsCurrent
                     ? Math.max(0, toMinutes(focus.end) - nowMinutes)
                     : Math.max(0, toMinutes(focus.start) - nowMinutes);
             focusMinutes.setText(remaining + " min");
         }
 
-        dayPulse.setText(String.valueOf(classes.size()));
-        completedText.setText(completed + "/" + classes.size());
-        freePeriodsText.setText(String.valueOf(calculateFreePeriods(classes)));
+        dayPulse.setText(String.valueOf(scheduled));
+        completedText.setText(viewingToday ? completed + "/" + scheduled : "—");
+        freePeriodsText.setText(String.valueOf(calculateOpenGaps(entries)));
 
         scheduleContainer.removeAllViews();
-        for (TimetableData.ClassItem item : classes) {
+        for (TimetableData.ClassItem item : entries) {
             boolean isCurrent = current != null && current.id.equals(item.id);
             boolean isNext = current == null && next != null && next.id.equals(item.id);
-            boolean isDone = toMinutes(item.end) <= nowMinutes;
-            scheduleContainer.addView(classCard(item, isCurrent, isNext, isDone));
+            boolean isDone = viewingToday && item.isAcademic() && toMinutes(item.end) <= nowMinutes;
+
+            scheduleContainer.addView(
+                    item.isBreak()
+                            ? breakCard(item)
+                            : classCard(item, isCurrent, isNext, isDone)
+            );
         }
     }
 
-    private View classCard(TimetableData.ClassItem item, boolean isCurrent, boolean isNext, boolean isDone) {
+    private int calculateOpenGaps(List<TimetableData.ClassItem> entries) {
+        int result = 0;
+        TimetableData.ClassItem previousAcademic = null;
+
+        for (TimetableData.ClassItem item : entries) {
+            if (!item.isAcademic()) continue;
+
+            if (previousAcademic != null) {
+                int gap = toMinutes(item.start) - toMinutes(previousAcademic.end);
+                if (gap >= 30) result++;
+            }
+            previousAcademic = item;
+        }
+        return result;
+    }
+
+    private LinearLayout breakCard(TimetableData.ClassItem item) {
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.HORIZONTAL);
+        card.setGravity(Gravity.CENTER_VERTICAL);
+        card.setPadding(dp(15), dp(10), dp(15), dp(10));
+        card.setBackground(round(Color.rgb(15, 18, 24), Color.rgb(31, 36, 44), 13));
+
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
+        params.setMargins(0, 0, 0, dp(7));
+        card.setLayoutParams(params);
+
+        TextView time = text(formatTime(item.start) + " – " + formatTime(item.end), 10, SUBTLE);
+        card.addView(time, new LinearLayout.LayoutParams(dp(132), -2));
+
+        TextView label = text(item.subject, 10, SUBTLE);
+        label.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        card.addView(label);
+
+        return card;
+    }
+
+    private LinearLayout classCard(
+            TimetableData.ClassItem item,
+            boolean isCurrent,
+            boolean isNext,
+            boolean isDone
+    ) {
         LinearLayout card = new LinearLayout(this);
         card.setOrientation(LinearLayout.HORIZONTAL);
         card.setGravity(Gravity.CENTER_VERTICAL);
         card.setPadding(dp(13), dp(13), dp(13), dp(13));
 
         int cardColor = (isCurrent || isNext) ? SURFACE_2 : SURFACE;
-        card.setBackground(round(cardColor, (isCurrent || isNext) ? TEXT : BORDER, 15));
+        card.setBackground(round(
+                cardColor,
+                (isCurrent || isNext) ? TEXT : BORDER,
+                15
+        ));
 
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
         params.setMargins(0, 0, 0, dp(9));
@@ -420,13 +498,14 @@ public class MainActivity extends Activity {
 
         TextView time = text(formatTime(item.start), 12, isDone ? SUBTLE : TEXT);
         time.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        LinearLayout.LayoutParams timeParams = new LinearLayout.LayoutParams(dp(70), -2);
-        card.addView(time, timeParams);
+        card.addView(time, new LinearLayout.LayoutParams(dp(70), -2));
 
-        TextView type = text(typeLetter(item.type), 10, TEXT);
+        String typeLetter = typeLetter(item);
+        TextView type = text(typeLetter, 10, TEXT);
         type.setGravity(Gravity.CENTER);
         type.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         type.setBackground(round(Color.rgb(36, 41, 50), Color.TRANSPARENT, 8));
+
         LinearLayout.LayoutParams typeParams = new LinearLayout.LayoutParams(dp(30), dp(30));
         typeParams.setMargins(0, 0, dp(10), 0);
         card.addView(type, typeParams);
@@ -438,17 +517,31 @@ public class MainActivity extends Activity {
         subject.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         main.addView(subject);
 
-        String batch = item.batch.isEmpty() ? "" : " · " + item.batch;
-        TextView details = text(item.teacher + " · " + item.type + batch, 10, SUBTLE);
+        StringBuilder detailsText = new StringBuilder();
+        if (!item.code.isEmpty()) {
+            detailsText.append(item.code);
+        }
+        if (!item.teacher.isEmpty()) {
+            if (detailsText.length() > 0) detailsText.append(" · ");
+            detailsText.append(item.teacher);
+        }
+        if (!item.batch.isEmpty()) {
+            if (detailsText.length() > 0) detailsText.append(" · ");
+            detailsText.append(item.batch);
+        }
+
+        TextView details = text(detailsText.toString(), 10, SUBTLE);
         details.setPadding(0, dp(4), 0, 0);
         main.addView(details);
 
         LinearLayout.LayoutParams mainParams = new LinearLayout.LayoutParams(0, -2, 1f);
         card.addView(main, mainParams);
 
-        TextView room = text("⌖ " + item.room, 10, MUTED);
-        room.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
-        card.addView(room, new LinearLayout.LayoutParams(dp(65), -2));
+        if (!item.room.isEmpty()) {
+            TextView room = text("⌖ " + item.room, 10, MUTED);
+            room.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
+            card.addView(room, new LinearLayout.LayoutParams(dp(75), -2));
+        }
 
         if (isCurrent || isNext) {
             TextView badge = text(isCurrent ? "NOW" : "NEXT", 9, TEXT);
@@ -465,13 +558,34 @@ public class MainActivity extends Activity {
         return card;
     }
 
+    private String typeLetter(TimetableData.ClassItem item) {
+        switch (item.kind) {
+            case PRACTICAL:
+                return "P";
+            case TUTORIAL:
+                return "T";
+            case LIBRARY:
+                return "L";
+            case SELF_LEARNING:
+                return "S";
+            case SPECIAL:
+                return "X";
+            default:
+                return "L";
+        }
+    }
+
     private void highlightDayButtons(LinearLayout dayRow) {
         for (int i = 0; i < dayRow.getChildCount(); i++) {
             TextView button = (TextView) dayRow.getChildAt(i);
             String day = TimetableData.DAYS[i];
             boolean selected = day.equals(selectedDay);
             button.setTextColor(selected ? BG : MUTED);
-            button.setBackground(round(selected ? TEXT : SURFACE_2, selected ? TEXT : BORDER, 999));
+            button.setBackground(round(
+                    selected ? TEXT : SURFACE_2,
+                    selected ? TEXT : BORDER,
+                    999
+            ));
         }
     }
 
@@ -528,22 +642,7 @@ public class MainActivity extends Activity {
         return hour + ":" + String.format("%02d", t.getMinute()) + " " + suffix;
     }
 
-    private int calculateFreePeriods(List<TimetableData.ClassItem> classes) {
-        int result = 0;
-        for (int i = 1; i < classes.size(); i++) {
-            int gap = toMinutes(classes.get(i).start) - toMinutes(classes.get(i - 1).end);
-            if (gap >= 45) result++;
-        }
-        return result;
-    }
-
-    private String typeLetter(String type) {
-        if ("Practical".equals(type)) return "P";
-        if ("Tutorial".equals(type)) return "T";
-        return "L";
-    }
-
-    private String todayNameOrMonday() {
+    private String todayName() {
         DayOfWeek day = LocalDate.now(zone).getDayOfWeek();
         switch (day) {
             case MONDAY: return "Monday";
@@ -551,9 +650,13 @@ public class MainActivity extends Activity {
             case WEDNESDAY: return "Wednesday";
             case THURSDAY: return "Thursday";
             case FRIDAY: return "Friday";
-            case SATURDAY: return "Saturday";
-            default: return "Monday";
+            default: return "";
         }
+    }
+
+    private String todayNameOrMonday() {
+        String today = todayName();
+        return today.isEmpty() ? "Monday" : today;
     }
 
     private int dp(int value) {
