@@ -153,15 +153,33 @@ public class MainActivity extends Activity {
         title.setPadding(0, dp(8), 0, 0);
         card.addView(title);
 
-        TextView subtitle = text("Enter your roll number and we'll build your personal timetable.", 13, MUTED);
+        TextView subtitle = text("Tell us who you are and we'll build your personal timetable.", 13, MUTED);
         subtitle.setGravity(Gravity.CENTER);
         subtitle.setPadding(0, dp(7), 0, dp(20));
         card.addView(subtitle);
 
-        TextView label = text("ROLL NUMBER", 10, MUTED);
-        label.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        label.setLetterSpacing(0.12f);
-        card.addView(label);
+        TextView nameLabel = text("YOUR NAME", 10, MUTED);
+        nameLabel.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        nameLabel.setLetterSpacing(0.12f);
+        card.addView(nameLabel);
+
+        EditText nameInput = new EditText(this);
+        nameInput.setSingleLine(true);
+        nameInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_WORDS);
+        nameInput.setTextSize(17);
+        nameInput.setTextColor(TEXT);
+        nameInput.setHintTextColor(SUBTLE);
+        nameInput.setHint("e.g. Neal");
+        nameInput.setPadding(dp(14), dp(10), dp(14), dp(10));
+        nameInput.setBackground(round(SURFACE_2, BORDER, 12));
+        LinearLayout.LayoutParams nameParams = new LinearLayout.LayoutParams(-1, dp(52));
+        nameParams.setMargins(0, dp(8), 0, dp(12));
+        card.addView(nameInput, nameParams);
+
+        TextView rollLabel = text("ROLL NUMBER", 10, MUTED);
+        rollLabel.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        rollLabel.setLetterSpacing(0.12f);
+        card.addView(rollLabel);
 
         EditText rollInput = new EditText(this);
         rollInput.setSingleLine(true);
@@ -182,24 +200,31 @@ public class MainActivity extends Activity {
         card.addView(batchHint);
 
         Button continueButton = new Button(this);
-        continueButton.setText("Continue");
+        continueButton.setText("Let's go");
         continueButton.setTextSize(13);
         continueButton.setTextColor(BG);
         continueButton.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         continueButton.setAllCaps(false);
         continueButton.setBackground(round(TEXT, TEXT, 13));
-        LinearLayout.LayoutParams buttonParams = new LinearLayout.LayoutParams(-1, dp(50));
-        card.addView(continueButton, buttonParams);
+        card.addView(continueButton, new LinearLayout.LayoutParams(-1, dp(50)));
 
         continueButton.setOnClickListener(v -> {
+            String name = nameInput.getText().toString().trim();
             String raw = rollInput.getText().toString().trim();
+
+            if (name.isEmpty()) {
+                nameInput.setError("Enter your name.");
+                return;
+            }
+
             try {
                 int roll = Integer.parseInt(raw);
                 if (roll < 1 || roll > 999) {
                     rollInput.setError("Enter a valid roll number.");
                     return;
                 }
-                saveRollNumber(roll);
+
+                saveProfile(name, roll);
                 openApp();
             } catch (NumberFormatException e) {
                 rollInput.setError("Enter your roll number.");
