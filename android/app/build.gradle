@@ -22,33 +22,10 @@ android {
         targetCompatibility JavaVersion.VERSION_17
     }
 
-    signingConfigs {
-        stable {
-            def keystore = file("nextbell-upload.jks")
-            if (keystore.exists()) {
-                storeFile keystore
-                storePassword System.getenv("NEXTBELL_KEYSTORE_PASSWORD") ?: ""
-                keyAlias System.getenv("NEXTBELL_KEY_ALIAS") ?: ""
-                keyPassword System.getenv("NEXTBELL_KEY_PASSWORD") ?: ""
-            }
-        }
-    }
-
     buildTypes {
-        debug {
-            // GitHub Actions supplies the stable signing key. This keeps the
-            // package installable as an update across future APK builds.
-            if (file("nextbell-upload.jks").exists()) {
-                signingConfig signingConfigs.stable
-            }
-        }
-
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
-            if (file("nextbell-upload.jks").exists()) {
-                signingConfig signingConfigs.stable
-            }
         }
     }
 }
