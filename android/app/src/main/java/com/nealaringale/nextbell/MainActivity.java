@@ -15,6 +15,7 @@ import android.os.Looper;
 import android.text.InputType;
 import android.view.Gravity;
 import android.view.View;
+import android.view.Window;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.HorizontalScrollView;
@@ -34,6 +35,7 @@ public class MainActivity extends Activity {
     private static final String KEY_NAME = "name";
     private static final String KEY_ROLL_NUMBER = "roll_number";
     private static final String KEY_NOTIFICATION_PROMPTED = "notification_prompted";
+    private static final String KEY_THEME = "theme";
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("HH:mm");
@@ -43,8 +45,16 @@ public class MainActivity extends Activity {
 
     private SharedPreferences preferences;
 
+    private LinearLayout root;
     private LinearLayout scheduleContainer;
     private LinearLayout nextPanel;
+    private LinearLayout heroCard;
+    private LinearLayout statsCard;
+    private TextView greetingText;
+    private TextView profileChip;
+    private TextView liveDate;
+    private TextView liveClock;
+    private TextView dayTitle;
     private TextView focusLabel;
     private TextView focusSubject;
     private TextView focusMeta;
@@ -52,31 +62,43 @@ public class MainActivity extends Activity {
     private TextView nextSubject;
     private TextView nextMeta;
     private TextView nextCountdown;
-    private TextView liveDate;
-    private TextView liveClock;
     private TextView dayPulse;
     private TextView completedText;
     private TextView freePeriodsText;
-    private TextView profileChip;
-    private TextView greetingText;
+    private TextView themeButtonLabel;
 
     private String selectedDay;
     private boolean followToday = true;
+    private int themeIndex;
     private Runnable refreshRunnable;
 
-    private final int BG = Color.rgb(11, 13, 18);
-    private final int SURFACE = Color.rgb(18, 21, 28);
-    private final int SURFACE_2 = Color.rgb(23, 27, 35);
-    private final int BORDER = Color.rgb(42, 48, 58);
-    private final int TEXT = Color.rgb(245, 247, 251);
-    private final int MUTED = Color.rgb(146, 154, 170);
-    private final int SUBTLE = Color.rgb(110, 118, 134);
-    private final int ACCENT = Color.rgb(126, 231, 135);
+    private static final String[] THEME_NAMES = {
+            "Midnight", "Ocean", "Sakura", "Forest", "Solar"
+    };
+
+    private static final int[][] THEMES = {
+            {Color.rgb(10, 12, 17), Color.rgb(17, 20, 27), Color.rgb(24, 28, 37), Color.rgb(47, 53, 64), Color.rgb(245, 247, 251), Color.rgb(148, 157, 175), Color.rgb(112, 233, 130), Color.rgb(31, 58, 39)},
+            {Color.rgb(7, 13, 24), Color.rgb(12, 22, 37), Color.rgb(18, 32, 51), Color.rgb(34, 56, 78), Color.rgb(241, 248, 255), Color.rgb(151, 174, 201), Color.rgb(88, 201, 255), Color.rgb(17, 52, 72)},
+            {Color.rgb(20, 12, 20), Color.rgb(31, 18, 32), Color.rgb(43, 23, 44), Color.rgb(72, 39, 70), Color.rgb(255, 246, 252), Color.rgb(187, 158, 181), Color.rgb(255, 132, 193), Color.rgb(70, 31, 56)},
+            {Color.rgb(8, 16, 14), Color.rgb(13, 26, 22), Color.rgb(20, 38, 31), Color.rgb(41, 65, 52), Color.rgb(239, 251, 245), Color.rgb(153, 185, 170), Color.rgb(101, 220, 163), Color.rgb(24, 65, 47)},
+            {Color.rgb(18, 15, 10), Color.rgb(29, 23, 14), Color.rgb(42, 32, 17), Color.rgb(74, 55, 28), Color.rgb(255, 250, 238), Color.rgb(193, 177, 145), Color.rgb(255, 184, 77), Color.rgb(78, 53, 18)}
+    };
+
+    private int BG;
+    private int SURFACE;
+    private int SURFACE_2;
+    private int BORDER;
+    private int TEXT;
+    private int MUTED;
+    private int ACCENT;
+    private int ACCENT_BG;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         preferences = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        themeIndex = Math.max(0, Math.min(4, preferences.getInt(KEY_THEME, 0)));
+        applyTheme();
 
         if (!hasSavedProfile()) {
             showSetupScreen();
@@ -108,6 +130,25 @@ public class MainActivity extends Activity {
                 .apply();
     }
 
+    private void applyTheme() {
+        int[] palette = THEMES[themeIndex];
+        BG = palette[0];
+        SURFACE = palette[1];
+        SURFACE_2 = palette[2];
+        BORDER = palette[3];
+        TEXT = palette[4];
+        MUTED = palette[5];
+        ACCENT = palette[6];
+        ACCENT_BG = palette[7];
+
+        Window window = getWindow();
+        window.setStatusBarColor(BG);
+        window.setNavigationBarColor(BG);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            window.getDecorView().setSystemUiVisibility(0);
+        }
+    }
+
     private void openApp() {
         selectedDay = todayNameOrMonday();
         followToday = true;
@@ -131,82 +172,51 @@ public class MainActivity extends Activity {
     }
 
     private void showSetupScreen() {
-        LinearLayout root = new LinearLayout(this);
-        root.setOrientation(LinearLayout.VERTICAL);
-        root.setGravity(Gravity.CENTER);
-        root.setPadding(dp(28), dp(28), dp(28), dp(28));
-        root.setBackgroundColor(BG);
+        LinearLayout page = page();
 
-        LinearLayout card = new LinearLayout(this);
-        card.setOrientation(LinearLayout.VERTICAL);
-        card.setPadding(dp(24), dp(26), dp(24), dp(24));
-        card.setBackground(round(SURFACE, BORDER, 22));
+        TextView logo = text("NB", 28, TEXT);
+        logo.setGravity(Gravity.CENTER);
+        logo.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        logo.setBackground(round(ACCENT, ACCENT, 18));
+        LinearLayout.LayoutParams logoParams = new LinearLayout.LayoutParams(dp(72), dp(72));
+        logoParams.gravity = Gravity.CENTER_HORIZONTAL;
+        page.addView(logo, logoParams);
 
-        TextView mark = text("⌁", 34, TEXT);
-        mark.setGravity(Gravity.CENTER);
-        mark.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        card.addView(mark);
-
-        TextView title = text("Welcome to NextBell", 25, TEXT);
+        TextView title = text("Welcome to NextBell", 28, TEXT);
         title.setGravity(Gravity.CENTER);
         title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        title.setPadding(0, dp(8), 0, 0);
-        card.addView(title);
+        title.setPadding(0, dp(16), 0, 0);
+        page.addView(title);
 
-        TextView subtitle = text("Tell us who you are and we'll build your personal timetable.", 13, MUTED);
+        TextView subtitle = text("Your college day, personalized around you.", 13, MUTED);
         subtitle.setGravity(Gravity.CENTER);
-        subtitle.setPadding(0, dp(7), 0, dp(20));
-        card.addView(subtitle);
+        subtitle.setPadding(0, dp(7), 0, dp(28));
+        page.addView(subtitle);
 
-        TextView nameLabel = text("YOUR NAME", 10, MUTED);
-        nameLabel.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        nameLabel.setLetterSpacing(0.12f);
+        LinearLayout card = card();
+        card.setPadding(dp(20), dp(20), dp(20), dp(20));
+
+        TextView nameLabel = sectionLabel("YOUR NAME");
         card.addView(nameLabel);
 
-        EditText nameInput = new EditText(this);
-        nameInput.setSingleLine(true);
-        nameInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_WORDS);
-        nameInput.setTextSize(17);
-        nameInput.setTextColor(TEXT);
-        nameInput.setHintTextColor(SUBTLE);
-        nameInput.setHint("e.g. Neal");
-        nameInput.setPadding(dp(14), dp(10), dp(14), dp(10));
-        nameInput.setBackground(round(SURFACE_2, BORDER, 12));
-        LinearLayout.LayoutParams nameParams = new LinearLayout.LayoutParams(-1, dp(52));
-        nameParams.setMargins(0, dp(8), 0, dp(12));
-        card.addView(nameInput, nameParams);
+        EditText nameInput = field("e.g. Neal", false);
+        card.addView(nameInput, fieldParams());
 
-        TextView rollLabel = text("ROLL NUMBER", 10, MUTED);
-        rollLabel.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        rollLabel.setLetterSpacing(0.12f);
-        card.addView(rollLabel);
+        TextView rollLabel = sectionLabel("ROLL NUMBER");
+        LinearLayout.LayoutParams rollLabelParams = new LinearLayout.LayoutParams(-1, -2);
+        rollLabelParams.setMargins(0, dp(18), 0, 0);
+        card.addView(rollLabel, rollLabelParams);
 
-        EditText rollInput = new EditText(this);
-        rollInput.setSingleLine(true);
-        rollInput.setInputType(InputType.TYPE_CLASS_NUMBER);
-        rollInput.setTextSize(17);
-        rollInput.setTextColor(TEXT);
-        rollInput.setHintTextColor(SUBTLE);
-        rollInput.setHint("e.g. 34");
-        rollInput.setPadding(dp(14), dp(10), dp(14), dp(10));
-        rollInput.setBackground(round(SURFACE_2, BORDER, 12));
-        LinearLayout.LayoutParams inputParams = new LinearLayout.LayoutParams(-1, dp(52));
-        inputParams.setMargins(0, dp(8), 0, dp(12));
-        card.addView(rollInput, inputParams);
+        EditText rollInput = field("e.g. 34", true);
+        card.addView(rollInput, fieldParams());
 
-        TextView batchHint = text("B1: 1–25  ·  B2: 26–50  ·  B3: 51 onwards", 10, SUBTLE);
+        TextView batchHint = text("B1 · 1–25    B2 · 26–50    B3 · 51+", 10, MUTED);
         batchHint.setGravity(Gravity.CENTER);
-        batchHint.setPadding(0, 0, 0, dp(17));
+        batchHint.setPadding(0, dp(8), 0, dp(18));
         card.addView(batchHint);
 
-        Button continueButton = new Button(this);
-        continueButton.setText("Let's go");
-        continueButton.setTextSize(13);
-        continueButton.setTextColor(BG);
-        continueButton.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        continueButton.setAllCaps(false);
-        continueButton.setBackground(round(TEXT, TEXT, 13));
-        card.addView(continueButton, new LinearLayout.LayoutParams(-1, dp(50)));
+        Button continueButton = primaryButton("Let's go");
+        card.addView(continueButton, new LinearLayout.LayoutParams(-1, dp(52)));
 
         continueButton.setOnClickListener(v -> {
             String name = nameInput.getText().toString().trim();
@@ -223,7 +233,6 @@ public class MainActivity extends Activity {
                     rollInput.setError("Enter a valid roll number.");
                     return;
                 }
-
                 saveProfile(name, roll);
                 openApp();
             } catch (NumberFormatException e) {
@@ -231,151 +240,154 @@ public class MainActivity extends Activity {
             }
         });
 
-        root.addView(card, new LinearLayout.LayoutParams(-1, -2));
-        setContentView(root);
+        LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(-1, -2);
+        cardParams.setMargins(0, dp(18), 0, 0);
+        page.addView(card, cardParams);
+
+        TextView privacy = text("Your profile is stored only on this phone.", 10, MUTED);
+        privacy.setGravity(Gravity.CENTER);
+        privacy.setPadding(0, dp(14), 0, 0);
+        page.addView(privacy);
+
+        setContentView(page);
     }
 
     private void buildUi() {
-        LinearLayout root = new LinearLayout(this);
+        root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(BG);
 
         LinearLayout header = new LinearLayout(this);
         header.setOrientation(LinearLayout.HORIZONTAL);
         header.setGravity(Gravity.CENTER_VERTICAL);
-        header.setPadding(dp(20), dp(18), dp(20), dp(8));
+        header.setPadding(dp(18), dp(16), dp(18), dp(8));
 
-        LinearLayout headerText = new LinearLayout(this);
-        headerText.setOrientation(LinearLayout.VERTICAL);
-        LinearLayout.LayoutParams headerTextParams = new LinearLayout.LayoutParams(0, -2, 1f);
+        LinearLayout identity = new LinearLayout(this);
+        identity.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout.LayoutParams identityParams = new LinearLayout.LayoutParams(0, -2, 1f);
 
-        TextView brand = text("NextBell", 24, TEXT);
+        TextView brand = text("NextBell", 23, TEXT);
         brand.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        headerText.addView(brand);
+        identity.addView(brand);
 
-        greetingText = text("Hi, " + getName() + " 👋", 12, TEXT);
+        greetingText = text("Hey, " + getName() + " 👋", 13, TEXT);
         greetingText.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        greetingText.setPadding(0, dp(4), 0, 0);
-        headerText.addView(greetingText);
+        greetingText.setPadding(0, dp(3), 0, 0);
+        identity.addView(greetingText);
 
-        TextView subtitle = text("NMIET · FE Div B · 2026–27", 10, MUTED);
-        subtitle.setPadding(0, dp(2), 0, 0);
-        headerText.addView(subtitle);
+        header.addView(identity, identityParams);
 
-        header.addView(headerText, headerTextParams);
-
-        LinearLayout liveInfo = new LinearLayout(this);
-        liveInfo.setOrientation(LinearLayout.VERTICAL);
-        liveInfo.setGravity(Gravity.END);
+        LinearLayout live = new LinearLayout(this);
+        live.setOrientation(LinearLayout.VERTICAL);
+        live.setGravity(Gravity.END);
 
         liveClock = text("--:--:-- --", 12, TEXT);
         liveClock.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        liveInfo.addView(liveClock);
+        live.addView(liveClock);
 
-        liveDate = text("Loading date…", 9, MUTED);
+        liveDate = text("Loading…", 9, MUTED);
         liveDate.setGravity(Gravity.END);
         liveDate.setPadding(0, dp(2), 0, 0);
-        liveInfo.addView(liveDate);
+        live.addView(liveDate);
 
-        header.addView(liveInfo);
+        header.addView(live);
 
-        profileChip = text(getName() + "\n" + getBatch() + " · Roll " + getRollNumber(), 9, MUTED);
-        profileChip.setGravity(Gravity.CENTER);
-        profileChip.setPadding(dp(10), dp(7), dp(10), dp(7));
-        profileChip.setBackground(round(SURFACE_2, BORDER, 999));
-        LinearLayout.LayoutParams profileParams = new LinearLayout.LayoutParams(-2, -2);
-        profileParams.setMargins(dp(10), 0, 0, 0);
-        header.addView(profileChip, profileParams);
-
-        TextView settingsButton = text("⚙", 22, TEXT);
-        settingsButton.setGravity(Gravity.CENTER);
-        settingsButton.setPadding(dp(9), dp(8), dp(6), dp(8));
-        settingsButton.setContentDescription("Settings");
-        settingsButton.setClickable(true);
-        settingsButton.setFocusable(true);
-        settingsButton.setOnClickListener(v -> showRollSettings());
-        header.addView(settingsButton, new LinearLayout.LayoutParams(dp(50), dp(50)));
+        TextView settings = text("⚙", 23, TEXT);
+        settings.setGravity(Gravity.CENTER);
+        settings.setContentDescription("Settings");
+        settings.setClickable(true);
+        settings.setFocusable(true);
+        settings.setOnClickListener(v -> showSettings());
+        header.addView(settings, new LinearLayout.LayoutParams(dp(48), dp(48)));
 
         root.addView(header);
 
-        HorizontalScrollView daysScroll = new HorizontalScrollView(this);
-        daysScroll.setHorizontalScrollBarEnabled(false);
-        LinearLayout dayRow = new LinearLayout(this);
-        dayRow.setOrientation(LinearLayout.HORIZONTAL);
-        dayRow.setPadding(dp(16), dp(4), dp(16), dp(14));
+        profileChip = text(getBatch() + " · Roll " + getRollNumber(), 9, ACCENT);
+        profileChip.setGravity(Gravity.CENTER);
+        profileChip.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        profileChip.setPadding(dp(11), dp(7), dp(11), dp(7));
+        profileChip.setBackground(round(ACCENT_BG, ACCENT, 999));
+        LinearLayout.LayoutParams chipParams = new LinearLayout.LayoutParams(-2, -2);
+        chipParams.setMargins(dp(18), 0, dp(18), dp(10));
+        chipParams.gravity = Gravity.START;
+        root.addView(profileChip, chipParams);
+
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+
+        ScrollView scroll = new ScrollView(this);
+        scroll.setFillViewport(true);
+        content.setPadding(0, 0, 0, 0);
+
+        LinearLayout body = new LinearLayout(this);
+        body.setOrientation(LinearLayout.VERTICAL);
+        body.setPadding(dp(18), 0, dp(18), dp(24));
+
+        dayTitle = text(selectedDay.toUpperCase(), 11, MUTED);
+        dayTitle.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        dayTitle.setLetterSpacing(0.18f);
+        body.addView(dayTitle);
+
+        LinearLayout dayTabs = new LinearLayout(this);
+        dayTabs.setOrientation(LinearLayout.HORIZONTAL);
+        LinearLayout.LayoutParams dayTabsParams = new LinearLayout.LayoutParams(-1, -2);
+        dayTabsParams.setMargins(0, dp(9), 0, dp(14));
+        body.addView(dayTabs, dayTabsParams);
 
         for (String day : TimetableData.DAYS) {
-            TextView dayButton = text(day.substring(0, 3), 11, MUTED);
-            dayButton.setGravity(Gravity.CENTER);
-            dayButton.setPadding(dp(15), dp(9), dp(15), dp(9));
-            LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(-2, -2);
-            p.setMargins(0, 0, dp(7), 0);
-            dayRow.addView(dayButton, p);
-
-            dayButton.setOnClickListener(v -> {
+            TextView tab = text(day.substring(0, 3), 11, MUTED);
+            tab.setGravity(Gravity.CENTER);
+            tab.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+            tab.setPadding(dp(13), dp(9), dp(13), dp(9));
+            LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(0, dp(38), 1f);
+            p.setMargins(0, 0, dp(6), 0);
+            dayTabs.addView(tab, p);
+            tab.setOnClickListener(v -> {
                 selectedDay = day;
                 followToday = day.equals(todayName());
-                highlightDayButtons(dayRow);
+                highlightDayButtons(dayTabs);
+                updateDayHeader();
                 refreshSchedule();
             });
         }
 
-        daysScroll.addView(dayRow);
-        root.addView(daysScroll);
-
-        TextView guideButton = text("📍  Campus Guide", 11, TEXT);
-        guideButton.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        guideButton.setGravity(Gravity.CENTER);
-        guideButton.setPadding(dp(14), dp(11), dp(14), dp(11));
-        guideButton.setBackground(round(SURFACE_2, BORDER, 13));
-        guideButton.setClickable(true);
-        guideButton.setFocusable(true);
-        guideButton.setContentDescription("Campus Guide");
-        guideButton.setOnClickListener(v -> showCampusGuide(""));
-        LinearLayout.LayoutParams guideParams = new LinearLayout.LayoutParams(-1, -2);
-        guideParams.setMargins(dp(16), 0, dp(16), dp(10));
-        root.addView(guideButton, guideParams);
-
-        LinearLayout hero = new LinearLayout(this);
-        hero.setOrientation(LinearLayout.VERTICAL);
-        hero.setPadding(dp(20), dp(19), dp(20), dp(20));
-        hero.setBackground(round(SURFACE, BORDER, 20));
-
+        heroCard = new LinearLayout(this);
+        heroCard.setOrientation(LinearLayout.VERTICAL);
+        heroCard.setPadding(dp(20), dp(19), dp(20), dp(20));
         LinearLayout.LayoutParams heroParams = new LinearLayout.LayoutParams(-1, -2);
-        heroParams.setMargins(dp(16), 0, dp(16), dp(10));
+        heroParams.setMargins(0, 0, 0, dp(10));
+        body.addView(heroCard, heroParams);
 
-        focusLabel = text("NEXT LECTURE", 10, MUTED);
+        focusLabel = text("NEXT LECTURE", 9, ACCENT);
         focusLabel.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        focusLabel.setLetterSpacing(0.12f);
+        focusLabel.setLetterSpacing(0.15f);
+        heroCard.addView(focusLabel);
 
-        focusSubject = text("Loading…", 28, TEXT);
+        focusSubject = text("Loading…", 27, TEXT);
         focusSubject.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         focusSubject.setPadding(0, dp(7), 0, 0);
+        heroCard.addView(focusSubject);
 
-        focusMeta = text("", 12, MUTED);
+        focusMeta = text("", 11, MUTED);
         focusMeta.setPadding(0, dp(7), 0, 0);
+        heroCard.addView(focusMeta);
 
-        focusMinutes = text("", 40, TEXT);
+        focusMinutes = text("", 38, TEXT);
         focusMinutes.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        focusMinutes.setPadding(0, dp(19), 0, 0);
-
-        hero.addView(focusLabel);
-        hero.addView(focusSubject);
-        hero.addView(focusMeta);
-        hero.addView(focusMinutes);
-        root.addView(hero, heroParams);
+        focusMinutes.setPadding(0, dp(17), 0, 0);
+        heroCard.addView(focusMinutes);
 
         nextPanel = new LinearLayout(this);
         nextPanel.setOrientation(LinearLayout.VERTICAL);
         nextPanel.setPadding(dp(17), dp(14), dp(17), dp(14));
-        nextPanel.setBackground(round(SURFACE_2, BORDER, 16));
-
+        nextPanel.setBackground(round(SURFACE_2, BORDER, 17));
         LinearLayout.LayoutParams nextParams = new LinearLayout.LayoutParams(-1, -2);
-        nextParams.setMargins(dp(16), 0, dp(16), dp(12));
+        nextParams.setMargins(0, 0, 0, dp(10));
+        body.addView(nextPanel, nextParams);
 
-        TextView nextLabel = text("NEXT AFTER THIS", 9, MUTED);
+        TextView nextLabel = text("UP NEXT", 9, MUTED);
         nextLabel.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        nextLabel.setLetterSpacing(0.10f);
+        nextLabel.setLetterSpacing(0.14f);
         nextPanel.addView(nextLabel);
 
         nextSubject = text("Loading…", 15, TEXT);
@@ -387,93 +399,161 @@ public class MainActivity extends Activity {
         nextMeta.setPadding(0, dp(3), 0, 0);
         nextPanel.addView(nextMeta);
 
-        nextCountdown = text("", 22, TEXT);
+        nextCountdown = text("", 19, TEXT);
         nextCountdown.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        nextCountdown.setPadding(0, dp(7), 0, 0);
+        nextCountdown.setPadding(0, dp(6), 0, 0);
         nextPanel.addView(nextCountdown);
 
-        root.addView(nextPanel, nextParams);
-
-        LinearLayout pulse = new LinearLayout(this);
-        pulse.setOrientation(LinearLayout.HORIZONTAL);
-        pulse.setPadding(dp(18), dp(13), dp(18), dp(13));
-        pulse.setGravity(Gravity.CENTER_VERTICAL);
-        pulse.setBackground(round(SURFACE, BORDER, 16));
-        LinearLayout.LayoutParams pulseParams = new LinearLayout.LayoutParams(-1, -2);
-        pulseParams.setMargins(dp(16), 0, dp(16), dp(12));
+        statsCard = card();
+        statsCard.setOrientation(LinearLayout.HORIZONTAL);
+        statsCard.setPadding(dp(16), dp(14), dp(16), dp(14));
+        LinearLayout.LayoutParams statsParams = new LinearLayout.LayoutParams(-1, -2);
+        statsParams.setMargins(0, 0, 0, dp(18));
+        body.addView(statsCard, statsParams);
 
         LinearLayout statA = statBlock();
-        LinearLayout statB = statBlock();
-        LinearLayout statC = statBlock();
-
         dayPulse = statValue(statA, "—");
-        addStatLabel(statA, "scheduled");
+        statLabel(statA, "classes");
 
+        LinearLayout statB = statBlock();
         completedText = statValue(statB, "—");
-        addStatLabel(statB, "completed");
+        statLabel(statB, "done");
 
+        LinearLayout statC = statBlock();
         freePeriodsText = statValue(statC, "—");
-        addStatLabel(statC, "open gaps");
+        statLabel(statC, "open gaps");
 
-        pulse.addView(statA, new LinearLayout.LayoutParams(0, -2, 1f));
-        pulse.addView(statB, new LinearLayout.LayoutParams(0, -2, 1f));
-        pulse.addView(statC, new LinearLayout.LayoutParams(0, -2, 1f));
-        root.addView(pulse, pulseParams);
+        statsCard.addView(statA, new LinearLayout.LayoutParams(0, -2, 1f));
+        statsCard.addView(statB, new LinearLayout.LayoutParams(0, -2, 1f));
+        statsCard.addView(statC, new LinearLayout.LayoutParams(0, -2, 1f));
 
-        TextView scheduleTitle = text("YOUR SCHEDULE", 11, MUTED);
-        scheduleTitle.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        scheduleTitle.setLetterSpacing(0.10f);
-        scheduleTitle.setPadding(dp(20), dp(3), dp(20), dp(9));
-        root.addView(scheduleTitle);
+        LinearLayout scheduleHeader = new LinearLayout(this);
+        scheduleHeader.setOrientation(LinearLayout.HORIZONTAL);
+        scheduleHeader.setGravity(Gravity.CENTER_VERTICAL);
+        body.addView(scheduleHeader);
 
-        ScrollView scroll = new ScrollView(this);
-        scroll.setFillViewport(true);
+        TextView scheduleHeading = text("TODAY'S FLOW", 10, MUTED);
+        scheduleHeading.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        scheduleHeading.setLetterSpacing(0.15f);
+        scheduleHeader.addView(scheduleHeading, new LinearLayout.LayoutParams(0, -2, 1f));
+
+        TextView rollInfo = text(getBatch(), 9, ACCENT);
+        rollInfo.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        scheduleHeader.addView(rollInfo);
+
         scheduleContainer = new LinearLayout(this);
         scheduleContainer.setOrientation(LinearLayout.VERTICAL);
-        scheduleContainer.setPadding(dp(16), 0, dp(16), dp(24));
-        scroll.addView(scheduleContainer);
-        root.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1f));
+        LinearLayout.LayoutParams scheduleParams = new LinearLayout.LayoutParams(-1, -2);
+        scheduleParams.setMargins(0, dp(10), 0, 0);
+        body.addView(scheduleContainer, scheduleParams);
 
-        updateLiveHeader();
-        highlightDayButtons(dayRow);
+        footer(body);
+
+        scroll.addView(body);
+        content.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1f));
+
+        root.addView(content, new LinearLayout.LayoutParams(-1, 0, 1f));
+
+        highlightDayButtons(dayTabs);
+        updateDayHeader();
+
         setContentView(root);
     }
 
-    private void showRollSettings() {
+    private void updateDayHeader() {
+        if (dayTitle != null) {
+            dayTitle.setText(selectedDay.toUpperCase());
+        }
+    }
+
+    private void showSettings() {
         LinearLayout box = new LinearLayout(this);
         box.setOrientation(LinearLayout.VERTICAL);
-        box.setPadding(dp(4), 0, dp(4), 0);
+        box.setPadding(dp(3), 0, dp(3), 0);
 
-        final EditText nameInput = new EditText(this);
-        nameInput.setSingleLine(true);
-        nameInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_WORDS);
-        nameInput.setText(getName());
-        nameInput.setTextSize(17);
-        nameInput.setHint("Your name");
-        nameInput.setPadding(dp(6), 0, dp(6), 0);
+        TextView profileSection = sectionLabel("PROFILE");
+        box.addView(profileSection);
 
-        final EditText rollInput = new EditText(this);
-        rollInput.setSingleLine(true);
-        rollInput.setInputType(InputType.TYPE_CLASS_NUMBER);
-        rollInput.setText(String.valueOf(getRollNumber()));
-        rollInput.setSelectAllOnFocus(true);
-        rollInput.setTextSize(17);
-        rollInput.setHint("Roll number");
-        rollInput.setPadding(dp(6), 0, dp(6), 0);
+        TextView profileDescription = text(
+                getName() + " · " + getBatch() + " · Roll " + getRollNumber(),
+                12,
+                MUTED
+        );
+        profileDescription.setPadding(0, dp(6), 0, dp(13));
+        box.addView(profileDescription);
 
-        TextView nameLabel = text("NAME", 9, MUTED);
-        nameLabel.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        TextView rollLabel = text("ROLL NUMBER", 9, MUTED);
-        rollLabel.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        Button editProfile = secondaryButton("Edit name & roll number");
+        box.addView(editProfile, new LinearLayout.LayoutParams(-1, dp(46)));
 
-        box.addView(nameLabel);
-        box.addView(nameInput, new LinearLayout.LayoutParams(-1, dp(46)));
-        box.addView(rollLabel);
-        box.addView(rollInput, new LinearLayout.LayoutParams(-1, dp(46)));
+        TextView appearance = sectionLabel("APPEARANCE");
+        LinearLayout.LayoutParams appearanceParams = new LinearLayout.LayoutParams(-1, -2);
+        appearanceParams.setMargins(0, dp(20), 0, 0);
+        box.addView(appearance, appearanceParams);
+
+        LinearLayout themeRow = new LinearLayout(this);
+        themeRow.setOrientation(LinearLayout.HORIZONTAL);
+        themeRow.setGravity(Gravity.CENTER_VERTICAL);
+        themeRow.setPadding(0, dp(8), 0, dp(6));
+
+        themeButtonLabel = text(THEME_NAMES[themeIndex], 13, TEXT);
+        themeButtonLabel.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        themeRow.addView(themeButtonLabel, new LinearLayout.LayoutParams(0, -2, 1f));
+
+        Button changeTheme = secondaryButton("Change");
+        themeRow.addView(changeTheme, new LinearLayout.LayoutParams(dp(92), dp(42)));
+        box.addView(themeRow);
+
+        TextView notificationLabel = sectionLabel("NOTIFICATIONS");
+        LinearLayout.LayoutParams notificationParams = new LinearLayout.LayoutParams(-1, -2);
+        notificationParams.setMargins(0, dp(20), 0, 0);
+        box.addView(notificationLabel, notificationParams);
+
+        TextView notificationText = text(
+                "15-minute reminders use your personalized timetable.",
+                11,
+                MUTED
+        );
+        notificationText.setPadding(0, dp(6), 0, 0);
+        box.addView(notificationText);
 
         AlertDialog dialog = new AlertDialog.Builder(this)
-                .setTitle("Profile settings")
-                .setMessage("Your name is shown on the home screen. Your roll number controls your B1/B2/B3 timetable.")
+                .setTitle("Settings")
+                .setView(box)
+                .setPositiveButton("Done", null)
+                .create();
+
+        editProfile.setOnClickListener(v -> {
+            dialog.dismiss();
+            showProfileEditor();
+        });
+
+        changeTheme.setOnClickListener(v -> {
+            showThemePicker();
+        });
+
+        dialog.show();
+    }
+
+    private void showProfileEditor() {
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+
+        final EditText nameInput = field("Your name", false);
+        nameInput.setText(getName());
+
+        final EditText rollInput = field("Roll number", true);
+        rollInput.setText(String.valueOf(getRollNumber()));
+
+        box.addView(sectionLabel("NAME"));
+        box.addView(nameInput, fieldParams());
+        LinearLayout.LayoutParams rollLabelParams = new LinearLayout.LayoutParams(-1, -2);
+        rollLabelParams.setMargins(0, dp(14), 0, 0);
+        TextView rollLabel = sectionLabel("ROLL NUMBER");
+        box.addView(rollLabel, rollLabelParams);
+        box.addView(rollInput, fieldParams());
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle("Edit profile")
                 .setView(box)
                 .setNegativeButton("Cancel", null)
                 .setPositiveButton("Save", null)
@@ -494,13 +574,8 @@ public class MainActivity extends Activity {
                 }
 
                 saveProfile(name, roll);
-                if (profileChip != null) {
-                    profileChip.setText(name + "\n" + getBatch() + " · Roll " + roll);
-                }
-                if (greetingText != null) {
-                    greetingText.setText("Hi, " + name + " 👋");
-                }
-
+                profileChip.setText(getBatch() + " · Roll " + roll);
+                greetingText.setText("Hey, " + getName() + " 👋");
                 NotificationScheduler.scheduleUpcoming(this);
                 refreshSchedule();
                 dialog.dismiss();
@@ -510,6 +585,26 @@ public class MainActivity extends Activity {
         }));
 
         dialog.show();
+    }
+
+    private void showThemePicker() {
+        new AlertDialog.Builder(this)
+                .setTitle("Choose a theme")
+                .setSingleChoiceItems(THEME_NAMES, themeIndex, (dialog, which) -> {
+                    themeIndex = which;
+                    preferences.edit().putInt(KEY_THEME, themeIndex).apply();
+                    applyTheme();
+                    dialog.dismiss();
+                    rebuildForTheme();
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void rebuildForTheme() {
+        if (hasSavedProfile()) {
+            openApp();
+        }
     }
 
     private void requestNotificationPermissionIfNeeded() {
@@ -532,7 +627,7 @@ public class MainActivity extends Activity {
 
         new AlertDialog.Builder(this)
                 .setTitle("Enable class reminders?")
-                .setMessage("NextBell can remind you 15 minutes before your personalized classes, including the correct room and wing.")
+                .setMessage("NextBell can remind you 15 minutes before your personalized classes.")
                 .setNegativeButton("Not now", null)
                 .setPositiveButton("Enable", (dialog, which) -> {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -553,89 +648,6 @@ public class MainActivity extends Activity {
         }
     }
 
-    private void showCampusGuide(String highlightRoom) {
-        LinearLayout root = new LinearLayout(this);
-        root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(4), 0, dp(4), 0);
-
-        TextView intro = text(
-                highlightRoom.isEmpty()
-                        ? "Quick directions for the buildings and rooms currently appearing in your timetable."
-                        : "Your selected room: " + highlightRoom,
-                12,
-                MUTED
-        );
-        intro.setPadding(0, 0, 0, dp(13));
-        root.addView(intro);
-
-        root.addView(guideCard(
-                "WING B",
-                "Known timetable rooms: 109, 115, 312",
-                "Rooms 109/115 are used by first-year sessions; 312 appears for Engineering Graphics.",
-                highlightRoom.contains("Wing B") ? "THIS IS YOUR DESTINATION" : ""
-        ));
-
-        root.addView(guideCard(
-                "WING C",
-                "Known timetable rooms: 101, 310",
-                "Room 101 and room 310 are explicitly listed as Wing C locations in the timetable.",
-                highlightRoom.contains("Wing C") ? "THIS IS YOUR DESTINATION" : ""
-        ));
-
-        root.addView(guideCard(
-                "OTHER / THIRD CAMPUS BUILDING",
-                "Map not configured yet",
-                "The current timetable does not identify the third campus building by name or room list. We can add its exact map once those room/building details are provided.",
-                highlightRoom.isEmpty() ? "" : "ROOM: " + highlightRoom
-        ));
-
-        AlertDialog dialog = new AlertDialog.Builder(this)
-                .setTitle("📍 Campus Guide")
-                .setView(root)
-                .setPositiveButton("Done", null)
-                .create();
-
-        dialog.show();
-    }
-
-    private View guideCard(String title, String rooms, String detail, String badgeText) {
-        LinearLayout card = new LinearLayout(this);
-        card.setOrientation(LinearLayout.VERTICAL);
-        card.setPadding(dp(14), dp(13), dp(14), dp(13));
-        card.setBackground(round(SURFACE, BORDER, 14));
-
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
-        params.setMargins(0, 0, 0, dp(9));
-        card.setLayoutParams(params);
-
-        LinearLayout titleRow = new LinearLayout(this);
-        titleRow.setOrientation(LinearLayout.HORIZONTAL);
-        titleRow.setGravity(Gravity.CENTER_VERTICAL);
-
-        TextView titleText = text(title, 12, TEXT);
-        titleText.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        titleRow.addView(titleText, new LinearLayout.LayoutParams(0, -2, 1f));
-
-        if (!badgeText.isEmpty()) {
-            TextView badge = text(badgeText, 8, ACCENT);
-            badge.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-            badge.setGravity(Gravity.CENTER);
-            titleRow.addView(badge);
-        }
-
-        card.addView(titleRow);
-
-        TextView roomText = text(rooms, 10, MUTED);
-        roomText.setPadding(0, dp(5), 0, 0);
-        card.addView(roomText);
-
-        TextView detailsText = text(detail, 10, SUBTLE);
-        detailsText.setPadding(0, dp(3), 0, 0);
-        card.addView(detailsText);
-
-        return card;
-    }
-
     private void refreshSchedule() {
         updateLiveHeader();
 
@@ -643,10 +655,12 @@ public class MainActivity extends Activity {
         if (followToday && !today.isEmpty() && !today.equals(selectedDay)) {
             selectedDay = today;
             refreshDayButtons();
+            updateDayHeader();
         }
 
+        if (scheduleContainer == null) return;
+
         int rollNumber = getRollNumber();
-        String batch = TimetableData.batchForRoll(rollNumber);
         List<TimetableData.ClassItem> entries =
                 TimetableData.forRollAndDay(rollNumber, selectedDay);
 
@@ -659,9 +673,7 @@ public class MainActivity extends Activity {
         int scheduled = 0;
 
         for (TimetableData.ClassItem item : entries) {
-            if (!item.isBreak()) {
-                scheduled++;
-            }
+            if (!item.isBreak()) scheduled++;
 
             int start = toSeconds(item.start);
             int end = toSeconds(item.end);
@@ -682,11 +694,11 @@ public class MainActivity extends Activity {
         }
 
         if (current != null) {
-            updateCurrentHero(current, next, nowSeconds, batch);
+            updateCurrentHero(current, next, nowSeconds);
         } else if (next != null) {
-            updateNextHero(next, viewingToday, nowSeconds, batch);
+            updateNextHero(next, viewingToday, nowSeconds);
         } else {
-            updateFinishedHero(selectedDay, viewingToday, batch);
+            updateFinishedHero(viewingToday);
         }
 
         dayPulse.setText(String.valueOf(scheduled));
@@ -710,80 +722,166 @@ public class MainActivity extends Activity {
     private void updateCurrentHero(
             TimetableData.ClassItem current,
             TimetableData.ClassItem next,
-            int nowSeconds,
-            String batch
+            int nowSeconds
     ) {
+        heroCard.setBackground(round(SURFACE, ACCENT, 21));
         focusLabel.setText("HAPPENING NOW");
         focusSubject.setText(current.subject);
-
-        String teacher = current.teacher.isEmpty() ? "" : "  ·  " + current.teacher;
-        String room = current.room.isEmpty() ? "" : "  ·  " + current.room;
-        String batchText = current.batch.isEmpty() ? "" : "  ·  " + current.batch;
-
         focusMeta.setText(
                 formatTime(current.start) + " – " + formatTime(current.end)
-                        + room + batchText + teacher
+                        + formatLocationAndBatch(current)
         );
+        focusMinutes.setText(formatCountdown(Math.max(0, toSeconds(current.end) - nowSeconds)));
 
-        int remaining = Math.max(0, toSeconds(current.end) - nowSeconds);
-        focusMinutes.setText(formatCountdown(remaining));
         nextPanel.setVisibility(next == null ? View.GONE : View.VISIBLE);
-
         if (next != null) {
             nextSubject.setText(next.subject);
             nextMeta.setText(
                     formatTime(next.start) + " – " + formatTime(next.end)
                             + formatLocationAndBatch(next)
             );
-            nextCountdown.setText("Starts in " + formatCountdown(Math.max(0, toSeconds(next.start) - nowSeconds)));
+            nextCountdown.setText(
+                    "Starts in " + formatCountdown(Math.max(0, toSeconds(next.start) - nowSeconds))
+            );
         }
     }
 
     private void updateNextHero(
             TimetableData.ClassItem next,
             boolean viewingToday,
-            int nowSeconds,
-            String batch
+            int nowSeconds
     ) {
+        heroCard.setBackground(round(SURFACE, BORDER, 21));
         focusLabel.setText(viewingToday ? "NEXT LECTURE" : "SELECTED DAY");
         focusSubject.setText(next.subject);
-
         focusMeta.setText(
                 formatTime(next.start) + " – " + formatTime(next.end)
                         + formatLocationAndBatch(next)
         );
-
-        if (viewingToday) {
-            int untilStart = Math.max(0, toSeconds(next.start) - nowSeconds);
-            focusMinutes.setText(formatCountdown(untilStart));
-        } else {
-            focusMinutes.setText("");
-        }
-
+        focusMinutes.setText(viewingToday
+                ? formatCountdown(Math.max(0, toSeconds(next.start) - nowSeconds))
+                : "");
         nextPanel.setVisibility(View.GONE);
     }
 
-    private void updateFinishedHero(String day, boolean viewingToday, String batch) {
+    private void updateFinishedHero(boolean viewingToday) {
+        heroCard.setBackground(round(SURFACE, BORDER, 21));
         focusLabel.setText(viewingToday ? "DAY COMPLETE" : "NO MORE CLASSES");
-        focusSubject.setText("Nothing else scheduled 🎉");
-        focusMeta.setText(day + " · " + batch);
+        focusSubject.setText(viewingToday ? "You're done for today 🎉" : "No more classes");
+        focusMeta.setText(selectedDay + " · " + getBatch());
         focusMinutes.setText("");
         nextPanel.setVisibility(View.GONE);
     }
 
     private String formatLocationAndBatch(TimetableData.ClassItem item) {
         StringBuilder result = new StringBuilder();
+        if (!item.room.isEmpty()) result.append("  ·  ").append(item.room);
+        if (!item.batch.isEmpty()) result.append("  ·  ").append(item.batch);
+        if (!item.teacher.isEmpty()) result.append("  ·  ").append(item.teacher);
+        return result.toString();
+    }
 
-        if (!item.room.isEmpty()) {
-            result.append("  ·  ").append(item.room);
+    private LinearLayout classCard(
+            TimetableData.ClassItem item,
+            boolean isCurrent,
+            boolean isNext,
+            boolean isDone
+    ) {
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.HORIZONTAL);
+        card.setGravity(Gravity.CENTER_VERTICAL);
+        card.setPadding(dp(13), dp(13), dp(13), dp(13));
+
+        int fill = (isCurrent || isNext) ? SURFACE_2 : SURFACE;
+        int stroke = isCurrent ? ACCENT : ((isCurrent || isNext) ? ACCENT : BORDER);
+        card.setBackground(round(fill, stroke, 16));
+
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
+        params.setMargins(0, 0, 0, dp(8));
+        card.setLayoutParams(params);
+
+        TextView time = text(formatTime(item.start), 11, isDone ? MUTED : TEXT);
+        time.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        card.addView(time, new LinearLayout.LayoutParams(dp(68), -2));
+
+        TextView type = text(typeLetter(item), 9, TEXT);
+        type.setGravity(Gravity.CENTER);
+        type.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        type.setBackground(round(SURFACE_2, BORDER, 8));
+        LinearLayout.LayoutParams typeParams = new LinearLayout.LayoutParams(dp(28), dp(28));
+        typeParams.setMargins(0, 0, dp(10), 0);
+        card.addView(type, typeParams);
+
+        LinearLayout main = new LinearLayout(this);
+        main.setOrientation(LinearLayout.VERTICAL);
+
+        LinearLayout titleLine = new LinearLayout(this);
+        titleLine.setOrientation(LinearLayout.HORIZONTAL);
+        titleLine.setGravity(Gravity.CENTER_VERTICAL);
+
+        TextView subject = text(item.subject, 12, isDone ? MUTED : TEXT);
+        subject.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        titleLine.addView(subject, new LinearLayout.LayoutParams(0, -2, 1f));
+
+        if (isCurrent || isNext) {
+            TextView badge = text(isCurrent ? "NOW" : "NEXT", 8, isCurrent ? ACCENT : MUTED);
+            badge.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+            badge.setGravity(Gravity.CENTER);
+            badge.setPadding(dp(5), dp(4), dp(5), dp(4));
+            badge.setBackground(round(isCurrent ? ACCENT_BG : SURFACE_2, isCurrent ? ACCENT : BORDER, 999));
+            titleLine.addView(badge);
+        }
+
+        main.addView(titleLine);
+
+        StringBuilder detailsText = new StringBuilder();
+        if (!item.code.isEmpty()) detailsText.append(item.code);
+        if (!item.teacher.isEmpty()) {
+            if (detailsText.length() > 0) detailsText.append(" · ");
+            detailsText.append(item.teacher);
         }
         if (!item.batch.isEmpty()) {
-            result.append("  ·  ").append(item.batch);
+            if (detailsText.length() > 0) detailsText.append(" · ");
+            detailsText.append(item.batch);
         }
-        if (!item.teacher.isEmpty()) {
-            result.append("  ·  ").append(item.teacher);
+
+        TextView details = text(detailsText.toString(), 9, MUTED);
+        details.setPadding(0, dp(4), 0, 0);
+        main.addView(details);
+
+        card.addView(main, new LinearLayout.LayoutParams(0, -2, 1f));
+
+        if (!item.room.isEmpty()) {
+            TextView room = text(item.room, 9, MUTED);
+            room.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
+            card.addView(room, new LinearLayout.LayoutParams(dp(76), -2));
         }
-        return result.toString();
+
+        card.setAlpha(isDone ? 0.45f : 1f);
+        return card;
+    }
+
+    private LinearLayout breakCard(TimetableData.ClassItem item) {
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.HORIZONTAL);
+        card.setGravity(Gravity.CENTER_VERTICAL);
+        card.setPadding(dp(14), dp(9), dp(14), dp(9));
+        card.setBackground(round(SURFACE_2, BORDER, 13));
+
+        LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(-1, -2);
+        p.setMargins(0, 0, 0, dp(7));
+        card.setLayoutParams(p);
+
+        TextView icon = text("·", 18, MUTED);
+        card.addView(icon, new LinearLayout.LayoutParams(dp(20), -2));
+
+        TextView time = text(formatTime(item.start) + " – " + formatTime(item.end), 9, MUTED);
+        card.addView(time, new LinearLayout.LayoutParams(dp(125), -2));
+
+        TextView label = text(item.subject, 10, MUTED);
+        label.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        card.addView(label);
+        return card;
     }
 
     private int calculateOpenGaps(List<TimetableData.ClassItem> entries) {
@@ -802,130 +900,14 @@ public class MainActivity extends Activity {
         return result;
     }
 
-    private LinearLayout breakCard(TimetableData.ClassItem item) {
-        LinearLayout card = new LinearLayout(this);
-        card.setOrientation(LinearLayout.HORIZONTAL);
-        card.setGravity(Gravity.CENTER_VERTICAL);
-        card.setPadding(dp(15), dp(10), dp(15), dp(10));
-        card.setBackground(round(Color.rgb(15, 18, 24), Color.rgb(31, 36, 44), 13));
-
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
-        params.setMargins(0, 0, 0, dp(7));
-        card.setLayoutParams(params);
-
-        TextView time = text(formatTime(item.start) + " – " + formatTime(item.end), 10, SUBTLE);
-        card.addView(time, new LinearLayout.LayoutParams(dp(132), -2));
-
-        TextView label = text(item.subject, 10, SUBTLE);
-        label.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        card.addView(label);
-
-        return card;
-    }
-
-    private LinearLayout classCard(
-            TimetableData.ClassItem item,
-            boolean isCurrent,
-            boolean isNext,
-            boolean isDone
-    ) {
-        LinearLayout card = new LinearLayout(this);
-        card.setOrientation(LinearLayout.HORIZONTAL);
-        card.setGravity(Gravity.CENTER_VERTICAL);
-        card.setPadding(dp(13), dp(13), dp(13), dp(13));
-
-        int cardColor = (isCurrent || isNext) ? SURFACE_2 : SURFACE;
-        int borderColor = isCurrent ? ACCENT : ((isCurrent || isNext) ? TEXT : BORDER);
-
-        card.setBackground(round(cardColor, borderColor, 15));
-
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
-        params.setMargins(0, 0, 0, dp(9));
-        card.setLayoutParams(params);
-
-        TextView time = text(formatTime(item.start), 12, isDone ? SUBTLE : TEXT);
-        time.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        card.addView(time, new LinearLayout.LayoutParams(dp(70), -2));
-
-        String typeLetter = typeLetter(item);
-        TextView type = text(typeLetter, 10, TEXT);
-        type.setGravity(Gravity.CENTER);
-        type.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        type.setBackground(round(Color.rgb(36, 41, 50), Color.TRANSPARENT, 8));
-
-        LinearLayout.LayoutParams typeParams = new LinearLayout.LayoutParams(dp(30), dp(30));
-        typeParams.setMargins(0, 0, dp(10), 0);
-        card.addView(type, typeParams);
-
-        LinearLayout main = new LinearLayout(this);
-        main.setOrientation(LinearLayout.VERTICAL);
-
-        LinearLayout titleLine = new LinearLayout(this);
-        titleLine.setOrientation(LinearLayout.HORIZONTAL);
-        titleLine.setGravity(Gravity.CENTER_VERTICAL);
-
-        TextView subject = text(item.subject, 13, isDone ? SUBTLE : TEXT);
-        subject.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        titleLine.addView(subject, new LinearLayout.LayoutParams(0, -2, 1f));
-
-        if (isCurrent || isNext) {
-            TextView badge = text(isCurrent ? "NOW" : "NEXT", 9, TEXT);
-            badge.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-            badge.setGravity(Gravity.CENTER);
-            badge.setPadding(dp(5), dp(4), dp(5), dp(4));
-            badge.setBackground(round(Color.TRANSPARENT, isCurrent ? ACCENT : BORDER, 999));
-            titleLine.addView(badge, new LinearLayout.LayoutParams(dp(40), -2));
-        }
-
-        main.addView(titleLine);
-
-        StringBuilder detailsText = new StringBuilder();
-        if (!item.code.isEmpty()) {
-            detailsText.append(item.code);
-        }
-        if (!item.teacher.isEmpty()) {
-            if (detailsText.length() > 0) detailsText.append(" · ");
-            detailsText.append(item.teacher);
-        }
-        if (!item.batch.isEmpty()) {
-            if (detailsText.length() > 0) detailsText.append(" · ");
-            detailsText.append(item.batch);
-        }
-
-        TextView details = text(detailsText.toString(), 10, SUBTLE);
-        details.setPadding(0, dp(4), 0, 0);
-        main.addView(details);
-
-        LinearLayout.LayoutParams mainParams = new LinearLayout.LayoutParams(0, -2, 1f);
-        card.addView(main, mainParams);
-
-        if (!item.room.isEmpty()) {
-            TextView room = text("⌖ " + item.room, 10, MUTED);
-            room.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
-            room.setClickable(true);
-            room.setFocusable(true);
-            room.setOnClickListener(v -> showCampusGuide(item.room));
-            card.addView(room, new LinearLayout.LayoutParams(dp(78), -2));
-        }
-
-        card.setAlpha(isDone ? 0.48f : 1f);
-        return card;
-    }
-
     private String typeLetter(TimetableData.ClassItem item) {
         switch (item.kind) {
-            case PRACTICAL:
-                return "P";
-            case TUTORIAL:
-                return "T";
-            case LIBRARY:
-                return "L";
-            case SELF_LEARNING:
-                return "S";
-            case SPECIAL:
-                return "X";
-            default:
-                return "L";
+            case PRACTICAL: return "P";
+            case TUTORIAL: return "T";
+            case LIBRARY: return "L";
+            case SELF_LEARNING: return "S";
+            case SPECIAL: return "X";
+            default: return "L";
         }
     }
 
@@ -935,68 +917,41 @@ public class MainActivity extends Activity {
             String day = TimetableData.DAYS[i];
             boolean selected = day.equals(selectedDay);
             button.setTextColor(selected ? BG : MUTED);
-            button.setBackground(round(
-                    selected ? TEXT : SURFACE_2,
-                    selected ? TEXT : BORDER,
-                    999
-            ));
+            button.setBackground(round(selected ? TEXT : SURFACE_2, selected ? TEXT : BORDER, 999));
         }
     }
 
     private void refreshDayButtons() {
-        View root = getWindow().getDecorView().findViewById(android.R.id.content);
-        if (!(root instanceof LinearLayout)) return;
+        View contentRoot = findViewById(android.R.id.content);
+        if (!(contentRoot instanceof LinearLayout)) return;
 
-        LinearLayout appRoot = (LinearLayout) root;
-        for (int i = 0; i < appRoot.getChildCount(); i++) {
-            View child = appRoot.getChildAt(i);
-            if (child instanceof HorizontalScrollView) {
-                HorizontalScrollView scroll = (HorizontalScrollView) child;
-                if (scroll.getChildCount() > 0 && scroll.getChildAt(0) instanceof LinearLayout) {
-                    highlightDayButtons((LinearLayout) scroll.getChildAt(0));
+        LinearLayout rootView = (LinearLayout) contentRoot;
+        for (int i = 0; i < rootView.getChildCount(); i++) {
+            View child = rootView.getChildAt(i);
+            if (child instanceof LinearLayout) {
+                LinearLayout outer = (LinearLayout) child;
+                for (int j = 0; j < outer.getChildCount(); j++) {
+                    View nested = outer.getChildAt(j);
+                    if (nested instanceof HorizontalScrollView) {
+                        HorizontalScrollView scroll = (HorizontalScrollView) nested;
+                        if (scroll.getChildCount() > 0 && scroll.getChildAt(0) instanceof LinearLayout) {
+                            highlightDayButtons((LinearLayout) scroll.getChildAt(0));
+                            return;
+                        }
+                    }
                 }
             }
         }
     }
 
-    private LinearLayout statBlock() {
-        LinearLayout block = new LinearLayout(this);
-        block.setOrientation(LinearLayout.VERTICAL);
-        return block;
-    }
-
-    private TextView statValue(LinearLayout block, String value) {
-        TextView t = text(value, 22, TEXT);
-        t.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        block.addView(t);
-        return t;
-    }
-
-    private void addStatLabel(LinearLayout block, String label) {
-        TextView t = text(label, 9, SUBTLE);
-        t.setPadding(0, dp(2), 0, 0);
-        block.addView(t);
-    }
-
-    private TextView text(String value, int sp, int color) {
-        TextView t = new TextView(this);
-        t.setText(value);
-        t.setTextSize(sp);
-        t.setTextColor(color);
-        return t;
-    }
-
-    private GradientDrawable round(int fill, int stroke, int radiusDp) {
-        GradientDrawable d = new GradientDrawable();
-        d.setColor(fill);
-        if (stroke != Color.TRANSPARENT) d.setStroke(dp(1), stroke);
-        d.setCornerRadius(dp(radiusDp));
-        return d;
+    private void updateLiveHeader() {
+        if (liveClock == null || liveDate == null) return;
+        liveClock.setText(LocalTime.now(zone).format(clockFormatter));
+        liveDate.setText(LocalDate.now(zone).format(dateFormatter));
     }
 
     private int toSeconds(String value) {
-        LocalTime t = LocalTime.parse(value, timeFormatter);
-        return t.toSecondOfDay();
+        return LocalTime.parse(value, timeFormatter).toSecondOfDay();
     }
 
     private int nowSeconds() {
@@ -1004,14 +959,11 @@ public class MainActivity extends Activity {
     }
 
     private String formatCountdown(int totalSeconds) {
-        int safeSeconds = Math.max(0, totalSeconds);
-        int hours = safeSeconds / 3600;
-        int minutes = (safeSeconds % 3600) / 60;
-        int seconds = safeSeconds % 60;
-
-        if (hours > 0) {
-            return String.format("%02d:%02d:%02d", hours, minutes, seconds);
-        }
+        int safe = Math.max(0, totalSeconds);
+        int hours = safe / 3600;
+        int minutes = (safe % 3600) / 60;
+        int seconds = safe % 60;
+        if (hours > 0) return String.format("%02d:%02d:%02d", hours, minutes, seconds);
         return String.format("%02d:%02d", minutes, seconds);
     }
 
@@ -1040,14 +992,121 @@ public class MainActivity extends Activity {
         return today.isEmpty() ? "Monday" : today;
     }
 
-    private void updateLiveHeader() {
-        if (liveClock == null || liveDate == null) return;
+    private LinearLayout page() {
+        LinearLayout page = new LinearLayout(this);
+        page.setOrientation(LinearLayout.VERTICAL);
+        page.setGravity(Gravity.CENTER);
+        page.setPadding(dp(24), dp(24), dp(24), dp(24));
+        page.setBackgroundColor(BG);
+        return page;
+    }
 
-        LocalDate date = LocalDate.now(zone);
-        LocalTime time = LocalTime.now(zone);
+    private LinearLayout card() {
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setBackground(round(SURFACE, BORDER, 18));
+        return card;
+    }
 
-        liveClock.setText(time.format(clockFormatter));
-        liveDate.setText(date.format(dateFormatter));
+    private EditText field(String hint, boolean number) {
+        EditText input = new EditText(this);
+        input.setSingleLine(true);
+        input.setInputType(number
+                ? InputType.TYPE_CLASS_NUMBER
+                : InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_WORDS);
+        input.setTextSize(16);
+        input.setTextColor(TEXT);
+        input.setHintTextColor(MUTED);
+        input.setHint(hint);
+        input.setPadding(dp(13), dp(8), dp(13), dp(8));
+        input.setBackground(round(SURFACE_2, BORDER, 12));
+        return input;
+    }
+
+    private LinearLayout.LayoutParams fieldParams() {
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, dp(50));
+        params.setMargins(0, dp(7), 0, 0);
+        return params;
+    }
+
+    private TextView sectionLabel(String value) {
+        TextView t = text(value, 9, MUTED);
+        t.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        t.setLetterSpacing(0.13f);
+        return t;
+    }
+
+    private Button primaryButton(String label) {
+        Button b = new Button(this);
+        b.setText(label);
+        b.setTextSize(13);
+        b.setTextColor(BG);
+        b.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        b.setAllCaps(false);
+        b.setBackground(round(ACCENT, ACCENT, 13));
+        return b;
+    }
+
+    private Button secondaryButton(String label) {
+        Button b = new Button(this);
+        b.setText(label);
+        b.setTextSize(11);
+        b.setTextColor(TEXT);
+        b.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        b.setAllCaps(false);
+        b.setBackground(round(SURFACE_2, BORDER, 11));
+        return b;
+    }
+
+    private LinearLayout statBlock() {
+        LinearLayout block = new LinearLayout(this);
+        block.setOrientation(LinearLayout.VERTICAL);
+        return block;
+    }
+
+    private TextView statValue(LinearLayout block, String value) {
+        TextView t = text(value, 21, TEXT);
+        t.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        block.addView(t);
+        return t;
+    }
+
+    private void statLabel(LinearLayout block, String value) {
+        TextView t = text(value, 9, MUTED);
+        t.setPadding(0, dp(2), 0, 0);
+        block.addView(t);
+    }
+
+    private void footer(LinearLayout body) {
+        LinearLayout footer = new LinearLayout(this);
+        footer.setOrientation(LinearLayout.HORIZONTAL);
+        footer.setGravity(Gravity.CENTER_VERTICAL);
+        footer.setPadding(0, dp(22), 0, 0);
+
+        TextView left = text("NEXTBELL · " + THEME_NAMES[themeIndex].toUpperCase(), 8, MUTED);
+        footer.addView(left, new LinearLayout.LayoutParams(0, -2, 1f));
+
+        TextView right = text("FE DIV B · 2026–27", 8, MUTED);
+        right.setGravity(Gravity.END);
+        footer.addView(right);
+
+        body.addView(footer);
+    }
+
+    private TextView text(String value, int sp, int color) {
+        TextView t = new TextView(this);
+        t.setText(value);
+        t.setTextSize(sp);
+        t.setTextColor(color);
+        return t;
+    }
+
+    private GradientDrawable round(int fill, int stroke, int radiusDp) {
+        GradientDrawable d = new GradientDrawable();
+        d.setColor(fill);
+        if (stroke != Color.TRANSPARENT) d.setStroke(dp(1), stroke);
+        d.setCornerRadius(dp(radiusDp));
+        return d;
     }
 
     private int dp(int value) {
