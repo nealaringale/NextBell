@@ -1023,12 +1023,6 @@ public class MainActivity extends Activity {
         return params;
     }
 
-    private LinearLayout.LayoutParams cardMargin() {
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
-        params.setMargins(0, dp(9), 0, dp(20));
-        return params;
-    }
-
     private LinearLayout themeCard(int index) {
         boolean selected = index == themeIndex;
         int[] palette = THEMES[index];
