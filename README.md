@@ -1,52 +1,64 @@
 # NextBell 🔔
 
-A student-first college timetable app for seeing today's classes, the next lecture, batch-specific sessions, announcements, and a weekly schedule at a glance.
+**NextBell is a native Android timetable app for college students.**
 
-## MVP
+The current MVP is built as an Android application and uses the student's division, batch, and roll number to show the most relevant class schedule.
 
-- Today view with live next-class calculation
-- Weekly timetable view
-- Division + roll-number profile context
+## Android MVP
+
+- Native Android app
+- Today view with current/next class
+- Live minutes remaining
+- Weekly day switching
 - Batch-aware practical/tutorial labels
-- Announcements page
-- Dark/light mode
-- Responsive desktop/mobile layout
+- Class room and teacher details
+- Day statistics and free-period count
+- Dark UI designed for quick glances
 
-## Local development
+## Build the APK with GitHub Actions
 
-```bash
-npm install
-npm run dev
+Every push to `main` triggers:
+
+```text
+GitHub Push
+    ↓
+GitHub Actions
+    ↓
+Android SDK + Java 17
+    ↓
+Gradle assembleDebug
+    ↓
+NextBell-debug-apk
 ```
 
-Build for production:
+Open the **Actions** tab, select **Build NextBell Android**, and download the `NextBell-debug-apk` artifact from a successful run.
+
+## Local Android build
+
+You need Android Studio/SDK and Gradle 8.9+.
 
 ```bash
-npm run build
+cd android
+gradle assembleDebug
 ```
+
+The APK is generated at:
+
+`android/app/build/outputs/apk/debug/app-debug.apk`
 
 ## Timetable data
 
-The demo timetable lives in `src/data.js`. Replace the sample classes with your real NMIET schedule. Keep each class shaped like:
+The demo timetable is currently stored in:
 
-```js
-{
-  id: 'mon-1',
-  start: '08:00',
-  end: '09:00',
-  subject: 'Engineering Mathematics',
-  short: 'Maths',
-  type: 'Lecture',
-  room: 'C-204',
-  teacher: 'Prof. Example',
-  batch: 'B2'
-}
-```
+`android/app/src/main/java/com/nealaringale/nextbell/TimetableData.java`
 
-`batch` is optional and is used for practical/tutorial sessions.
+Replace the sample classes with the real NMIET schedule as you collect it.
 
 ## Roadmap
 
-1. Replace demo timetable with the real class schedule.
-2. Add Supabase for shared class data and admin edits.
-3. Add authentication, attendance, reminders, and timetable-change notifications.
+1. Replace demo timetable with the real NMIET timetable.
+2. Add a first-run profile setup screen.
+3. Store profile + attendance locally.
+4. Add notifications for upcoming classes.
+5. Add Supabase for shared class updates and admin edits.
+6. Produce a signed release APK/AAB for wider distribution.
