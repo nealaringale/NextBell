@@ -559,8 +559,7 @@ public class MainActivity extends Activity {
             TextView chip = dayChip(day);
             dayRow.addView(chip, new LinearLayout.LayoutParams(dp(78), dp(46)));
             if (!day.equals(TimetableData.DAYS[TimetableData.DAYS.length - 1])) {
-                SpaceView spacer = new SpaceView(this, dp(8), 1);
-                dayRow.addView(spacer);
+                dayRow.addView(spacer(dp(8), dp(1)));
             }
         }
 
