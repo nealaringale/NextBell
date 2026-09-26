@@ -52,15 +52,28 @@ function App() {
     document.documentElement.dataset.theme = dark ? 'dark' : 'light';
   }, [dark]);
 
-  const todayClasses = timetable[selectedDay] ?? [];
+  const classesForDay = timetable[selectedDay] ?? [];
 
-  const nextClass = useMemo(
-    () => todayClasses.find((item) => minutes(item.end) > now),
-    [todayClasses, now]
+  const currentClass = useMemo(
+    () => classesForDay.find((item) => minutes(item.start) <= now && now < minutes(item.end)),
+    [classesForDay, now]
   );
 
-  const completed = todayClasses.filter((item) => minutes(item.end) <= now).length;
-  const freePeriods = todayClasses.length > 0 ? 2 : 0;
+  const nextClass = useMemo(
+    () => classesForDay.find((item) => minutes(item.start) > now),
+    [classesForDay, now]
+  );
+
+  const focusClass = currentClass ?? nextClass;
+  const focusIsCurrent = Boolean(currentClass);
+  const completed = classesForDay.filter((item) => minutes(item.end) <= now).length;
+
+  const freePeriods = classesForDay.reduce((count, item, index) => {
+    if (index === 0) return count;
+    const previous = classesForDay[index - 1];
+    const gap = minutes(item.start) - minutes(previous.end);
+    return count + (gap >= 45 ? 1 : 0);
+  }, 0);
 
   const goToDay = (day) => {
     setSelectedDay(day);
@@ -125,43 +138,46 @@ function App() {
           <>
             <section className="hero-grid">
               <div className="hero-card">
-                <div className="hero-label">NEXT CLASS</div>
+                <div className="hero-label">{focusIsCurrent ? 'HAPPENING NOW' : 'NEXT CLASS'}</div>
                 <div className="hero-title">
-                  {nextClass ? nextClass.subject : 'You’re done for today 🎉'}
+                  {focusClass ? focusClass.subject : 'You’re done for today 🎉'}
                 </div>
 
-                {nextClass ? (
+                {focusClass ? (
                   <>
                     <div className="hero-meta">
-                      {formatTime(nextClass.start)} – {formatTime(nextClass.end)} · {nextClass.room}
+                      {formatTime(focusClass.start)} – {formatTime(focusClass.end)} · {focusClass.room}
                     </div>
 
                     <div className="hero-bottom">
                       <div className="countdown">
-                        {Math.max(0, minutes(nextClass.start) - now)} <span>min</span>
+                        {focusIsCurrent
+                          ? Math.max(0, minutes(focusClass.end) - now)
+                          : Math.max(0, minutes(focusClass.start) - now)}
+                        <span> min</span>
                       </div>
                       <span className="type-chip">
-                        <b>{typeIcons[nextClass.type]}</b>
-                        {nextClass.type}
-                        {nextClass.batch ? ` · ${nextClass.batch}` : ''}
+                        <b>{typeIcons[focusClass.type]}</b>
+                        {focusClass.type}
+                        {focusClass.batch ? ` · ${focusClass.batch}` : ''}
                       </span>
                     </div>
                   </>
                 ) : (
-                  <div className="hero-meta">No more scheduled classes in this demo timetable.</div>
+                  <div className="hero-meta">No more scheduled classes in this timetable.</div>
                 )}
               </div>
 
               <div className="stat-card">
                 <div className="stat-top">
                   <span>DAY PULSE</span>
-                  <span>Today</span>
+                  <span>{selectedDay === today ? 'Today' : selectedDay}</span>
                 </div>
-                <div className="stat-number">{todayClasses.length}</div>
+                <div className="stat-number">{classesForDay.length}</div>
                 <div className="stat-label">classes scheduled</div>
                 <div className="stat-row">
                   <span>Completed</span>
-                  <b>{completed}/{todayClasses.length}</b>
+                  <b>{completed}/{classesForDay.length}</b>
                 </div>
                 <div className="stat-row">
                   <span>Free periods</span>
@@ -190,17 +206,18 @@ function App() {
             </section>
 
             <div className="class-list">
-              {todayClasses.length === 0 ? (
+              {classesForDay.length === 0 ? (
                 <div className="empty-state">No classes scheduled. Enjoy the free day.</div>
               ) : (
-                todayClasses.map((item) => {
+                classesForDay.map((item) => {
                   const isDone = minutes(item.end) <= now;
-                  const isNext = nextClass?.id === item.id;
+                  const isCurrent = currentClass?.id === item.id;
+                  const isNext = !currentClass && nextClass?.id === item.id;
 
                   return (
                     <article
                       key={item.id}
-                      className={`class-row ${isNext ? 'next' : ''} ${isDone ? 'done' : ''}`}
+                      className={`class-row ${isCurrent || isNext ? 'next' : ''} ${isDone ? 'done' : ''}`}
                     >
                       <div className="time-col">
                         <strong>{formatTime(item.start)}</strong>
@@ -212,7 +229,9 @@ function App() {
                       <div className="class-main">
                         <div className="class-title-line">
                           <h3>{item.subject}</h3>
-                          {isNext && <span className="next-badge">NEXT</span>}
+                          {(isCurrent || isNext) && (
+                            <span className="next-badge">{isCurrent ? 'NOW' : 'NEXT'}</span>
+                          )}
                         </div>
                         <p>
                           {item.teacher} · {item.type}
