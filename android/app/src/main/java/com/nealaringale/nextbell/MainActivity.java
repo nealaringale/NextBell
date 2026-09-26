@@ -1341,39 +1341,52 @@ public class MainActivity extends Activity {
     }
 
     private void setHeroLocation(TimetableData.ClassItem item) {
-        if (homeHero == null || homeHero.getChildCount() < 5) return;
-
-        View locationView = homeHero.getChildAt(4);
-        if (!(locationView instanceof LinearLayout)) return;
-        LinearLayout row = (LinearLayout) locationView;
-
-        if (row.getChildCount() < 2) return;
-        TextView room = (TextView) row.getChildAt(0);
-        TextView wing = (TextView) row.getChildAt(1);
+        if (heroRoomText == null || heroWingText == null) return;
 
         String roomValue = roomNumber(item);
         String wingValue = wing(item);
 
-        room.setText(roomValue.isEmpty()
-                ? "ROOM\nNot listed"
-                : "ROOM\n" + roomValue);
-        wing.setText(wingValue.isEmpty()
-                ? "WING\nNot listed"
-                : "WING\n" + wingValue);
-        room.setTextColor(TEXT);
-        wing.setTextColor(ACCENT);
+        heroRoomText.setText(
+                roomValue.isEmpty() ? "ROOM\nNot listed" : "ROOM\n" + roomValue
+        );
+        heroWingText.setText(
+                wingValue.isEmpty() ? "WING\nNot listed" : "WING\n" + wingValue
+        );
     }
 
     private void clearHeroLocation() {
-        if (homeHero == null || homeHero.getChildCount() < 5) return;
+        if (heroRoomText == null || heroWingText == null) return;
 
-        View locationView = homeHero.getChildAt(4);
-        if (!(locationView instanceof LinearLayout)) return;
-        LinearLayout row = (LinearLayout) locationView;
-        if (row.getChildCount() < 2) return;
+        heroRoomText.setText("ROOM\n—");
+        heroWingText.setText("WING\n—");
+    }
 
-        ((TextView) row.getChildAt(0)).setText("ROOM\n—");
-        ((TextView) row.getChildAt(1)).setText("WING\n—");
+    private long secondsUntilNextWeekendClass(TimetableData.ClassItem next) {
+        LocalDate today = LocalDate.now(zone);
+        LocalDate monday;
+
+        if (today.getDayOfWeek() == DayOfWeek.SATURDAY) {
+            monday = today.plusDays(2);
+        } else {
+            monday = today.plusDays(1);
+        }
+
+        LocalTime start = LocalTime.parse(next.start, timeFormatter);
+        ZonedDateTime target = monday.atTime(start).atZone(zone);
+        ZonedDateTime now = ZonedDateTime.now(zone);
+
+        return Math.max(0L, target.toEpochSecond() - now.toEpochSecond());
+    }
+
+    private String formatHumanCountdown(long totalSeconds) {
+        long safe = Math.max(0L, totalSeconds);
+        long days = safe / 86400L;
+        long hours = (safe % 86400L) / 3600L;
+        long minutes = (safe % 3600L) / 60L;
+
+        if (days > 0) return days + "d " + hours + "h";
+        if (hours > 0) return hours + "h " + minutes + "m";
+        return minutes + "m";
     }
 
     private String roomNumber(TimetableData.ClassItem item) {
