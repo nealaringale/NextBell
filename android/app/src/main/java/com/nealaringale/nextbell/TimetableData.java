@@ -277,8 +277,8 @@ public final class TimetableData {
                                 Kind.LUNCH),
 
                         entry("thu-pm-b1", "13:30", "15:30",
-                                "Electrical Engineering", "ELE",
-                                "Prof. Arti S. Bindu", "101 · Wing C", "B1", "B1",
+                                "Engineering Physics", "PHY",
+                                "Prof. Rupali Jagnade", "115 · Wing B", "B1", "B1",
                                 Kind.PRACTICAL),
 
                         entry("thu-pm-b2", "13:30", "15:30",
@@ -287,8 +287,8 @@ public final class TimetableData {
                                 Kind.PRACTICAL),
 
                         entry("thu-pm-b3", "13:30", "15:30",
-                                "Engineering Physics", "PHY",
-                                "Prof. Rupali Jagnade", "115 · Wing B", "B3", "B3",
+                                "Electrical Engineering", "ELE",
+                                "Prof. Arti S. Bindu", "101 · Wing C", "B3", "B3",
                                 Kind.PRACTICAL)
                 );
 
