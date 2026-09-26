@@ -243,18 +243,18 @@ public final class TimetableData {
             case "Thursday":
                 return Arrays.asList(
                         entry("thu-b1", "08:20", "10:20",
-                                "Engineering Physics", "PHY",
-                                "Prof. Rupali Jagnade", "115 · Wing B", "B1", "B1",
+                                "Engineering Graphics", "EG",
+                                "Prof. Santosh Dabhole", "312 · Wing B", "B1", "B1",
                                 Kind.PRACTICAL),
 
                         entry("thu-b2", "08:20", "10:20",
-                                "Engineering Graphics", "EG",
-                                "Prof. Santosh Dabhole", "310 · Wing C", "B2", "B2",
+                                "Electrical Engineering", "ELE",
+                                "Prof. Arti S. Bindu", "101 · Wing C", "B2", "B2",
                                 Kind.PRACTICAL),
 
                         entry("thu-b3", "08:20", "10:20",
-                                "Electrical Engineering", "ELE",
-                                "Prof. Arti S. Bindu", "101 · Wing C", "B3", "B3",
+                                "Engineering Physics", "PHY",
+                                "Prof. Rupali Jagnade", "115 · Wing B", "B3", "B3",
                                 Kind.PRACTICAL),
 
                         entry("thu-break", "10:20", "10:40",
