@@ -29,8 +29,10 @@ import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Locale;
 
 public class MainActivity extends Activity {
     private static final String PREFS_NAME = "nextbell_profile";
@@ -40,9 +42,12 @@ public class MainActivity extends Activity {
     private static final String KEY_THEME = "theme";
 
     private final Handler handler = new Handler(Looper.getMainLooper());
-    private final DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("HH:mm");
-    private final DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("EEE, d MMM");
-    private final DateTimeFormatter clockFormatter = DateTimeFormatter.ofPattern("hh:mm:ss a");
+    private final DateTimeFormatter timeFormatter =
+            DateTimeFormatter.ofPattern("HH:mm", Locale.ENGLISH);
+    private final DateTimeFormatter dateFormatter =
+            DateTimeFormatter.ofPattern("EEE, d MMM", Locale.ENGLISH);
+    private final DateTimeFormatter clockFormatter =
+            DateTimeFormatter.ofPattern("hh:mm:ss a", Locale.ENGLISH);
     private final ZoneId zone = ZoneId.of("Asia/Kolkata");
 
     private SharedPreferences preferences;
@@ -65,6 +70,7 @@ public class MainActivity extends Activity {
     private TextView homeDayLabel;
 
     private LinearLayout weekSchedule;
+    private TextView weekDayTitle;
     private String weekSelectedDay;
 
     private int themeIndex;
@@ -603,10 +609,10 @@ public class MainActivity extends Activity {
         scrollerParams.setMargins(0, 0, 0, dp(19));
         page.addView(dayScroller, scrollerParams);
 
-        TextView dayTitle = text(weekSelectedDay.toUpperCase(), 12, MUTED);
-        dayTitle.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
-        dayTitle.setLetterSpacing(0.1f);
-        page.addView(dayTitle);
+        weekDayTitle = text(weekSelectedDay.toUpperCase(), 12, MUTED);
+        weekDayTitle.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
+        weekDayTitle.setLetterSpacing(0.1f);
+        page.addView(weekDayTitle);
 
         TextView dayHelper = text(
                 "Tap another day above to browse your timetable.",
@@ -1129,6 +1135,9 @@ public class MainActivity extends Activity {
             chip.setOnClickListener(v -> {
                 weekSelectedDay = day;
                 updateWeekDayChips(row);
+                if (weekDayTitle != null) {
+                    weekDayTitle.setText(weekSelectedDay.toUpperCase());
+                }
                 refreshWeekSchedule();
             });
         }
@@ -1499,8 +1508,7 @@ public class MainActivity extends Activity {
         return params;
     }
 
-    private String greeting() {
-        int hour = LocalTime.now(zone).getHour();
+    private String greetingForHour(int hour) {
         if (hour < 12) return "Good morning";
         if (hour < 18) return "Good afternoon";
         return "Good evening";
@@ -1508,10 +1516,13 @@ public class MainActivity extends Activity {
 
     private void updateClock() {
         if (liveClock == null || liveDate == null) return;
-        liveClock.setText(LocalTime.now(zone).format(clockFormatter));
-        liveDate.setText(LocalDate.now(zone).format(dateFormatter));
+
+        ZonedDateTime now = ZonedDateTime.now(zone);
+        liveClock.setText(now.format(clockFormatter));
+        liveDate.setText(now.format(dateFormatter));
+
         if (greetingText != null) {
-            greetingText.setText(greeting() + ", " + getName());
+            greetingText.setText(greetingForHour(now.getHour()) + ", " + getName());
         }
     }
 
