@@ -16,8 +16,8 @@ import android.text.InputType;
 import android.view.Gravity;
 import android.view.View;
 import android.view.Window;
-import android.widget.Button;
 import android.widget.EditText;
+import android.widget.FrameLayout;
 import android.widget.HorizontalScrollView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -39,37 +39,34 @@ public class MainActivity extends Activity {
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("HH:mm");
-    private final DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("EEE, d MMM yyyy");
+    private final DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("EEE, d MMM");
     private final DateTimeFormatter clockFormatter = DateTimeFormatter.ofPattern("hh:mm:ss a");
     private final ZoneId zone = ZoneId.of("Asia/Kolkata");
 
     private SharedPreferences preferences;
+    private FrameLayout root;
+    private FrameLayout contentHost;
+    private LinearLayout bottomNav;
 
-    private LinearLayout root;
-    private LinearLayout scheduleContainer;
-    private LinearLayout nextPanel;
-    private LinearLayout heroCard;
-    private LinearLayout statsCard;
-    private TextView greetingText;
-    private TextView profileChip;
-    private TextView liveDate;
     private TextView liveClock;
-    private TextView dayTitle;
-    private TextView focusLabel;
-    private TextView focusSubject;
-    private TextView focusMeta;
-    private TextView focusMinutes;
-    private TextView nextSubject;
-    private TextView nextMeta;
-    private TextView nextCountdown;
-    private TextView dayPulse;
-    private TextView completedText;
-    private TextView freePeriodsText;
-    private TextView themeButtonLabel;
+    private TextView liveDate;
+    private TextView greetingText;
+    private TextView profileBadge;
 
-    private String selectedDay;
-    private boolean followToday = true;
+    private LinearLayout homeHero;
+    private TextView heroLabel;
+    private TextView heroSubject;
+    private TextView heroMeta;
+    private TextView heroCountdown;
+    private TextView heroCountdownLabel;
+    private LinearLayout homeSchedule;
+    private TextView homeDayLabel;
+
+    private LinearLayout weekSchedule;
+    private String weekSelectedDay;
+
     private int themeIndex;
+    private String selectedScreen = "home";
     private Runnable refreshRunnable;
 
     private static final String[] THEME_NAMES = {
@@ -77,11 +74,11 @@ public class MainActivity extends Activity {
     };
 
     private static final int[][] THEMES = {
-            {Color.rgb(10, 12, 17), Color.rgb(17, 20, 27), Color.rgb(24, 28, 37), Color.rgb(47, 53, 64), Color.rgb(245, 247, 251), Color.rgb(148, 157, 175), Color.rgb(112, 233, 130), Color.rgb(31, 58, 39)},
-            {Color.rgb(7, 13, 24), Color.rgb(12, 22, 37), Color.rgb(18, 32, 51), Color.rgb(34, 56, 78), Color.rgb(241, 248, 255), Color.rgb(151, 174, 201), Color.rgb(88, 201, 255), Color.rgb(17, 52, 72)},
-            {Color.rgb(20, 12, 20), Color.rgb(31, 18, 32), Color.rgb(43, 23, 44), Color.rgb(72, 39, 70), Color.rgb(255, 246, 252), Color.rgb(187, 158, 181), Color.rgb(255, 132, 193), Color.rgb(70, 31, 56)},
-            {Color.rgb(8, 16, 14), Color.rgb(13, 26, 22), Color.rgb(20, 38, 31), Color.rgb(41, 65, 52), Color.rgb(239, 251, 245), Color.rgb(153, 185, 170), Color.rgb(101, 220, 163), Color.rgb(24, 65, 47)},
-            {Color.rgb(18, 15, 10), Color.rgb(29, 23, 14), Color.rgb(42, 32, 17), Color.rgb(74, 55, 28), Color.rgb(255, 250, 238), Color.rgb(193, 177, 145), Color.rgb(255, 184, 77), Color.rgb(78, 53, 18)}
+            {Color.rgb(10, 12, 17), Color.rgb(17, 20, 27), Color.rgb(24, 28, 37), Color.rgb(42, 48, 59), Color.rgb(245, 247, 251), Color.rgb(148, 157, 175), Color.rgb(112, 233, 130), Color.rgb(31, 58, 39)},
+            {Color.rgb(7, 13, 24), Color.rgb(12, 22, 37), Color.rgb(18, 32, 51), Color.rgb(32, 54, 76), Color.rgb(241, 248, 255), Color.rgb(151, 174, 201), Color.rgb(88, 201, 255), Color.rgb(17, 52, 72)},
+            {Color.rgb(20, 12, 20), Color.rgb(31, 18, 32), Color.rgb(43, 23, 44), Color.rgb(66, 38, 66), Color.rgb(255, 246, 252), Color.rgb(187, 158, 181), Color.rgb(255, 132, 193), Color.rgb(70, 31, 56)},
+            {Color.rgb(8, 16, 14), Color.rgb(13, 26, 22), Color.rgb(20, 38, 31), Color.rgb(38, 61, 50), Color.rgb(239, 251, 245), Color.rgb(153, 185, 170), Color.rgb(101, 220, 163), Color.rgb(24, 65, 47)},
+            {Color.rgb(18, 15, 10), Color.rgb(29, 23, 14), Color.rgb(42, 32, 17), Color.rgb(70, 53, 28), Color.rgb(255, 250, 238), Color.rgb(193, 177, 145), Color.rgb(255, 184, 77), Color.rgb(78, 53, 18)}
     };
 
     private int BG;
@@ -97,15 +94,39 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
         preferences = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-        themeIndex = Math.max(0, Math.min(4, preferences.getInt(KEY_THEME, 0)));
+        themeIndex = clampTheme(preferences.getInt(KEY_THEME, 0));
         applyTheme();
 
         if (!hasSavedProfile()) {
             showSetupScreen();
         } else {
+            selectedScreen = "home";
+            weekSelectedDay = todayNameOrMonday();
             openApp();
         }
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (refreshRunnable != null) {
+            handler.removeCallbacks(refreshRunnable);
+        }
+    }
+
+    @Override
+    public void onBackPressed() {
+        if (!"home".equals(selectedScreen)) {
+            navigate("home");
+            return;
+        }
+        super.onBackPressed();
+    }
+
+    private int clampTheme(int value) {
+        return Math.max(0, Math.min(THEME_NAMES.length - 1, value));
     }
 
     private boolean hasSavedProfile() {
@@ -139,7 +160,7 @@ public class MainActivity extends Activity {
         BORDER = palette[3];
         TEXT = palette[4];
         MUTED = palette[5];
-        SUBTLE = blend(MUTED, BG, 0.60f);
+        SUBTLE = blend(MUTED, BG, 0.55f);
         ACCENT = palette[6];
         ACCENT_BG = palette[7];
 
@@ -152,11 +173,8 @@ public class MainActivity extends Activity {
     }
 
     private void openApp() {
-        selectedDay = todayNameOrMonday();
-        followToday = true;
-        buildUi();
-        refreshSchedule();
-        NotificationScheduler.scheduleUpcoming(this);
+        buildShell();
+        navigate(selectedScreen);
         requestNotificationPermissionIfNeeded();
 
         if (refreshRunnable != null) {
@@ -166,59 +184,171 @@ public class MainActivity extends Activity {
         refreshRunnable = new Runnable() {
             @Override
             public void run() {
-                refreshSchedule();
+                refreshLiveUi();
                 handler.postDelayed(this, 1_000);
             }
         };
         handler.postDelayed(refreshRunnable, 1_000);
     }
 
-    private void showSetupScreen() {
-        LinearLayout page = page();
+    private void buildShell() {
+        root = new FrameLayout(this);
+        root.setBackgroundColor(BG);
 
-        TextView logo = text("NB", 28, TEXT);
+        contentHost = new FrameLayout(this);
+        FrameLayout.LayoutParams contentParams =
+                new FrameLayout.LayoutParams(-1, -1);
+        contentParams.bottomMargin = dp(76);
+        root.addView(contentHost, contentParams);
+
+        bottomNav = buildBottomNav();
+        FrameLayout.LayoutParams navParams =
+                new FrameLayout.LayoutParams(-1, dp(76), Gravity.BOTTOM);
+        root.addView(bottomNav, navParams);
+
+        setContentView(root);
+    }
+
+    private LinearLayout buildBottomNav() {
+        LinearLayout nav = new LinearLayout(this);
+        nav.setOrientation(LinearLayout.HORIZONTAL);
+        nav.setGravity(Gravity.CENTER);
+        nav.setPadding(dp(12), dp(9), dp(12), dp(9));
+        nav.setBackground(round(SURFACE, BORDER, 24));
+
+        nav.addView(navItem("home", "HOME"), navWeight());
+        nav.addView(navItem("week", "WEEK"), navWeight());
+        nav.addView(navItem("settings", "SETTINGS"), navWeight());
+
+        return nav;
+    }
+
+    private LinearLayout.LayoutParams navWeight() {
+        return new LinearLayout.LayoutParams(0, -1, 1f);
+    }
+
+    private TextView navItem(String id, String label) {
+        TextView item = text(label, 10, MUTED);
+        item.setGravity(Gravity.CENTER);
+        item.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+        item.setLetterSpacing(0.08f);
+        item.setPadding(dp(8), dp(10), dp(8), dp(10));
+        item.setClickable(true);
+        item.setFocusable(true);
+        item.setContentDescription(label);
+        item.setOnClickListener(v -> navigate(id));
+        return item;
+    }
+
+    private void updateBottomNav() {
+        if (bottomNav == null) return;
+        for (int i = 0; i < bottomNav.getChildCount(); i++) {
+            TextView item = (TextView) bottomNav.getChildAt(i);
+            String id = i == 0 ? "home" : (i == 1 ? "week" : "settings");
+            boolean selected = id.equals(selectedScreen);
+            item.setTextColor(selected ? TEXT : MUTED);
+            item.setTypeface(
+                    Typeface.create("sans-serif-medium",
+                            selected ? Typeface.BOLD : Typeface.NORMAL)
+            );
+            item.setBackground(
+                    round(selected ? ACCENT_BG : Color.TRANSPARENT,
+                            selected ? ACCENT : Color.TRANSPARENT,
+                            18)
+            );
+        }
+    }
+
+    private void navigate(String screen) {
+        if (root == null) return;
+
+        selectedScreen = screen;
+        if ("week".equals(screen)) {
+            String today = todayName();
+            if (weekSelectedDay == null || weekSelectedDay.isEmpty()) {
+                weekSelectedDay = today.isEmpty() ? "Monday" : today;
+            }
+        }
+
+        if ("home".equals(screen)) {
+            buildHomeScreen();
+        } else if ("week".equals(screen)) {
+            buildWeekScreen();
+        } else {
+            buildSettingsScreen();
+        }
+
+        updateBottomNav();
+        refreshLiveUi();
+    }
+
+    private void showSetupScreen() {
+        LinearLayout page = new LinearLayout(this);
+        page.setOrientation(LinearLayout.VERTICAL);
+        page.setGravity(Gravity.CENTER);
+        page.setPadding(dp(24), dp(28), dp(24), dp(28));
+        page.setBackgroundColor(BG);
+
+        LinearLayout logo = new LinearLayout(this);
         logo.setGravity(Gravity.CENTER);
-        logo.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        logo.setBackground(round(ACCENT, ACCENT, 18));
-        LinearLayout.LayoutParams logoParams = new LinearLayout.LayoutParams(dp(72), dp(72));
+        logo.setBackground(round(ACCENT, ACCENT, 20));
+        TextView logoText = text("NB", 22, BG);
+        logoText.setTypeface(Typeface.DEFAULT_BOLD);
+        logo.addView(logoText);
+
+        LinearLayout.LayoutParams logoParams =
+                new LinearLayout.LayoutParams(dp(68), dp(68));
         logoParams.gravity = Gravity.CENTER_HORIZONTAL;
         page.addView(logo, logoParams);
 
-        TextView title = text("Welcome to NextBell", 28, TEXT);
+        TextView title = text("Welcome to NextBell", 29, TEXT);
         title.setGravity(Gravity.CENTER);
-        title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        title.setPadding(0, dp(16), 0, 0);
+        title.setTypeface(Typeface.DEFAULT_BOLD);
+        title.setPadding(0, dp(18), 0, 0);
         page.addView(title);
 
-        TextView subtitle = text("Your college day, personalized around you.", 13, MUTED);
+        TextView subtitle = text(
+                "Your college day, without the mental math.",
+                13,
+                MUTED
+        );
         subtitle.setGravity(Gravity.CENTER);
-        subtitle.setPadding(0, dp(7), 0, dp(28));
+        subtitle.setPadding(0, dp(8), 0, dp(26));
         page.addView(subtitle);
 
-        LinearLayout card = card();
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
         card.setPadding(dp(20), dp(20), dp(20), dp(20));
+        card.setBackground(round(SURFACE, BORDER, 22));
 
-        TextView nameLabel = sectionLabel("YOUR NAME");
-        card.addView(nameLabel);
-
+        card.addView(sectionLabel("YOUR NAME"));
         EditText nameInput = field("e.g. Neal", false);
-        card.addView(nameInput, fieldParams());
+        LinearLayout.LayoutParams fieldParams1 = fieldParams();
+        fieldParams1.setMargins(0, dp(8), 0, 0);
+        card.addView(nameInput, fieldParams1);
 
         TextView rollLabel = sectionLabel("ROLL NUMBER");
-        LinearLayout.LayoutParams rollLabelParams = new LinearLayout.LayoutParams(-1, -2);
+        LinearLayout.LayoutParams rollLabelParams =
+                new LinearLayout.LayoutParams(-1, -2);
         rollLabelParams.setMargins(0, dp(18), 0, 0);
         card.addView(rollLabel, rollLabelParams);
 
         EditText rollInput = field("e.g. 34", true);
-        card.addView(rollInput, fieldParams());
+        LinearLayout.LayoutParams fieldParams2 = fieldParams();
+        fieldParams2.setMargins(0, dp(8), 0, 0);
+        card.addView(rollInput, fieldParams2);
 
-        TextView batchHint = text("B1 · 1–25    B2 · 26–50    B3 · 51+", 10, MUTED);
+        TextView batchHint = text(
+                "B1  1–25     B2  26–50     B3  51+",
+                10,
+                MUTED
+        );
         batchHint.setGravity(Gravity.CENTER);
-        batchHint.setPadding(0, dp(8), 0, dp(18));
+        batchHint.setPadding(0, dp(9), 0, dp(18));
         card.addView(batchHint);
 
-        Button continueButton = primaryButton("Let's go");
-        card.addView(continueButton, new LinearLayout.LayoutParams(-1, dp(52)));
+        TextView continueButton = actionButton("Continue", true);
+        card.addView(continueButton, new LinearLayout.LayoutParams(-1, dp(50)));
 
         continueButton.setOnClickListener(v -> {
             String name = nameInput.getText().toString().trim();
@@ -235,18 +365,23 @@ public class MainActivity extends Activity {
                     rollInput.setError("Enter a valid roll number.");
                     return;
                 }
+
                 saveProfile(name, roll);
+                weekSelectedDay = todayNameOrMonday();
+                selectedScreen = "home";
                 openApp();
             } catch (NumberFormatException e) {
                 rollInput.setError("Enter your roll number.");
             }
         });
 
-        LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(-1, -2);
-        cardParams.setMargins(0, dp(18), 0, 0);
-        page.addView(card, cardParams);
+        page.addView(card, new LinearLayout.LayoutParams(-1, -2));
 
-        TextView privacy = text("Your profile is stored only on this phone.", 10, MUTED);
+        TextView privacy = text(
+                "Saved locally on this phone.",
+                10,
+                MUTED
+        );
         privacy.setGravity(Gravity.CENTER);
         privacy.setPadding(0, dp(14), 0, 0);
         page.addView(privacy);
@@ -254,359 +389,957 @@ public class MainActivity extends Activity {
         setContentView(page);
     }
 
-    private void buildUi() {
-        root = new LinearLayout(this);
-        root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundColor(BG);
+    private void buildHomeScreen() {
+        LinearLayout page = scrollPage();
 
-        LinearLayout header = new LinearLayout(this);
-        header.setOrientation(LinearLayout.HORIZONTAL);
-        header.setGravity(Gravity.CENTER_VERTICAL);
-        header.setPadding(dp(18), dp(16), dp(18), dp(8));
+        LinearLayout top = new LinearLayout(this);
+        top.setGravity(Gravity.CENTER_VERTICAL);
 
-        LinearLayout identity = new LinearLayout(this);
-        identity.setOrientation(LinearLayout.VERTICAL);
-        LinearLayout.LayoutParams identityParams = new LinearLayout.LayoutParams(0, -2, 1f);
+        LinearLayout titleBlock = new LinearLayout(this);
+        titleBlock.setOrientation(LinearLayout.VERTICAL);
+        top.addView(titleBlock, new LinearLayout.LayoutParams(0, -2, 1f));
 
-        TextView brand = text("NextBell", 23, TEXT);
-        brand.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        identity.addView(brand);
+        TextView brand = text("NextBell", 25, TEXT);
+        brand.setTypeface(Typeface.DEFAULT_BOLD);
+        titleBlock.addView(brand);
 
-        greetingText = text("Hey, " + getName() + " 👋", 13, TEXT);
-        greetingText.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        greetingText.setPadding(0, dp(3), 0, 0);
-        identity.addView(greetingText);
-
-        header.addView(identity, identityParams);
-
-        LinearLayout live = new LinearLayout(this);
-        live.setOrientation(LinearLayout.VERTICAL);
-        live.setGravity(Gravity.END);
-
-        liveClock = text("--:--:-- --", 12, TEXT);
-        liveClock.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        live.addView(liveClock);
-
-        liveDate = text("Loading…", 9, MUTED);
-        liveDate.setGravity(Gravity.END);
-        liveDate.setPadding(0, dp(2), 0, 0);
-        live.addView(liveDate);
-
-        header.addView(live);
-
-        TextView settings = text("⚙", 23, TEXT);
-        settings.setGravity(Gravity.CENTER);
-        settings.setContentDescription("Settings");
-        settings.setClickable(true);
-        settings.setFocusable(true);
-        settings.setOnClickListener(v -> showSettings());
-        header.addView(settings, new LinearLayout.LayoutParams(dp(48), dp(48)));
-
-        root.addView(header);
-
-        profileChip = text(getBatch() + " · Roll " + getRollNumber(), 9, ACCENT);
-        profileChip.setGravity(Gravity.CENTER);
-        profileChip.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        profileChip.setPadding(dp(11), dp(7), dp(11), dp(7));
-        profileChip.setBackground(round(ACCENT_BG, ACCENT, 999));
-        LinearLayout.LayoutParams chipParams = new LinearLayout.LayoutParams(-2, -2);
-        chipParams.setMargins(dp(18), 0, dp(18), dp(10));
-        chipParams.gravity = Gravity.START;
-        root.addView(profileChip, chipParams);
-
-        LinearLayout content = new LinearLayout(this);
-        content.setOrientation(LinearLayout.VERTICAL);
-
-        ScrollView scroll = new ScrollView(this);
-        scroll.setFillViewport(true);
-        content.setPadding(0, 0, 0, 0);
-
-        LinearLayout body = new LinearLayout(this);
-        body.setOrientation(LinearLayout.VERTICAL);
-        body.setPadding(dp(18), 0, dp(18), dp(24));
-
-        dayTitle = text(selectedDay.toUpperCase(), 11, MUTED);
-        dayTitle.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        dayTitle.setLetterSpacing(0.18f);
-        body.addView(dayTitle);
-
-        LinearLayout dayTabs = new LinearLayout(this);
-        dayTabs.setOrientation(LinearLayout.HORIZONTAL);
-        LinearLayout.LayoutParams dayTabsParams = new LinearLayout.LayoutParams(-1, -2);
-        dayTabsParams.setMargins(0, dp(9), 0, dp(14));
-        body.addView(dayTabs, dayTabsParams);
-
-        for (String day : TimetableData.DAYS) {
-            TextView tab = text(day.substring(0, 3), 11, MUTED);
-            tab.setGravity(Gravity.CENTER);
-            tab.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-            tab.setPadding(dp(13), dp(9), dp(13), dp(9));
-            LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(0, dp(38), 1f);
-            p.setMargins(0, 0, dp(6), 0);
-            dayTabs.addView(tab, p);
-            tab.setOnClickListener(v -> {
-                selectedDay = day;
-                followToday = day.equals(todayName());
-                highlightDayButtons(dayTabs);
-                updateDayHeader();
-                refreshSchedule();
-            });
-        }
-
-        heroCard = new LinearLayout(this);
-        heroCard.setOrientation(LinearLayout.VERTICAL);
-        heroCard.setPadding(dp(20), dp(19), dp(20), dp(20));
-        LinearLayout.LayoutParams heroParams = new LinearLayout.LayoutParams(-1, -2);
-        heroParams.setMargins(0, 0, 0, dp(10));
-        body.addView(heroCard, heroParams);
-
-        focusLabel = text("NEXT LECTURE", 9, ACCENT);
-        focusLabel.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        focusLabel.setLetterSpacing(0.15f);
-        heroCard.addView(focusLabel);
-
-        focusSubject = text("Loading…", 27, TEXT);
-        focusSubject.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        focusSubject.setPadding(0, dp(7), 0, 0);
-        heroCard.addView(focusSubject);
-
-        focusMeta = text("", 11, MUTED);
-        focusMeta.setPadding(0, dp(7), 0, 0);
-        heroCard.addView(focusMeta);
-
-        focusMinutes = text("", 38, TEXT);
-        focusMinutes.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        focusMinutes.setPadding(0, dp(17), 0, 0);
-        heroCard.addView(focusMinutes);
-
-        nextPanel = new LinearLayout(this);
-        nextPanel.setOrientation(LinearLayout.VERTICAL);
-        nextPanel.setPadding(dp(17), dp(14), dp(17), dp(14));
-        nextPanel.setBackground(round(SURFACE_2, BORDER, 17));
-        LinearLayout.LayoutParams nextParams = new LinearLayout.LayoutParams(-1, -2);
-        nextParams.setMargins(0, 0, 0, dp(10));
-        body.addView(nextPanel, nextParams);
-
-        TextView nextLabel = text("UP NEXT", 9, MUTED);
-        nextLabel.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        nextLabel.setLetterSpacing(0.14f);
-        nextPanel.addView(nextLabel);
-
-        nextSubject = text("Loading…", 15, TEXT);
-        nextSubject.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        nextSubject.setPadding(0, dp(5), 0, 0);
-        nextPanel.addView(nextSubject);
-
-        nextMeta = text("", 10, SUBTLE);
-        nextMeta.setPadding(0, dp(3), 0, 0);
-        nextPanel.addView(nextMeta);
-
-        nextCountdown = text("", 19, TEXT);
-        nextCountdown.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        nextCountdown.setPadding(0, dp(6), 0, 0);
-        nextPanel.addView(nextCountdown);
-
-        statsCard = card();
-        statsCard.setOrientation(LinearLayout.HORIZONTAL);
-        statsCard.setPadding(dp(16), dp(14), dp(16), dp(14));
-        LinearLayout.LayoutParams statsParams = new LinearLayout.LayoutParams(-1, -2);
-        statsParams.setMargins(0, 0, 0, dp(18));
-        body.addView(statsCard, statsParams);
-
-        LinearLayout statA = statBlock();
-        dayPulse = statValue(statA, "—");
-        statLabel(statA, "classes");
-
-        LinearLayout statB = statBlock();
-        completedText = statValue(statB, "—");
-        statLabel(statB, "done");
-
-        LinearLayout statC = statBlock();
-        freePeriodsText = statValue(statC, "—");
-        statLabel(statC, "open gaps");
-
-        statsCard.addView(statA, new LinearLayout.LayoutParams(0, -2, 1f));
-        statsCard.addView(statB, new LinearLayout.LayoutParams(0, -2, 1f));
-        statsCard.addView(statC, new LinearLayout.LayoutParams(0, -2, 1f));
-
-        LinearLayout scheduleHeader = new LinearLayout(this);
-        scheduleHeader.setOrientation(LinearLayout.HORIZONTAL);
-        scheduleHeader.setGravity(Gravity.CENTER_VERTICAL);
-        body.addView(scheduleHeader);
-
-        TextView scheduleHeading = text("TODAY'S FLOW", 10, MUTED);
-        scheduleHeading.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        scheduleHeading.setLetterSpacing(0.15f);
-        scheduleHeader.addView(scheduleHeading, new LinearLayout.LayoutParams(0, -2, 1f));
-
-        TextView rollInfo = text(getBatch(), 9, ACCENT);
-        rollInfo.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        scheduleHeader.addView(rollInfo);
-
-        scheduleContainer = new LinearLayout(this);
-        scheduleContainer.setOrientation(LinearLayout.VERTICAL);
-        LinearLayout.LayoutParams scheduleParams = new LinearLayout.LayoutParams(-1, -2);
-        scheduleParams.setMargins(0, dp(10), 0, 0);
-        body.addView(scheduleContainer, scheduleParams);
-
-        footer(body);
-
-        scroll.addView(body);
-        content.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1f));
-
-        root.addView(content, new LinearLayout.LayoutParams(-1, 0, 1f));
-
-        highlightDayButtons(dayTabs);
-        updateDayHeader();
-
-        setContentView(root);
-    }
-
-    private void updateDayHeader() {
-        if (dayTitle != null) {
-            dayTitle.setText(selectedDay.toUpperCase());
-        }
-    }
-
-    private void showSettings() {
-        LinearLayout box = new LinearLayout(this);
-        box.setOrientation(LinearLayout.VERTICAL);
-        box.setPadding(dp(3), 0, dp(3), 0);
-
-        TextView profileSection = sectionLabel("PROFILE");
-        box.addView(profileSection);
-
-        TextView profileDescription = text(
-                getName() + " · " + getBatch() + " · Roll " + getRollNumber(),
-                12,
+        greetingText = text(
+                greeting() + ", " + getName(),
+                13,
                 MUTED
         );
-        profileDescription.setPadding(0, dp(6), 0, dp(13));
-        box.addView(profileDescription);
+        greetingText.setPadding(0, dp(4), 0, 0);
+        titleBlock.addView(greetingText);
 
-        Button editProfile = secondaryButton("Edit name & roll number");
-        box.addView(editProfile, new LinearLayout.LayoutParams(-1, dp(46)));
+        LinearLayout liveBlock = new LinearLayout(this);
+        liveBlock.setOrientation(LinearLayout.VERTICAL);
+        liveBlock.setGravity(Gravity.END);
 
-        TextView appearance = sectionLabel("APPEARANCE");
-        LinearLayout.LayoutParams appearanceParams = new LinearLayout.LayoutParams(-1, -2);
-        appearanceParams.setMargins(0, dp(20), 0, 0);
-        box.addView(appearance, appearanceParams);
+        liveClock = text("--:--", 12, TEXT);
+        liveClock.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
+        liveBlock.addView(liveClock);
 
-        LinearLayout themeRow = new LinearLayout(this);
-        themeRow.setOrientation(LinearLayout.HORIZONTAL);
-        themeRow.setGravity(Gravity.CENTER_VERTICAL);
-        themeRow.setPadding(0, dp(8), 0, dp(6));
+        liveDate = text("--", 9, MUTED);
+        liveDate.setGravity(Gravity.END);
+        liveDate.setPadding(0, dp(2), 0, 0);
+        liveBlock.addView(liveDate);
 
-        themeButtonLabel = text(THEME_NAMES[themeIndex], 13, TEXT);
-        themeButtonLabel.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        themeRow.addView(themeButtonLabel, new LinearLayout.LayoutParams(0, -2, 1f));
+        TextView avatar = avatarText();
+        LinearLayout.LayoutParams avatarParams =
+                new LinearLayout.LayoutParams(dp(44), dp(44));
+        avatarParams.setMargins(dp(12), 0, 0, 0);
+        top.addView(liveBlock);
+        top.addView(avatar, avatarParams);
 
-        Button changeTheme = secondaryButton("Change");
-        themeRow.addView(changeTheme, new LinearLayout.LayoutParams(dp(92), dp(42)));
-        box.addView(themeRow);
+        page.addView(top);
 
-        TextView notificationLabel = sectionLabel("NOTIFICATIONS");
-        LinearLayout.LayoutParams notificationParams = new LinearLayout.LayoutParams(-1, -2);
-        notificationParams.setMargins(0, dp(20), 0, 0);
-        box.addView(notificationLabel, notificationParams);
+        profileBadge = text(
+                getBatch() + "  •  Roll " + getRollNumber(),
+                10,
+                ACCENT
+        );
+        profileBadge.setGravity(Gravity.CENTER);
+        profileBadge.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
+        profileBadge.setPadding(dp(12), dp(7), dp(12), dp(7));
+        profileBadge.setBackground(round(ACCENT_BG, Color.TRANSPARENT, 999));
 
-        TextView notificationText = text(
-                "15-minute reminders use your personalized timetable.",
+        LinearLayout.LayoutParams badgeParams =
+                new LinearLayout.LayoutParams(-2, -2);
+        badgeParams.setMargins(0, dp(12), 0, dp(18));
+        page.addView(profileBadge, badgeParams);
+
+        homeHero = new LinearLayout(this);
+        homeHero.setOrientation(LinearLayout.VERTICAL);
+        homeHero.setPadding(dp(20), dp(20), dp(20), dp(20));
+        LinearLayout.LayoutParams heroParams =
+                new LinearLayout.LayoutParams(-1, -2);
+        heroParams.setMargins(0, 0, 0, dp(16));
+        page.addView(homeHero, heroParams);
+
+        heroLabel = sectionLabel("NEXT CLASS");
+        heroLabel.setTextColor(ACCENT);
+        homeHero.addView(heroLabel);
+
+        heroSubject = text("Loading…", 28, TEXT);
+        heroSubject.setTypeface(Typeface.DEFAULT_BOLD);
+        heroSubject.setPadding(0, dp(8), 0, 0);
+        homeHero.addView(heroSubject);
+
+        heroMeta = text("", 11, MUTED);
+        heroMeta.setPadding(0, dp(7), 0, 0);
+        homeHero.addView(heroMeta);
+
+        LinearLayout countdownRow = new LinearLayout(this);
+        countdownRow.setGravity(Gravity.BOTTOM | Gravity.CENTER_VERTICAL);
+        countdownRow.setPadding(0, dp(18), 0, 0);
+
+        heroCountdown = text("--:--", 36, TEXT);
+        heroCountdown.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
+        countdownRow.addView(heroCountdown, new LinearLayout.LayoutParams(0, -2, 1f));
+
+        heroCountdownLabel = text(
+                "until it starts",
+                10,
+                MUTED
+        );
+        heroCountdownLabel.setGravity(Gravity.END | Gravity.BOTTOM);
+        countdownRow.addView(heroCountdownLabel);
+
+        homeHero.addView(countdownRow);
+
+        LinearLayout quickRow = new LinearLayout(this);
+        quickRow.setOrientation(LinearLayout.HORIZONTAL);
+        quickRow.setGravity(Gravity.CENTER_VERTICAL);
+
+        TextView todayChip = chipButton("TODAY", ACCENT_BG, ACCENT);
+        quickRow.addView(todayChip, new LinearLayout.LayoutParams(dp(86), dp(38)));
+
+        TextView viewWeek = chipButton("VIEW WEEK  →", SURFACE_2, TEXT);
+        LinearLayout.LayoutParams weekButtonParams =
+                new LinearLayout.LayoutParams(0, dp(38), 1f);
+        weekButtonParams.setMargins(dp(8), 0, 0, 0);
+        quickRow.addView(viewWeek, weekButtonParams);
+        viewWeek.setOnClickListener(v -> navigate("week"));
+
+        LinearLayout.LayoutParams quickParams =
+                new LinearLayout.LayoutParams(-1, -2);
+        quickParams.setMargins(0, 0, 0, dp(18));
+        page.addView(quickRow, quickParams);
+
+        LinearLayout sectionHeader = new LinearLayout(this);
+        sectionHeader.setGravity(Gravity.CENTER_VERTICAL);
+
+        homeDayLabel = text("TODAY", 13, TEXT);
+        homeDayLabel.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
+        sectionHeader.addView(homeDayLabel, new LinearLayout.LayoutParams(0, -2, 1f));
+
+        TextView smallBatch = text(getBatch(), 10, MUTED);
+        sectionHeader.addView(smallBatch);
+
+        page.addView(sectionHeader);
+
+        TextView helper = text(
+                "Your full day, in time order.",
+                10,
+                MUTED
+        );
+        helper.setPadding(0, dp(4), 0, dp(11));
+        page.addView(helper);
+
+        homeSchedule = new LinearLayout(this);
+        homeSchedule.setOrientation(LinearLayout.VERTICAL);
+        page.addView(homeSchedule);
+
+        addBottomSpace(page);
+    }
+
+    private void buildWeekScreen() {
+        LinearLayout page = scrollPage();
+
+        TextView title = text("Your week", 27, TEXT);
+        title.setTypeface(Typeface.DEFAULT_BOLD);
+        page.addView(title);
+
+        TextView subtitle = text(
+                getBatch() + "  •  Roll " + getRollNumber(),
                 11,
                 MUTED
         );
-        notificationText.setPadding(0, dp(6), 0, 0);
-        box.addView(notificationText);
+        subtitle.setPadding(0, dp(5), 0, dp(18));
+        page.addView(subtitle);
 
-        AlertDialog dialog = new AlertDialog.Builder(this)
-                .setTitle("Settings")
-                .setView(box)
-                .setPositiveButton("Done", null)
-                .create();
+        HorizontalScrollView dayScroller = new HorizontalScrollView(this);
+        dayScroller.setHorizontalScrollBarEnabled(false);
+        dayScroller.setOverScrollMode(View.OVER_SCROLL_NEVER);
 
-        editProfile.setOnClickListener(v -> {
-            dialog.dismiss();
-            showProfileEditor();
-        });
+        LinearLayout dayRow = new LinearLayout(this);
+        dayRow.setOrientation(LinearLayout.HORIZONTAL);
 
-        changeTheme.setOnClickListener(v -> {
-            showThemePicker();
-        });
+        for (String day : TimetableData.DAYS) {
+            TextView chip = dayChip(day);
+            dayRow.addView(chip, new LinearLayout.LayoutParams(dp(78), dp(46)));
+            if (!day.equals(TimetableData.DAYS[TimetableData.DAYS.length - 1])) {
+                SpaceView spacer = new SpaceView(this, dp(8), 1);
+                dayRow.addView(spacer);
+            }
+        }
 
-        dialog.show();
+        dayScroller.addView(dayRow);
+        LinearLayout.LayoutParams scrollerParams =
+                new LinearLayout.LayoutParams(-1, dp(46));
+        scrollerParams.setMargins(0, 0, 0, dp(19));
+        page.addView(dayScroller, scrollerParams);
+
+        TextView dayTitle = text(weekSelectedDay.toUpperCase(), 12, MUTED);
+        dayTitle.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
+        dayTitle.setLetterSpacing(0.1f);
+        page.addView(dayTitle);
+
+        TextView dayHelper = text(
+                "Tap another day above to browse your timetable.",
+                10,
+                MUTED
+        );
+        dayHelper.setPadding(0, dp(4), 0, dp(12));
+        page.addView(dayHelper);
+
+        weekSchedule = new LinearLayout(this);
+        weekSchedule.setOrientation(LinearLayout.VERTICAL);
+        page.addView(weekSchedule);
+
+        addBottomSpace(page);
+
+        updateWeekDayChips(dayRow);
+        refreshWeekSchedule();
     }
 
-    private void showProfileEditor() {
+    private void buildSettingsScreen() {
+        LinearLayout page = scrollPage();
+
+        LinearLayout header = new LinearLayout(this);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+
+        TextView back = text("‹", 34, TEXT);
+        back.setGravity(Gravity.CENTER);
+        back.setContentDescription("Back");
+        back.setClickable(true);
+        back.setFocusable(true);
+        back.setBackground(round(SURFACE_2, Color.TRANSPARENT, 16));
+        back.setOnClickListener(v -> navigate("home"));
+        header.addView(back, new LinearLayout.LayoutParams(dp(48), dp(48)));
+
+        TextView title = text("Settings", 27, TEXT);
+        title.setTypeface(Typeface.DEFAULT_BOLD);
+        LinearLayout.LayoutParams titleParams =
+                new LinearLayout.LayoutParams(0, -2, 1f);
+        titleParams.setMargins(dp(10), 0, 0, 0);
+        header.addView(title, titleParams);
+
+        page.addView(header);
+
+        TextView subtitle = text(
+                "Make NextBell feel like yours.",
+                12,
+                MUTED
+        );
+        subtitle.setPadding(dp(58), dp(2), 0, dp(22));
+        page.addView(subtitle);
+
+        page.addView(sectionLabel("PROFILE"));
+
+        LinearLayout profileCard = settingCard();
+        TextView initials = avatarText();
+        profileCard.addView(initials, new LinearLayout.LayoutParams(dp(48), dp(48)));
+
+        LinearLayout profileText = new LinearLayout(this);
+        profileText.setOrientation(LinearLayout.VERTICAL);
+        TextView name = text(getName(), 15, TEXT);
+        name.setTypeface(Typeface.DEFAULT_BOLD);
+        profileText.addView(name);
+
+        TextView info = text(
+                getBatch() + "  •  Roll " + getRollNumber(),
+                10,
+                MUTED
+        );
+        info.setPadding(0, dp(3), 0, 0);
+        profileText.addView(info);
+
+        LinearLayout.LayoutParams profileTextParams =
+                new LinearLayout.LayoutParams(0, -2, 1f);
+        profileTextParams.setMargins(dp(12), 0, dp(8), 0);
+        profileCard.addView(profileText, profileTextParams);
+
+        TextView edit = actionButton("Edit", false);
+        profileCard.addView(edit, new LinearLayout.LayoutParams(dp(72), dp(40)));
+        edit.setOnClickListener(v -> showEditProfile());
+
+        page.addView(profileCard, cardMargin());
+
+        page.addView(sectionLabel("APPEARANCE"));
+
+        TextView appearanceHint = text(
+                "Choose a visual style. It stays saved on this phone.",
+                10,
+                MUTED
+        );
+        appearanceHint.setPadding(0, dp(5), 0, dp(11));
+        page.addView(appearanceHint);
+
+        LinearLayout themes = new LinearLayout(this);
+        themes.setOrientation(LinearLayout.VERTICAL);
+        page.addView(themes);
+
+        for (int i = 0; i < THEME_NAMES.length; i += 2) {
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+
+            row.addView(themeCard(i), new LinearLayout.LayoutParams(0, dp(94), 1f));
+
+            if (i + 1 < THEME_NAMES.length) {
+                View gap = spacer(dp(9), 1);
+                row.addView(gap);
+                row.addView(themeCard(i + 1), new LinearLayout.LayoutParams(0, dp(94), 1f));
+            }
+
+            LinearLayout.LayoutParams rowParams =
+                    new LinearLayout.LayoutParams(-1, dp(94));
+            rowParams.setMargins(0, 0, 0, dp(9));
+            themes.addView(row, rowParams);
+        }
+
+        page.addView(sectionLabel("NOTIFICATIONS"));
+
+        LinearLayout notificationCard = settingCard();
+        TextView notificationDot = text(
+                isNotificationGranted() ? "●" : "○",
+                20,
+                isNotificationGranted() ? ACCENT : MUTED
+        );
+        notificationCard.addView(
+                notificationDot,
+                new LinearLayout.LayoutParams(dp(40), dp(40))
+        );
+
+        LinearLayout notifText = new LinearLayout(this);
+        notifText.setOrientation(LinearLayout.VERTICAL);
+
+        TextView notifTitle = text(
+                "Class reminders",
+                14,
+                TEXT
+        );
+        notifTitle.setTypeface(Typeface.DEFAULT_BOLD);
+        notifText.addView(notifTitle);
+
+        TextView notifDescription = text(
+                isNotificationGranted()
+                        ? "15 minutes before your personalized classes."
+                        : "Tap to enable 15-minute class reminders.",
+                10,
+                MUTED
+        );
+        notifDescription.setPadding(0, dp(3), 0, 0);
+        notifText.addView(notifDescription);
+
+        notificationCard.addView(
+                notifText,
+                new LinearLayout.LayoutParams(0, -2, 1f)
+        );
+
+        if (!isNotificationGranted() && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            TextView enable = actionButton("Enable", false);
+            notificationCard.addView(
+                    enable,
+                    new LinearLayout.LayoutParams(dp(82), dp(40))
+            );
+            enable.setOnClickListener(v -> requestNotificationAccess());
+        }
+
+        page.addView(notificationCard, cardMargin());
+
+        page.addView(sectionLabel("ABOUT"));
+
+        LinearLayout aboutCard = settingCard();
+        LinearLayout aboutText = new LinearLayout(this);
+        aboutText.setOrientation(LinearLayout.VERTICAL);
+
+        TextView aboutTitle = text("NextBell", 14, TEXT);
+        aboutTitle.setTypeface(Typeface.DEFAULT_BOLD);
+        aboutText.addView(aboutTitle);
+
+        TextView aboutSubtitle = text(
+                "FE Division B  •  Academic Year 2026–27",
+                10,
+                MUTED
+        );
+        aboutSubtitle.setPadding(0, dp(3), 0, 0);
+        aboutText.addView(aboutSubtitle);
+
+        TextView aboutVersion = text(
+                "Timetable source: official schedule, W.E.F. 16/09/2026.",
+                9,
+                SUBTLE
+        );
+        aboutVersion.setPadding(0, dp(5), 0, 0);
+        aboutText.addView(aboutVersion);
+
+        aboutCard.addView(aboutText);
+        page.addView(aboutCard, cardMargin());
+
+        addBottomSpace(page);
+    }
+
+    private LinearLayout scrollPage() {
+        ScrollView scroll = new ScrollView(this);
+        scroll.setFillViewport(true);
+        scroll.setVerticalScrollBarEnabled(false);
+        scroll.setOverScrollMode(View.OVER_SCROLL_NEVER);
+
+        LinearLayout body = new LinearLayout(this);
+        body.setOrientation(LinearLayout.VERTICAL);
+        body.setPadding(dp(20), dp(22), dp(20), dp(30));
+
+        scroll.addView(body);
+        contentHost.removeAllViews();
+        contentHost.addView(scroll);
+        return body;
+    }
+
+    private void addBottomSpace(LinearLayout page) {
+        View spacer = spacer(1, dp(32));
+        page.addView(spacer);
+    }
+
+    private LinearLayout settingCard() {
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.HORIZONTAL);
+        card.setGravity(Gravity.CENTER_VERTICAL);
+        card.setPadding(dp(14), dp(13), dp(14), dp(13));
+        card.setBackground(round(SURFACE, Color.TRANSPARENT, 18));
+        return card;
+    }
+
+    private LinearLayout.LayoutParams cardMargin() {
+        LinearLayout.LayoutParams params =
+                new LinearLayout.LayoutParams(-1, -2);
+        params.setMargins(0, dp(9), 0, dp(20));
+        return params;
+    }
+
+    private TextView themeCard(int index) {
+        TextView card = text(
+                THEME_NAMES[index] + (index == themeIndex ? "   ✓" : ""),
+                12,
+                index == themeIndex ? ACCENT : TEXT
+        );
+        card.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
+        card.setGravity(Gravity.CENTER_VERTICAL);
+        card.setPadding(dp(14), 0, dp(10), 0);
+        card.setBackground(round(
+                index == themeIndex ? ACCENT_BG : SURFACE,
+                index == themeIndex ? ACCENT : Color.TRANSPARENT,
+                18
+        ));
+        card.setContentDescription(
+                "Theme " + THEME_NAMES[index] +
+                        (index == themeIndex ? ", selected" : "")
+        );
+        card.setClickable(true);
+        card.setFocusable(true);
+
+        View.OnClickListener listener = v -> {
+            if (themeIndex == index) return;
+            themeIndex = index;
+            preferences.edit().putInt(KEY_THEME, themeIndex).apply();
+            applyTheme();
+
+            String keepScreen = selectedScreen;
+            buildShell();
+            selectedScreen = keepScreen;
+            navigate("settings");
+        };
+        card.setOnClickListener(listener);
+        return card;
+    }
+
+    private void showEditProfile() {
         LinearLayout box = new LinearLayout(this);
         box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(dp(2), 0, dp(2), 0);
 
-        final EditText nameInput = field("Your name", false);
+        EditText nameInput = field(getName(), false);
         nameInput.setText(getName());
+        nameInput.setSelection(nameInput.length());
 
-        final EditText rollInput = field("Roll number", true);
+        EditText rollInput = field(String.valueOf(getRollNumber()), true);
         rollInput.setText(String.valueOf(getRollNumber()));
+        rollInput.setSelection(rollInput.length());
 
-        box.addView(sectionLabel("NAME"));
         box.addView(nameInput, fieldParams());
-        LinearLayout.LayoutParams rollLabelParams = new LinearLayout.LayoutParams(-1, -2);
-        rollLabelParams.setMargins(0, dp(14), 0, 0);
-        TextView rollLabel = sectionLabel("ROLL NUMBER");
-        box.addView(rollLabel, rollLabelParams);
-        box.addView(rollInput, fieldParams());
+        box.addView(rollInput, fieldParamsWithTop());
 
-        AlertDialog dialog = new AlertDialog.Builder(this)
+        new AlertDialog.Builder(this)
                 .setTitle("Edit profile")
                 .setView(box)
                 .setNegativeButton("Cancel", null)
-                .setPositiveButton("Save", null)
-                .create();
+                .setPositiveButton("Save", (dialog, which) -> {
+                    String name = nameInput.getText().toString().trim();
+                    String rollRaw = rollInput.getText().toString().trim();
 
-        dialog.setOnShowListener(v -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(view -> {
-            String name = nameInput.getText().toString().trim();
-            if (name.isEmpty()) {
-                nameInput.setError("Enter your name.");
-                return;
-            }
+                    if (name.isEmpty()) {
+                        name = getName();
+                    }
 
-            try {
-                int roll = Integer.parseInt(rollInput.getText().toString().trim());
-                if (roll < 1 || roll > 999) {
-                    rollInput.setError("Enter a valid roll number.");
-                    return;
-                }
+                    try {
+                        int roll = Integer.parseInt(rollRaw);
+                        if (roll < 1 || roll > 999) {
+                            throw new NumberFormatException();
+                        }
 
-                saveProfile(name, roll);
-                profileChip.setText(getBatch() + " · Roll " + roll);
-                greetingText.setText("Hey, " + getName() + " 👋");
-                NotificationScheduler.scheduleUpcoming(this);
-                refreshSchedule();
-                dialog.dismiss();
-            } catch (NumberFormatException e) {
-                rollInput.setError("Enter your roll number.");
-            }
-        }));
-
-        dialog.show();
-    }
-
-    private void showThemePicker() {
-        new AlertDialog.Builder(this)
-                .setTitle("Choose a theme")
-                .setSingleChoiceItems(THEME_NAMES, themeIndex, (dialog, which) -> {
-                    themeIndex = which;
-                    preferences.edit().putInt(KEY_THEME, themeIndex).apply();
-                    applyTheme();
-                    dialog.dismiss();
-                    rebuildForTheme();
+                        saveProfile(name, roll);
+                        weekSelectedDay = todayNameOrMonday();
+                        NotificationScheduler.scheduleUpcoming(this);
+                        navigate("settings");
+                    } catch (NumberFormatException ignored) {
+                        rollInput.setError("Enter a valid roll number.");
+                    }
                 })
-                .setNegativeButton("Cancel", null)
                 .show();
     }
 
-    private void rebuildForTheme() {
-        if (hasSavedProfile()) {
-            openApp();
+    private void refreshLiveUi() {
+        updateClock();
+
+        if ("home".equals(selectedScreen)) {
+            refreshHome();
+        } else if ("week".equals(selectedScreen)) {
+            refreshWeekSchedule();
         }
+    }
+
+    private void refreshHome() {
+        if (homeSchedule == null || homeHero == null) return;
+
+        String today = todayName();
+        boolean isWeekend = today.isEmpty();
+        String day = isWeekend ? "Monday" : today;
+
+        List<TimetableData.ClassItem> entries =
+                TimetableData.forRollAndDay(getRollNumber(), day);
+
+        int now = isWeekend ? -1 : nowSeconds();
+        TimetableData.ClassItem current = null;
+        TimetableData.ClassItem next = null;
+
+        for (TimetableData.ClassItem item : entries) {
+            if (!item.isAcademic()) continue;
+
+            int start = toSeconds(item.start);
+            int end = toSeconds(item.end);
+
+            if (!isWeekend && start <= now && now < end) {
+                current = item;
+            } else if (isWeekend && next == null) {
+                next = item;
+            } else if (!isWeekend && start > now && next == null) {
+                next = item;
+            }
+        }
+
+        if (current != null) {
+            homeHero.setBackground(round(SURFACE, ACCENT, 22));
+            heroLabel.setText("HAPPENING NOW");
+            heroSubject.setText(current.subject);
+            heroMeta.setText(
+                    formatTime(current.start) + " – " + formatTime(current.end)
+                            + formatLocation(current)
+            );
+            heroCountdown.setText(
+                    formatCountdown(Math.max(0, toSeconds(current.end) - now))
+            );
+            heroCountdownLabel.setText("until it ends");
+        } else if (next != null) {
+            homeHero.setBackground(round(SURFACE, Color.TRANSPARENT, 22));
+            heroLabel.setText("NEXT CLASS");
+            heroSubject.setText(next.subject);
+            heroMeta.setText(
+                    formatTime(next.start) + " – " + formatTime(next.end)
+                            + formatLocation(next)
+            );
+
+            if (isWeekend) {
+                heroCountdown.setText(formatTime(next.start));
+                heroCountdownLabel.setText(day + " · " + getBatch());
+            } else {
+                heroCountdown.setText(
+                        formatCountdown(Math.max(0, toSeconds(next.start) - now))
+                );
+                heroCountdownLabel.setText("until it starts");
+            }
+        } else {
+            homeHero.setBackground(round(SURFACE, Color.TRANSPARENT, 22));
+            heroLabel.setText("DAY COMPLETE");
+            heroSubject.setText("You're done for today.");
+            heroMeta.setText(day + "  •  " + getBatch());
+            heroCountdown.setText("✓");
+            heroCountdownLabel.setText("nothing else scheduled");
+        }
+
+        homeDayLabel.setText(
+                isWeekend
+                        ? "MONDAY PREVIEW"
+                        : "TODAY  ·  " + formatTodayDate()
+        );
+
+        profileBadge.setText(getBatch() + "  •  Roll " + getRollNumber());
+
+        homeSchedule.removeAllViews();
+        for (TimetableData.ClassItem item : entries) {
+            boolean isCurrent = current != null && current.id.equals(item.id);
+            boolean isDone = !isWeekend
+                    && item.isAcademic()
+                    && toSeconds(item.end) <= now;
+
+            if (item.isBreak()) {
+                homeSchedule.addView(breakRow(item));
+            } else {
+                homeSchedule.addView(classRow(item, isCurrent, false, isDone));
+            }
+        }
+    }
+
+    private void refreshWeekSchedule() {
+        if (weekSchedule == null) return;
+
+        List<TimetableData.ClassItem> entries =
+                TimetableData.forRollAndDay(getRollNumber(), weekSelectedDay);
+
+        weekSchedule.removeAllViews();
+
+        String today = todayName();
+        boolean viewingToday = weekSelectedDay.equals(today) && !today.isEmpty();
+        int now = viewingToday ? nowSeconds() : -1;
+
+        TimetableData.ClassItem current = null;
+        if (viewingToday) {
+            for (TimetableData.ClassItem item : entries) {
+                if (!item.isAcademic()) continue;
+                int start = toSeconds(item.start);
+                int end = toSeconds(item.end);
+                if (start <= now && now < end) {
+                    current = item;
+                    break;
+                }
+            }
+        }
+
+        if (entries.isEmpty()) {
+            TextView empty = text(
+                    "No classes scheduled.",
+                    13,
+                    MUTED
+            );
+            empty.setGravity(Gravity.CENTER);
+            empty.setPadding(0, dp(30), 0, dp(30));
+            weekSchedule.addView(empty);
+            return;
+        }
+
+        for (TimetableData.ClassItem item : entries) {
+            boolean isCurrent = current != null && current.id.equals(item.id);
+            boolean isDone = viewingToday
+                    && item.isAcademic()
+                    && toSeconds(item.end) <= now;
+
+            weekSchedule.addView(
+                    item.isBreak()
+                            ? breakRow(item)
+                            : classRow(item, isCurrent, false, isDone)
+            );
+        }
+    }
+
+    private void updateWeekDayChips(LinearLayout row) {
+        for (int i = 0; i < TimetableData.DAYS.length; i++) {
+            String day = TimetableData.DAYS[i];
+            TextView chip = (TextView) row.getChildAt(i * 2);
+            if (chip == null) continue;
+
+            boolean selected = day.equals(weekSelectedDay);
+            chip.setTextColor(selected ? BG : TEXT);
+            chip.setTypeface(
+                    Typeface.create("sans-serif-medium",
+                            selected ? Typeface.BOLD : Typeface.NORMAL)
+            );
+            chip.setBackground(round(
+                    selected ? TEXT : SURFACE,
+                    Color.TRANSPARENT,
+                    16
+            ));
+
+            chip.setOnClickListener(v -> {
+                weekSelectedDay = day;
+                updateWeekDayChips(row);
+                refreshWeekSchedule();
+            });
+        }
+    }
+
+    private TextView dayChip(String day) {
+        TextView chip = text(day.substring(0, 3), 11, TEXT);
+        chip.setGravity(Gravity.CENTER);
+        chip.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+        chip.setClickable(true);
+        chip.setFocusable(true);
+        chip.setContentDescription("View " + day + " timetable");
+        return chip;
+    }
+
+    private LinearLayout classRow(
+            TimetableData.ClassItem item,
+            boolean isCurrent,
+            boolean isNext,
+            boolean isDone
+    ) {
+        LinearLayout outer = new LinearLayout(this);
+        outer.setOrientation(LinearLayout.HORIZONTAL);
+        outer.setGravity(Gravity.CENTER_VERTICAL);
+        outer.setPadding(0, 0, 0, 0);
+
+        if (isCurrent) {
+            View indicator = new View(this);
+            indicator.setBackground(round(ACCENT, Color.TRANSPARENT, 999));
+            outer.addView(
+                    indicator,
+                    new LinearLayout.LayoutParams(dp(4), dp(54))
+            );
+        } else {
+            outer.addView(spacer(dp(4), 1));
+        }
+
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.HORIZONTAL);
+        card.setGravity(Gravity.CENTER_VERTICAL);
+        card.setPadding(dp(13), dp(12), dp(12), dp(12));
+        card.setBackground(round(
+                isCurrent ? ACCENT_BG : SURFACE,
+                Color.TRANSPARENT,
+                18
+        ));
+
+        LinearLayout.LayoutParams cardParams =
+                new LinearLayout.LayoutParams(0, -2, 1f);
+        cardParams.setMargins(dp(7), 0, 0, dp(8));
+        outer.addView(card, cardParams);
+
+        LinearLayout timeBlock = new LinearLayout(this);
+        timeBlock.setOrientation(LinearLayout.VERTICAL);
+
+        TextView start = text(
+                formatTime(item.start),
+                11,
+                isDone ? MUTED : TEXT
+        );
+        start.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
+        timeBlock.addView(start);
+
+        TextView end = text(
+                formatTime(item.end),
+                9,
+                SUBTLE
+        );
+        end.setPadding(0, dp(2), 0, 0);
+        timeBlock.addView(end);
+
+        card.addView(timeBlock, new LinearLayout.LayoutParams(dp(73), -2));
+
+        LinearLayout main = new LinearLayout(this);
+        main.setOrientation(LinearLayout.VERTICAL);
+
+        TextView subject = text(
+                item.subject,
+                13,
+                isDone ? MUTED : TEXT
+        );
+        subject.setTypeface(Typeface.DEFAULT_BOLD);
+        main.addView(subject);
+
+        TextView details = text(
+                detailsFor(item),
+                9,
+                MUTED
+        );
+        details.setPadding(0, dp(4), 0, 0);
+        main.addView(details);
+
+        card.addView(main, new LinearLayout.LayoutParams(0, -2, 1f));
+
+        if (!item.room.isEmpty()) {
+            TextView room = text(item.room, 9, MUTED);
+            room.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
+            card.addView(room, new LinearLayout.LayoutParams(dp(50), -2));
+        }
+
+        if (isCurrent) {
+            TextView now = text("NOW", 8, ACCENT);
+            now.setGravity(Gravity.CENTER);
+            now.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
+            now.setPadding(dp(6), dp(5), dp(6), dp(5));
+            now.setBackground(round(ACCENT_BG, ACCENT, 999));
+
+            LinearLayout.LayoutParams nowParams =
+                    new LinearLayout.LayoutParams(-2, dp(26));
+            nowParams.setMargins(dp(7), 0, 0, 0);
+            card.addView(now, nowParams);
+        }
+
+        card.setAlpha(isDone ? 0.58f : 1f);
+        return outer;
+    }
+
+    private LinearLayout breakRow(TimetableData.ClassItem item) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(dp(5), dp(5), dp(5), dp(5));
+
+        TextView dash = text("—", 13, MUTED);
+        row.addView(dash, new LinearLayout.LayoutParams(dp(34), -2));
+
+        TextView time = text(
+                formatTime(item.start) + " – " + formatTime(item.end),
+                9,
+                MUTED
+        );
+        row.addView(time, new LinearLayout.LayoutParams(dp(122), -2));
+
+        TextView label = text(item.subject, 10, MUTED);
+        label.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
+        row.addView(label);
+
+        LinearLayout.LayoutParams params =
+                new LinearLayout.LayoutParams(-1, -2);
+        params.setMargins(0, 0, 0, dp(5));
+        row.setLayoutParams(params);
+        return row;
+    }
+
+    private String detailsFor(TimetableData.ClassItem item) {
+        StringBuilder builder = new StringBuilder();
+        if (!item.code.isEmpty()) builder.append(item.code);
+        if (!item.teacher.isEmpty()) {
+            if (builder.length() > 0) builder.append("  •  ");
+            builder.append(item.teacher);
+        }
+        if (!item.batch.isEmpty()) {
+            if (builder.length() > 0) builder.append("  •  ");
+            builder.append(item.batch);
+        }
+        return builder.toString();
+    }
+
+    private String formatLocation(TimetableData.ClassItem item) {
+        StringBuilder builder = new StringBuilder();
+        if (!item.room.isEmpty()) builder.append("  •  ").append(item.room);
+        if (!item.batch.isEmpty()) builder.append("  •  ").append(item.batch);
+        return builder.toString();
+    }
+
+    private TextView avatarText() {
+        String name = getName();
+        String initials = name.isEmpty()
+                ? "N"
+                : name.substring(0, 1).toUpperCase();
+
+        TextView avatar = text(initials, 15, BG);
+        avatar.setGravity(Gravity.CENTER);
+        avatar.setTypeface(Typeface.DEFAULT_BOLD);
+        avatar.setBackground(round(ACCENT, Color.TRANSPARENT, 999));
+        avatar.setContentDescription("Profile and settings");
+        avatar.setClickable(true);
+        avatar.setFocusable(true);
+        avatar.setOnClickListener(v -> navigate("settings"));
+        return avatar;
+    }
+
+    private TextView chipButton(String label, int fill, int color) {
+        TextView chip = text(label, 10, color);
+        chip.setGravity(Gravity.CENTER);
+        chip.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
+        chip.setLetterSpacing(0.04f);
+        chip.setBackground(round(fill, Color.TRANSPARENT, 999));
+        chip.setClickable(true);
+        chip.setFocusable(true);
+        return chip;
+    }
+
+    private TextView actionButton(String label, boolean primary) {
+        TextView button = text(
+                label,
+                11,
+                primary ? BG : TEXT
+        );
+        button.setGravity(Gravity.CENTER);
+        button.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
+        button.setBackground(round(
+                primary ? ACCENT : SURFACE_2,
+                Color.TRANSPARENT,
+                14
+        ));
+        button.setClickable(true);
+        button.setFocusable(true);
+        return button;
+    }
+
+    private TextView sectionLabel(String value) {
+        TextView t = text(value, 9, MUTED);
+        t.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
+        t.setLetterSpacing(0.13f);
+        t.setPadding(0, 0, 0, 0);
+        return t;
+    }
+
+    private EditText field(String value, boolean number) {
+        EditText input = new EditText(this);
+        input.setSingleLine(true);
+        input.setInputType(
+                number
+                        ? InputType.TYPE_CLASS_NUMBER
+                        : InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_WORDS
+        );
+        input.setTextSize(16);
+        input.setTextColor(TEXT);
+        input.setHintTextColor(MUTED);
+        input.setHint(value);
+        input.setPadding(dp(13), dp(6), dp(13), dp(6));
+        input.setBackground(round(SURFACE_2, Color.TRANSPARENT, 14));
+        return input;
+    }
+
+    private LinearLayout.LayoutParams fieldParams() {
+        return new LinearLayout.LayoutParams(-1, dp(50));
+    }
+
+    private LinearLayout.LayoutParams fieldParamsWithTop() {
+        LinearLayout.LayoutParams params =
+                new LinearLayout.LayoutParams(-1, dp(50));
+        params.setMargins(0, dp(9), 0, 0);
+        return params;
+    }
+
+    private String greeting() {
+        int hour = LocalTime.now(zone).getHour();
+        if (hour < 12) return "Good morning";
+        if (hour < 18) return "Good afternoon";
+        return "Good evening";
+    }
+
+    private void updateClock() {
+        if (liveClock == null || liveDate == null) return;
+        liveClock.setText(LocalTime.now(zone).format(clockFormatter));
+        liveDate.setText(LocalDate.now(zone).format(dateFormatter));
+        if (greetingText != null) {
+            greetingText.setText(greeting() + ", " + getName());
+        }
+    }
+
+    private boolean isNotificationGranted() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return true;
+        return checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
+                == PackageManager.PERMISSION_GRANTED;
+    }
+
+    private void requestNotificationAccess() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            NotificationScheduler.scheduleUpcoming(this);
+            return;
+        }
+
+        requestPermissions(
+                new String[]{Manifest.permission.POST_NOTIFICATIONS},
+                7001
+        );
     }
 
     private void requestNotificationPermissionIfNeeded() {
@@ -615,8 +1348,7 @@ public class MainActivity extends Activity {
             return;
         }
 
-        if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
-                == PackageManager.PERMISSION_GRANTED) {
+        if (isNotificationGranted()) {
             NotificationScheduler.scheduleUpcoming(this);
             return;
         }
@@ -628,328 +1360,35 @@ public class MainActivity extends Activity {
         preferences.edit().putBoolean(KEY_NOTIFICATION_PROMPTED, true).apply();
 
         new AlertDialog.Builder(this)
-                .setTitle("Enable class reminders?")
-                .setMessage("NextBell can remind you 15 minutes before your personalized classes.")
+                .setTitle("Class reminders")
+                .setMessage(
+                        "NextBell can remind you 15 minutes before your personalized classes."
+                )
                 .setNegativeButton("Not now", null)
                 .setPositiveButton("Enable", (dialog, which) -> {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                        requestPermissions(
-                                new String[]{Manifest.permission.POST_NOTIFICATIONS},
-                                7001
-                        );
-                    }
+                    requestNotificationAccess();
                 })
                 .show();
     }
 
     @Override
-    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+    public void onRequestPermissionsResult(
+            int requestCode,
+            String[] permissions,
+            int[] grantResults
+    ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == 7001) {
             NotificationScheduler.scheduleUpcoming(this);
-        }
-    }
-
-    private void refreshSchedule() {
-        updateLiveHeader();
-
-        String today = todayName();
-        if (followToday && !today.isEmpty() && !today.equals(selectedDay)) {
-            selectedDay = today;
-            refreshDayButtons();
-            updateDayHeader();
-        }
-
-        if (scheduleContainer == null) return;
-
-        int rollNumber = getRollNumber();
-        List<TimetableData.ClassItem> entries =
-                TimetableData.forRollAndDay(rollNumber, selectedDay);
-
-        boolean viewingToday = selectedDay.equals(todayName());
-        int nowSeconds = viewingToday ? nowSeconds() : -1;
-
-        TimetableData.ClassItem current = null;
-        TimetableData.ClassItem next = null;
-        int completed = 0;
-        int scheduled = 0;
-
-        for (TimetableData.ClassItem item : entries) {
-            if (!item.isBreak()) scheduled++;
-
-            int start = toSeconds(item.start);
-            int end = toSeconds(item.end);
-
-            if (viewingToday && item.isAcademic() && end <= nowSeconds) {
-                completed++;
-            }
-
-            if (item.isAcademic()) {
-                if (viewingToday && start <= nowSeconds && nowSeconds < end) {
-                    current = item;
-                } else if (viewingToday && start > nowSeconds && next == null) {
-                    next = item;
-                } else if (!viewingToday && next == null) {
-                    next = item;
-                }
-            }
-        }
-
-        if (current != null) {
-            updateCurrentHero(current, next, nowSeconds);
-        } else if (next != null) {
-            updateNextHero(next, viewingToday, nowSeconds);
-        } else {
-            updateFinishedHero(viewingToday);
-        }
-
-        dayPulse.setText(String.valueOf(scheduled));
-        completedText.setText(viewingToday ? completed + "/" + scheduled : "—");
-        freePeriodsText.setText(String.valueOf(calculateOpenGaps(entries)));
-
-        scheduleContainer.removeAllViews();
-        for (TimetableData.ClassItem item : entries) {
-            boolean isCurrent = current != null && current.id.equals(item.id);
-            boolean isNext = current == null && next != null && next.id.equals(item.id);
-            boolean isDone = viewingToday && item.isAcademic() && toSeconds(item.end) <= nowSeconds;
-
-            scheduleContainer.addView(
-                    item.isBreak()
-                            ? breakCard(item)
-                            : classCard(item, isCurrent, isNext, isDone)
-            );
-        }
-    }
-
-    private void updateCurrentHero(
-            TimetableData.ClassItem current,
-            TimetableData.ClassItem next,
-            int nowSeconds
-    ) {
-        heroCard.setBackground(round(SURFACE, ACCENT, 21));
-        focusLabel.setText("HAPPENING NOW");
-        focusSubject.setText(current.subject);
-        focusMeta.setText(
-                formatTime(current.start) + " – " + formatTime(current.end)
-                        + formatLocationAndBatch(current)
-        );
-        focusMinutes.setText(formatCountdown(Math.max(0, toSeconds(current.end) - nowSeconds)));
-
-        nextPanel.setVisibility(next == null ? View.GONE : View.VISIBLE);
-        if (next != null) {
-            nextSubject.setText(next.subject);
-            nextMeta.setText(
-                    formatTime(next.start) + " – " + formatTime(next.end)
-                            + formatLocationAndBatch(next)
-            );
-            nextCountdown.setText(
-                    "Starts in " + formatCountdown(Math.max(0, toSeconds(next.start) - nowSeconds))
-            );
-        }
-    }
-
-    private void updateNextHero(
-            TimetableData.ClassItem next,
-            boolean viewingToday,
-            int nowSeconds
-    ) {
-        heroCard.setBackground(round(SURFACE, BORDER, 21));
-        focusLabel.setText(viewingToday ? "NEXT LECTURE" : "SELECTED DAY");
-        focusSubject.setText(next.subject);
-        focusMeta.setText(
-                formatTime(next.start) + " – " + formatTime(next.end)
-                        + formatLocationAndBatch(next)
-        );
-        focusMinutes.setText(viewingToday
-                ? formatCountdown(Math.max(0, toSeconds(next.start) - nowSeconds))
-                : "");
-        nextPanel.setVisibility(View.GONE);
-    }
-
-    private void updateFinishedHero(boolean viewingToday) {
-        heroCard.setBackground(round(SURFACE, BORDER, 21));
-        focusLabel.setText(viewingToday ? "DAY COMPLETE" : "NO MORE CLASSES");
-        focusSubject.setText(viewingToday ? "You're done for today 🎉" : "No more classes");
-        focusMeta.setText(selectedDay + " · " + getBatch());
-        focusMinutes.setText("");
-        nextPanel.setVisibility(View.GONE);
-    }
-
-    private String formatLocationAndBatch(TimetableData.ClassItem item) {
-        StringBuilder result = new StringBuilder();
-        if (!item.room.isEmpty()) result.append("  ·  ").append(item.room);
-        if (!item.batch.isEmpty()) result.append("  ·  ").append(item.batch);
-        if (!item.teacher.isEmpty()) result.append("  ·  ").append(item.teacher);
-        return result.toString();
-    }
-
-    private LinearLayout classCard(
-            TimetableData.ClassItem item,
-            boolean isCurrent,
-            boolean isNext,
-            boolean isDone
-    ) {
-        LinearLayout card = new LinearLayout(this);
-        card.setOrientation(LinearLayout.HORIZONTAL);
-        card.setGravity(Gravity.CENTER_VERTICAL);
-        card.setPadding(dp(13), dp(13), dp(13), dp(13));
-
-        int fill = (isCurrent || isNext) ? SURFACE_2 : SURFACE;
-        int stroke = isCurrent ? ACCENT : ((isCurrent || isNext) ? ACCENT : BORDER);
-        card.setBackground(round(fill, stroke, 16));
-
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
-        params.setMargins(0, 0, 0, dp(8));
-        card.setLayoutParams(params);
-
-        TextView time = text(formatTime(item.start), 11, isDone ? MUTED : TEXT);
-        time.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        card.addView(time, new LinearLayout.LayoutParams(dp(68), -2));
-
-        TextView type = text(typeLetter(item), 9, TEXT);
-        type.setGravity(Gravity.CENTER);
-        type.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        type.setBackground(round(SURFACE_2, BORDER, 8));
-        LinearLayout.LayoutParams typeParams = new LinearLayout.LayoutParams(dp(28), dp(28));
-        typeParams.setMargins(0, 0, dp(10), 0);
-        card.addView(type, typeParams);
-
-        LinearLayout main = new LinearLayout(this);
-        main.setOrientation(LinearLayout.VERTICAL);
-
-        LinearLayout titleLine = new LinearLayout(this);
-        titleLine.setOrientation(LinearLayout.HORIZONTAL);
-        titleLine.setGravity(Gravity.CENTER_VERTICAL);
-
-        TextView subject = text(item.subject, 12, isDone ? MUTED : TEXT);
-        subject.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        titleLine.addView(subject, new LinearLayout.LayoutParams(0, -2, 1f));
-
-        if (isCurrent || isNext) {
-            TextView badge = text(isCurrent ? "NOW" : "NEXT", 8, isCurrent ? ACCENT : MUTED);
-            badge.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-            badge.setGravity(Gravity.CENTER);
-            badge.setPadding(dp(5), dp(4), dp(5), dp(4));
-            badge.setBackground(round(isCurrent ? ACCENT_BG : SURFACE_2, isCurrent ? ACCENT : BORDER, 999));
-            titleLine.addView(badge);
-        }
-
-        main.addView(titleLine);
-
-        StringBuilder detailsText = new StringBuilder();
-        if (!item.code.isEmpty()) detailsText.append(item.code);
-        if (!item.teacher.isEmpty()) {
-            if (detailsText.length() > 0) detailsText.append(" · ");
-            detailsText.append(item.teacher);
-        }
-        if (!item.batch.isEmpty()) {
-            if (detailsText.length() > 0) detailsText.append(" · ");
-            detailsText.append(item.batch);
-        }
-
-        TextView details = text(detailsText.toString(), 9, MUTED);
-        details.setPadding(0, dp(4), 0, 0);
-        main.addView(details);
-
-        card.addView(main, new LinearLayout.LayoutParams(0, -2, 1f));
-
-        if (!item.room.isEmpty()) {
-            TextView room = text(item.room, 9, MUTED);
-            room.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
-            card.addView(room, new LinearLayout.LayoutParams(dp(76), -2));
-        }
-
-        card.setAlpha(isDone ? 0.45f : 1f);
-        return card;
-    }
-
-    private LinearLayout breakCard(TimetableData.ClassItem item) {
-        LinearLayout card = new LinearLayout(this);
-        card.setOrientation(LinearLayout.HORIZONTAL);
-        card.setGravity(Gravity.CENTER_VERTICAL);
-        card.setPadding(dp(14), dp(9), dp(14), dp(9));
-        card.setBackground(round(SURFACE_2, BORDER, 13));
-
-        LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(-1, -2);
-        p.setMargins(0, 0, 0, dp(7));
-        card.setLayoutParams(p);
-
-        TextView icon = text("·", 18, MUTED);
-        card.addView(icon, new LinearLayout.LayoutParams(dp(20), -2));
-
-        TextView time = text(formatTime(item.start) + " – " + formatTime(item.end), 9, MUTED);
-        card.addView(time, new LinearLayout.LayoutParams(dp(125), -2));
-
-        TextView label = text(item.subject, 10, MUTED);
-        label.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        card.addView(label);
-        return card;
-    }
-
-    private int calculateOpenGaps(List<TimetableData.ClassItem> entries) {
-        int result = 0;
-        TimetableData.ClassItem previousAcademic = null;
-
-        for (TimetableData.ClassItem item : entries) {
-            if (!item.isAcademic()) continue;
-
-            if (previousAcademic != null) {
-                int gap = toSeconds(item.start) - toSeconds(previousAcademic.end);
-                if (gap >= 30 * 60) result++;
-            }
-            previousAcademic = item;
-        }
-        return result;
-    }
-
-    private String typeLetter(TimetableData.ClassItem item) {
-        switch (item.kind) {
-            case PRACTICAL: return "P";
-            case TUTORIAL: return "T";
-            case LIBRARY: return "L";
-            case SELF_LEARNING: return "S";
-            case SPECIAL: return "X";
-            default: return "L";
-        }
-    }
-
-    private void highlightDayButtons(LinearLayout dayRow) {
-        for (int i = 0; i < dayRow.getChildCount(); i++) {
-            TextView button = (TextView) dayRow.getChildAt(i);
-            String day = TimetableData.DAYS[i];
-            boolean selected = day.equals(selectedDay);
-            button.setTextColor(selected ? BG : MUTED);
-            button.setBackground(round(selected ? TEXT : SURFACE_2, selected ? TEXT : BORDER, 999));
-        }
-    }
-
-    private void refreshDayButtons() {
-        View contentRoot = findViewById(android.R.id.content);
-        if (!(contentRoot instanceof LinearLayout)) return;
-
-        LinearLayout rootView = (LinearLayout) contentRoot;
-        for (int i = 0; i < rootView.getChildCount(); i++) {
-            View child = rootView.getChildAt(i);
-            if (child instanceof LinearLayout) {
-                LinearLayout outer = (LinearLayout) child;
-                for (int j = 0; j < outer.getChildCount(); j++) {
-                    View nested = outer.getChildAt(j);
-                    if (nested instanceof HorizontalScrollView) {
-                        HorizontalScrollView scroll = (HorizontalScrollView) nested;
-                        if (scroll.getChildCount() > 0 && scroll.getChildAt(0) instanceof LinearLayout) {
-                            highlightDayButtons((LinearLayout) scroll.getChildAt(0));
-                            return;
-                        }
-                    }
-                }
+            if ("settings".equals(selectedScreen)) {
+                buildSettingsScreen();
+                updateBottomNav();
             }
         }
     }
 
-    private void updateLiveHeader() {
-        if (liveClock == null || liveDate == null) return;
-        liveClock.setText(LocalTime.now(zone).format(clockFormatter));
-        liveDate.setText(LocalDate.now(zone).format(dateFormatter));
+    private String formatTodayDate() {
+        return LocalDate.now(zone).format(dateFormatter).toUpperCase();
     }
 
     private int toSeconds(String value) {
@@ -965,7 +1404,10 @@ public class MainActivity extends Activity {
         int hours = safe / 3600;
         int minutes = (safe % 3600) / 60;
         int seconds = safe % 60;
-        if (hours > 0) return String.format("%02d:%02d:%02d", hours, minutes, seconds);
+
+        if (hours > 0) {
+            return String.format("%02d:%02d:%02d", hours, minutes, seconds);
+        }
         return String.format("%02d:%02d", minutes, seconds);
     }
 
@@ -994,105 +1436,9 @@ public class MainActivity extends Activity {
         return today.isEmpty() ? "Monday" : today;
     }
 
-    private LinearLayout page() {
-        LinearLayout page = new LinearLayout(this);
-        page.setOrientation(LinearLayout.VERTICAL);
-        page.setGravity(Gravity.CENTER);
-        page.setPadding(dp(24), dp(24), dp(24), dp(24));
-        page.setBackgroundColor(BG);
-        return page;
-    }
-
-    private LinearLayout card() {
-        LinearLayout card = new LinearLayout(this);
-        card.setOrientation(LinearLayout.VERTICAL);
-        card.setBackground(round(SURFACE, BORDER, 18));
-        return card;
-    }
-
-    private EditText field(String hint, boolean number) {
-        EditText input = new EditText(this);
-        input.setSingleLine(true);
-        input.setInputType(number
-                ? InputType.TYPE_CLASS_NUMBER
-                : InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_WORDS);
-        input.setTextSize(16);
-        input.setTextColor(TEXT);
-        input.setHintTextColor(MUTED);
-        input.setHint(hint);
-        input.setPadding(dp(13), dp(8), dp(13), dp(8));
-        input.setBackground(round(SURFACE_2, BORDER, 12));
-        return input;
-    }
-
-    private LinearLayout.LayoutParams fieldParams() {
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, dp(50));
-        params.setMargins(0, dp(7), 0, 0);
-        return params;
-    }
-
-    private TextView sectionLabel(String value) {
-        TextView t = text(value, 9, MUTED);
-        t.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        t.setLetterSpacing(0.13f);
-        return t;
-    }
-
-    private Button primaryButton(String label) {
-        Button b = new Button(this);
-        b.setText(label);
-        b.setTextSize(13);
-        b.setTextColor(BG);
-        b.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        b.setAllCaps(false);
-        b.setBackground(round(ACCENT, ACCENT, 13));
-        return b;
-    }
-
-    private Button secondaryButton(String label) {
-        Button b = new Button(this);
-        b.setText(label);
-        b.setTextSize(11);
-        b.setTextColor(TEXT);
-        b.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        b.setAllCaps(false);
-        b.setBackground(round(SURFACE_2, BORDER, 11));
-        return b;
-    }
-
-    private LinearLayout statBlock() {
-        LinearLayout block = new LinearLayout(this);
-        block.setOrientation(LinearLayout.VERTICAL);
-        return block;
-    }
-
-    private TextView statValue(LinearLayout block, String value) {
-        TextView t = text(value, 21, TEXT);
-        t.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        block.addView(t);
-        return t;
-    }
-
-    private void statLabel(LinearLayout block, String value) {
-        TextView t = text(value, 9, MUTED);
-        t.setPadding(0, dp(2), 0, 0);
-        block.addView(t);
-    }
-
-    private void footer(LinearLayout body) {
-        LinearLayout footer = new LinearLayout(this);
-        footer.setOrientation(LinearLayout.HORIZONTAL);
-        footer.setGravity(Gravity.CENTER_VERTICAL);
-        footer.setPadding(0, dp(22), 0, 0);
-
-        TextView left = text("NEXTBELL · " + THEME_NAMES[themeIndex].toUpperCase(), 8, MUTED);
-        footer.addView(left, new LinearLayout.LayoutParams(0, -2, 1f));
-
-        TextView right = text("FE DIV B · 2026–27", 8, MUTED);
-        right.setGravity(Gravity.END);
-        footer.addView(right);
-
-        body.addView(footer);
+    private View spacer(int width, int height) {
+        SpaceView view = new SpaceView(this, width, height);
+        return view;
     }
 
     private TextView text(String value, int sp, int color) {
@@ -1100,13 +1446,16 @@ public class MainActivity extends Activity {
         t.setText(value);
         t.setTextSize(sp);
         t.setTextColor(color);
+        t.setIncludeFontPadding(false);
         return t;
     }
 
     private GradientDrawable round(int fill, int stroke, int radiusDp) {
         GradientDrawable d = new GradientDrawable();
         d.setColor(fill);
-        if (stroke != Color.TRANSPARENT) d.setStroke(dp(1), stroke);
+        if (stroke != Color.TRANSPARENT) {
+            d.setStroke(dp(1), stroke);
+        }
         d.setCornerRadius(dp(radiusDp));
         return d;
     }
@@ -1124,5 +1473,17 @@ public class MainActivity extends Activity {
 
     private int dp(int value) {
         return Math.round(value * getResources().getDisplayMetrics().density);
+    }
+
+    private static class SpaceView extends View {
+        SpaceView(Activity activity, int widthDp, int heightDp) {
+            super(activity);
+            setLayoutParams(new LinearLayout.LayoutParams(
+                    activity.getResources().getDisplayMetrics().densityDpi > 0
+                            ? Math.round(widthDp * activity.getResources().getDisplayMetrics().density)
+                            : widthDp,
+                    Math.round(heightDp * activity.getResources().getDisplayMetrics().density)
+            ));
+        }
     }
 }
