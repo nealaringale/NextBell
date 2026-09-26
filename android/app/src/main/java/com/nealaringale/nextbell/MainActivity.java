@@ -90,6 +90,7 @@ public class MainActivity extends Activity {
     private int BORDER;
     private int TEXT;
     private int MUTED;
+    private int SUBTLE;
     private int ACCENT;
     private int ACCENT_BG;
 
@@ -138,6 +139,7 @@ public class MainActivity extends Activity {
         BORDER = palette[3];
         TEXT = palette[4];
         MUTED = palette[5];
+        SUBTLE = blend(MUTED, BG, 0.60f);
         ACCENT = palette[6];
         ACCENT_BG = palette[7];
 
@@ -1107,6 +1109,17 @@ public class MainActivity extends Activity {
         if (stroke != Color.TRANSPARENT) d.setStroke(dp(1), stroke);
         d.setCornerRadius(dp(radiusDp));
         return d;
+    }
+
+    private int blend(int a, int b, float amountB) {
+        float amount = Math.max(0f, Math.min(1f, amountB));
+        int ar = Color.red(a), ag = Color.green(a), ab = Color.blue(a);
+        int br = Color.red(b), bg = Color.green(b), bb = Color.blue(b);
+        return Color.rgb(
+                Math.round(ar + (br - ar) * amount),
+                Math.round(ag + (bg - ag) * amount),
+                Math.round(ab + (bb - ab) * amount)
+        );
     }
 
     private int dp(int value) {
