@@ -5,6 +5,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
+// Source: official FE Div B timetable, W.E.F. 16/09/2026, Revision 00.
 public final class TimetableData {
     public static final String[] DAYS = {
             "Monday", "Tuesday", "Wednesday", "Thursday", "Friday"
