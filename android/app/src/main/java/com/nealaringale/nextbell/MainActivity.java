@@ -762,7 +762,7 @@ public class MainActivity extends Activity {
             if (i < THEME_NAMES.length - 1) themeRow.addView(spacer(dp(9), 1));
         }
         themeScroller.addView(themeRow);
-        LinearLayout themeParams = new LinearLayout.LayoutParams(-1, dp(108));
+        LinearLayout.LayoutParams themeParams = new LinearLayout.LayoutParams(-1, dp(108));
         themeParams.setMargins(0, 0, 0, dp(21));
         page.addView(themeScroller, themeParams);
 
@@ -804,7 +804,7 @@ public class MainActivity extends Activity {
             notificationCard.addView(status, new LinearLayout.LayoutParams(dp(46), dp(32)));
         }
 
-        LinearLayout notifParams = new LinearLayout.LayoutParams(-1, -2);
+        LinearLayout.LayoutParams notifParams = new LinearLayout.LayoutParams(-1, -2);
         notifParams.setMargins(0, dp(9), 0, dp(20));
         page.addView(notificationCard, notifParams);
 
