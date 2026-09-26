@@ -471,6 +471,38 @@ public class MainActivity extends Activity {
         heroMeta.setPadding(0, dp(7), 0, 0);
         homeHero.addView(heroMeta);
 
+        LinearLayout heroLocation = new LinearLayout(this);
+        heroLocation.setOrientation(LinearLayout.HORIZONTAL);
+        heroLocation.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams heroLocationParams =
+                new LinearLayout.LayoutParams(-1, dp(62));
+        heroLocationParams.setMargins(0, dp(14), 0, 0);
+
+        TextView heroRoom = text("ROOM\n—", 11, TEXT);
+        heroRoom.setGravity(Gravity.CENTER_VERTICAL);
+        heroRoom.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
+        heroRoom.setPadding(dp(12), 0, dp(12), 0);
+        heroRoom.setBackground(round(SURFACE_2, Color.TRANSPARENT, 16));
+        heroRoom.setContentDescription("Classroom");
+
+        TextView heroWing = text("WING\n—", 11, ACCENT);
+        heroWing.setGravity(Gravity.CENTER_VERTICAL);
+        heroWing.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
+        heroWing.setPadding(dp(12), 0, dp(12), 0);
+        heroWing.setBackground(round(ACCENT_BG, Color.TRANSPARENT, 16));
+        heroWing.setContentDescription("College wing");
+
+        LinearLayout.LayoutParams locationHalf =
+                new LinearLayout.LayoutParams(0, -1, 1f);
+        heroLocation.addView(heroRoom, locationHalf);
+
+        LinearLayout.LayoutParams wingParams =
+                new LinearLayout.LayoutParams(0, -1, 1f);
+        wingParams.setMargins(dp(8), 0, 0, 0);
+        heroLocation.addView(heroWing, wingParams);
+
+        homeHero.addView(heroLocation, heroLocationParams);
+
         LinearLayout countdownRow = new LinearLayout(this);
         countdownRow.setGravity(Gravity.BOTTOM | Gravity.CENTER_VERTICAL);
         countdownRow.setPadding(0, dp(18), 0, 0);
@@ -970,10 +1002,8 @@ public class MainActivity extends Activity {
             homeHero.setBackground(round(SURFACE, ACCENT, 22));
             heroLabel.setText("HAPPENING NOW");
             heroSubject.setText(current.subject);
-            heroMeta.setText(
-                    formatTime(current.start) + " – " + formatTime(current.end)
-                            + formatLocation(current)
-            );
+            heroMeta.setText(formatTeacher(current));
+            setHeroLocation(current);
             heroCountdown.setText(
                     formatCountdown(Math.max(0, toSeconds(current.end) - now))
             );
@@ -982,10 +1012,8 @@ public class MainActivity extends Activity {
             homeHero.setBackground(round(SURFACE, Color.TRANSPARENT, 22));
             heroLabel.setText("NEXT CLASS");
             heroSubject.setText(next.subject);
-            heroMeta.setText(
-                    formatTime(next.start) + " – " + formatTime(next.end)
-                            + formatLocation(next)
-            );
+            heroMeta.setText(formatTeacher(next));
+            setHeroLocation(next);
 
             if (isWeekend) {
                 heroCountdown.setText(formatTime(next.start));
@@ -1000,7 +1028,8 @@ public class MainActivity extends Activity {
             homeHero.setBackground(round(SURFACE, Color.TRANSPARENT, 22));
             heroLabel.setText("DAY COMPLETE");
             heroSubject.setText("You're done for today.");
-            heroMeta.setText(day + "  •  " + getBatch());
+            heroMeta.setText("No more classes scheduled");
+            clearHeroLocation();
             heroCountdown.setText("✓");
             heroCountdownLabel.setText("nothing else scheduled");
         }
@@ -1194,10 +1223,33 @@ public class MainActivity extends Activity {
 
         card.addView(main, new LinearLayout.LayoutParams(0, -2, 1f));
 
-        if (!item.room.isEmpty()) {
-            TextView room = text(item.room, 9, MUTED);
-            room.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
-            card.addView(room, new LinearLayout.LayoutParams(dp(50), -2));
+        if (!roomNumber(item).isEmpty() || !wing(item).isEmpty()) {
+            LinearLayout locationBlock = new LinearLayout(this);
+            locationBlock.setOrientation(LinearLayout.VERTICAL);
+            locationBlock.setGravity(Gravity.END);
+
+            TextView room = text(
+                    roomNumber(item).isEmpty() ? "—" : roomNumber(item),
+                    11,
+                    TEXT
+            );
+            room.setGravity(Gravity.END);
+            room.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
+            locationBlock.addView(room);
+
+            TextView wingText = text(
+                    wing(item).isEmpty() ? "Wing —" : wing(item),
+                    8,
+                    ACCENT
+            );
+            wingText.setGravity(Gravity.END);
+            wingText.setPadding(0, dp(2), 0, 0);
+            locationBlock.addView(wingText);
+
+            LinearLayout.LayoutParams locationParams =
+                    new LinearLayout.LayoutParams(dp(68), -2);
+            locationParams.setMargins(dp(6), 0, 0, 0);
+            card.addView(locationBlock, locationParams);
         }
 
         if (isCurrent) {
@@ -1260,9 +1312,80 @@ public class MainActivity extends Activity {
 
     private String formatLocation(TimetableData.ClassItem item) {
         StringBuilder builder = new StringBuilder();
-        if (!item.room.isEmpty()) builder.append("  •  ").append(item.room);
-        if (!item.batch.isEmpty()) builder.append("  •  ").append(item.batch);
+        if (!roomNumber(item).isEmpty()) builder.append("  •  Room ").append(roomNumber(item));
+        if (!wing(item).isEmpty()) builder.append("  •  ").append(wing(item));
         return builder.toString();
+    }
+
+    private String formatTeacher(TimetableData.ClassItem item) {
+        StringBuilder builder = new StringBuilder();
+        if (!item.teacher.isEmpty()) builder.append(item.teacher);
+        if (!item.batch.isEmpty()) {
+            if (builder.length() > 0) builder.append("  •  ");
+            builder.append(item.batch);
+        }
+        return builder.toString();
+    }
+
+    private void setHeroLocation(TimetableData.ClassItem item) {
+        if (homeHero == null || homeHero.getChildCount() < 5) return;
+
+        View locationView = homeHero.getChildAt(4);
+        if (!(locationView instanceof LinearLayout)) return;
+        LinearLayout row = (LinearLayout) locationView;
+
+        if (row.getChildCount() < 2) return;
+        TextView room = (TextView) row.getChildAt(0);
+        TextView wing = (TextView) row.getChildAt(1);
+
+        String roomValue = roomNumber(item);
+        String wingValue = wing(item);
+
+        room.setText(roomValue.isEmpty()
+                ? "ROOM\nNot listed"
+                : "ROOM\n" + roomValue);
+        wing.setText(wingValue.isEmpty()
+                ? "WING\nNot listed"
+                : "WING\n" + wingValue);
+        room.setTextColor(TEXT);
+        wing.setTextColor(ACCENT);
+    }
+
+    private void clearHeroLocation() {
+        if (homeHero == null || homeHero.getChildCount() < 5) return;
+
+        View locationView = homeHero.getChildAt(4);
+        if (!(locationView instanceof LinearLayout)) return;
+        LinearLayout row = (LinearLayout) locationView;
+        if (row.getChildCount() < 2) return;
+
+        ((TextView) row.getChildAt(0)).setText("ROOM\n—");
+        ((TextView) row.getChildAt(1)).setText("WING\n—");
+    }
+
+    private String roomNumber(TimetableData.ClassItem item) {
+        if (item.room == null || item.room.isEmpty()) return "";
+
+        String value = item.room;
+        java.util.regex.Matcher matcher =
+                java.util.regex.Pattern.compile("\\b(\\d{3})\\b").matcher(value);
+        if (matcher.find()) return matcher.group(1);
+
+        return value.startsWith("Library") ? value : "";
+    }
+
+    private String wing(TimetableData.ClassItem item) {
+        if (item.room == null || item.room.isEmpty()) return "";
+
+        java.util.regex.Matcher matcher =
+                java.util.regex.Pattern.compile("Wing\\s+[A-Z]", java.util.regex.Pattern.CASE_INSENSITIVE)
+                        .matcher(item.room);
+        if (matcher.find()) return matcher.group().replace("wing", "Wing");
+
+        // The official timetable is headed Wing C; room-only three-digit
+        // common classrooms therefore use Wing C as the displayed default.
+        if (item.room.matches("\\d{3}")) return "Wing C";
+        return "";
     }
 
     private void openWhatsApp() {
