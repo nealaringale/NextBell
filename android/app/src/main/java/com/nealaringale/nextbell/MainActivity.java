@@ -1,11 +1,14 @@
 package com.nealaringale.nextbell;
 
+import android.Manifest;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -28,7 +31,9 @@ import java.util.List;
 
 public class MainActivity extends Activity {
     private static final String PREFS_NAME = "nextbell_profile";
+    private static final String KEY_NAME = "name";
     private static final String KEY_ROLL_NUMBER = "roll_number";
+    private static final String KEY_NOTIFICATION_PROMPTED = "notification_prompted";
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("HH:mm");
@@ -53,6 +58,7 @@ public class MainActivity extends Activity {
     private TextView completedText;
     private TextView freePeriodsText;
     private TextView profileChip;
+    private TextView greetingText;
 
     private String selectedDay;
     private boolean followToday = true;
@@ -72,15 +78,19 @@ public class MainActivity extends Activity {
         super.onCreate(savedInstanceState);
         preferences = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
 
-        if (!hasSavedRoll()) {
+        if (!hasSavedProfile()) {
             showSetupScreen();
         } else {
             openApp();
         }
     }
 
-    private boolean hasSavedRoll() {
-        return preferences.getInt(KEY_ROLL_NUMBER, -1) > 0;
+    private boolean hasSavedProfile() {
+        return !getName().isEmpty() && preferences.getInt(KEY_ROLL_NUMBER, -1) > 0;
+    }
+
+    private String getName() {
+        return preferences.getString(KEY_NAME, "").trim();
     }
 
     private int getRollNumber() {
@@ -91,8 +101,11 @@ public class MainActivity extends Activity {
         return TimetableData.batchForRoll(getRollNumber());
     }
 
-    private void saveRollNumber(int rollNumber) {
-        preferences.edit().putInt(KEY_ROLL_NUMBER, rollNumber).apply();
+    private void saveProfile(String name, int rollNumber) {
+        preferences.edit()
+                .putString(KEY_NAME, name.trim())
+                .putInt(KEY_ROLL_NUMBER, rollNumber)
+                .apply();
     }
 
     private void openApp() {
@@ -100,6 +113,8 @@ public class MainActivity extends Activity {
         followToday = true;
         buildUi();
         refreshSchedule();
+        NotificationScheduler.scheduleUpcoming(this);
+        requestNotificationPermissionIfNeeded();
 
         if (refreshRunnable != null) {
             handler.removeCallbacks(refreshRunnable);
