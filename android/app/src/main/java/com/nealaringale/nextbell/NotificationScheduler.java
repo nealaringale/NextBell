@@ -29,18 +29,24 @@ public final class NotificationScheduler {
     private NotificationScheduler() {}
 
     public static void scheduleUpcoming(Context context) {
+        SharedPreferences preferences =
+                context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+
+        // Always clear previously scheduled alarms first so changing a profile
+        // never leaves reminders from the old roll number behind.
+        cancelScheduled(context);
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             NotificationManager manager =
                     (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
-            if (manager == null ||
-                    manager.areNotificationsEnabled() == false) {
+            if (manager == null || !manager.areNotificationsEnabled()) {
                 return;
             }
         }
 
         ensureChannel(context);
 
-        SharedPreferences preferences =
+        preferences =
                 context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         int roll = preferences.getInt(KEY_ROLL_NUMBER, -1);
         if (roll < 1) return;
