@@ -11,6 +11,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.text.InputType;
 import android.view.Gravity;
+import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.HorizontalScrollView;
@@ -31,21 +32,30 @@ public class MainActivity extends Activity {
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("HH:mm");
+    private final DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("EEE, d MMM yyyy");
+    private final DateTimeFormatter clockFormatter = DateTimeFormatter.ofPattern("hh:mm:ss a");
     private final ZoneId zone = ZoneId.of("Asia/Kolkata");
 
     private SharedPreferences preferences;
 
     private LinearLayout scheduleContainer;
+    private LinearLayout nextPanel;
     private TextView focusLabel;
     private TextView focusSubject;
     private TextView focusMeta;
     private TextView focusMinutes;
+    private TextView nextSubject;
+    private TextView nextMeta;
+    private TextView nextCountdown;
+    private TextView liveDate;
+    private TextView liveClock;
     private TextView dayPulse;
     private TextView completedText;
     private TextView freePeriodsText;
     private TextView profileChip;
 
     private String selectedDay;
+    private boolean followToday = true;
     private Runnable refreshRunnable;
 
     private final int BG = Color.rgb(11, 13, 18);
@@ -55,6 +65,7 @@ public class MainActivity extends Activity {
     private final int TEXT = Color.rgb(245, 247, 251);
     private final int MUTED = Color.rgb(146, 154, 170);
     private final int SUBTLE = Color.rgb(110, 118, 134);
+    private final int ACCENT = Color.rgb(126, 231, 135);
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -86,6 +97,7 @@ public class MainActivity extends Activity {
 
     private void openApp() {
         selectedDay = todayNameOrMonday();
+        followToday = true;
         buildUi();
         refreshSchedule();
 
@@ -97,10 +109,10 @@ public class MainActivity extends Activity {
             @Override
             public void run() {
                 refreshSchedule();
-                handler.postDelayed(this, 30_000);
+                handler.postDelayed(this, 1_000);
             }
         };
-        handler.postDelayed(refreshRunnable, 30_000);
+        handler.postDelayed(refreshRunnable, 1_000);
     }
 
     private void showSetupScreen() {
@@ -191,7 +203,7 @@ public class MainActivity extends Activity {
         LinearLayout header = new LinearLayout(this);
         header.setOrientation(LinearLayout.HORIZONTAL);
         header.setGravity(Gravity.CENTER_VERTICAL);
-        header.setPadding(dp(20), dp(20), dp(20), dp(10));
+        header.setPadding(dp(20), dp(18), dp(20), dp(8));
 
         LinearLayout headerText = new LinearLayout(this);
         headerText.setOrientation(LinearLayout.VERTICAL);
@@ -207,11 +219,28 @@ public class MainActivity extends Activity {
 
         header.addView(headerText, headerTextParams);
 
+        LinearLayout liveInfo = new LinearLayout(this);
+        liveInfo.setOrientation(LinearLayout.VERTICAL);
+        liveInfo.setGravity(Gravity.END);
+
+        liveClock = text("--:--:-- --", 12, TEXT);
+        liveClock.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        liveInfo.addView(liveClock);
+
+        liveDate = text("Loading date…", 9, MUTED);
+        liveDate.setGravity(Gravity.END);
+        liveDate.setPadding(0, dp(2), 0, 0);
+        liveInfo.addView(liveDate);
+
+        header.addView(liveInfo);
+
         profileChip = text("Div B · " + getBatch() + "\nRoll " + getRollNumber(), 10, MUTED);
         profileChip.setGravity(Gravity.CENTER);
         profileChip.setPadding(dp(10), dp(7), dp(10), dp(7));
         profileChip.setBackground(round(SURFACE_2, BORDER, 999));
-        header.addView(profileChip);
+        LinearLayout.LayoutParams profileParams = new LinearLayout.LayoutParams(-2, -2);
+        profileParams.setMargins(dp(10), 0, 0, 0);
+        header.addView(profileChip, profileParams);
 
         TextView settingsButton = text("⚙", 22, TEXT);
         settingsButton.setGravity(Gravity.CENTER);
@@ -228,7 +257,7 @@ public class MainActivity extends Activity {
         daysScroll.setHorizontalScrollBarEnabled(false);
         LinearLayout dayRow = new LinearLayout(this);
         dayRow.setOrientation(LinearLayout.HORIZONTAL);
-        dayRow.setPadding(dp(16), dp(4), dp(16), dp(16));
+        dayRow.setPadding(dp(16), dp(4), dp(16), dp(14));
 
         for (String day : TimetableData.DAYS) {
             TextView dayButton = text(day.substring(0, 3), 11, MUTED);
@@ -237,8 +266,10 @@ public class MainActivity extends Activity {
             LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(-2, -2);
             p.setMargins(0, 0, dp(7), 0);
             dayRow.addView(dayButton, p);
+
             dayButton.setOnClickListener(v -> {
                 selectedDay = day;
+                followToday = day.equals(todayName());
                 highlightDayButtons(dayRow);
                 refreshSchedule();
             });
@@ -249,13 +280,13 @@ public class MainActivity extends Activity {
 
         LinearLayout hero = new LinearLayout(this);
         hero.setOrientation(LinearLayout.VERTICAL);
-        hero.setPadding(dp(20), dp(20), dp(20), dp(20));
+        hero.setPadding(dp(20), dp(19), dp(20), dp(20));
         hero.setBackground(round(SURFACE, BORDER, 20));
 
         LinearLayout.LayoutParams heroParams = new LinearLayout.LayoutParams(-1, -2);
-        heroParams.setMargins(dp(16), 0, dp(16), dp(12));
+        heroParams.setMargins(dp(16), 0, dp(16), dp(10));
 
-        focusLabel = text("NEXT CLASS", 10, MUTED);
+        focusLabel = text("NEXT LECTURE", 10, MUTED);
         focusLabel.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         focusLabel.setLetterSpacing(0.12f);
 
@@ -266,9 +297,9 @@ public class MainActivity extends Activity {
         focusMeta = text("", 12, MUTED);
         focusMeta.setPadding(0, dp(7), 0, 0);
 
-        focusMinutes = text("", 39, TEXT);
+        focusMinutes = text("", 40, TEXT);
         focusMinutes.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        focusMinutes.setPadding(0, dp(22), 0, 0);
+        focusMinutes.setPadding(0, dp(19), 0, 0);
 
         hero.addView(focusLabel);
         hero.addView(focusSubject);
@@ -276,13 +307,42 @@ public class MainActivity extends Activity {
         hero.addView(focusMinutes);
         root.addView(hero, heroParams);
 
+        nextPanel = new LinearLayout(this);
+        nextPanel.setOrientation(LinearLayout.VERTICAL);
+        nextPanel.setPadding(dp(17), dp(14), dp(17), dp(14));
+        nextPanel.setBackground(round(SURFACE_2, BORDER, 16));
+
+        LinearLayout.LayoutParams nextParams = new LinearLayout.LayoutParams(-1, -2);
+        nextParams.setMargins(dp(16), 0, dp(16), dp(12));
+
+        TextView nextLabel = text("NEXT AFTER THIS", 9, MUTED);
+        nextLabel.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        nextLabel.setLetterSpacing(0.10f);
+        nextPanel.addView(nextLabel);
+
+        nextSubject = text("Loading…", 15, TEXT);
+        nextSubject.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        nextSubject.setPadding(0, dp(5), 0, 0);
+        nextPanel.addView(nextSubject);
+
+        nextMeta = text("", 10, SUBTLE);
+        nextMeta.setPadding(0, dp(3), 0, 0);
+        nextPanel.addView(nextMeta);
+
+        nextCountdown = text("", 22, TEXT);
+        nextCountdown.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        nextCountdown.setPadding(0, dp(7), 0, 0);
+        nextPanel.addView(nextCountdown);
+
+        root.addView(nextPanel, nextParams);
+
         LinearLayout pulse = new LinearLayout(this);
         pulse.setOrientation(LinearLayout.HORIZONTAL);
-        pulse.setPadding(dp(18), dp(14), dp(18), dp(14));
+        pulse.setPadding(dp(18), dp(13), dp(18), dp(13));
         pulse.setGravity(Gravity.CENTER_VERTICAL);
         pulse.setBackground(round(SURFACE, BORDER, 16));
         LinearLayout.LayoutParams pulseParams = new LinearLayout.LayoutParams(-1, -2);
-        pulseParams.setMargins(dp(16), 0, dp(16), dp(14));
+        pulseParams.setMargins(dp(16), 0, dp(16), dp(12));
 
         LinearLayout statA = statBlock();
         LinearLayout statB = statBlock();
@@ -316,6 +376,7 @@ public class MainActivity extends Activity {
         scroll.addView(scheduleContainer);
         root.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1f));
 
+        updateLiveHeader();
         highlightDayButtons(dayRow);
         setContentView(root);
     }
@@ -358,13 +419,21 @@ public class MainActivity extends Activity {
     }
 
     private void refreshSchedule() {
+        updateLiveHeader();
+
+        String today = todayName();
+        if (followToday && !today.isEmpty() && !today.equals(selectedDay)) {
+            selectedDay = today;
+            refreshDayButtons();
+        }
+
         int rollNumber = getRollNumber();
         String batch = TimetableData.batchForRoll(rollNumber);
         List<TimetableData.ClassItem> entries =
                 TimetableData.forRollAndDay(rollNumber, selectedDay);
 
         boolean viewingToday = selectedDay.equals(todayName());
-        int nowMinutes = viewingToday ? nowMinutes() : 0;
+        int nowSeconds = viewingToday ? nowSeconds() : -1;
 
         TimetableData.ClassItem current = null;
         TimetableData.ClassItem next = null;
@@ -376,47 +445,30 @@ public class MainActivity extends Activity {
                 scheduled++;
             }
 
-            int start = toMinutes(item.start);
-            int end = toMinutes(item.end);
+            int start = toSeconds(item.start);
+            int end = toSeconds(item.end);
 
-            if (viewingToday && item.isAcademic() && end <= nowMinutes) {
+            if (viewingToday && item.isAcademic() && end <= nowSeconds) {
                 completed++;
             }
 
             if (item.isAcademic()) {
-                if (viewingToday && start <= nowMinutes && nowMinutes < end) {
+                if (viewingToday && start <= nowSeconds && nowSeconds < end) {
                     current = item;
-                } else if ((!viewingToday || start > nowMinutes) && next == null) {
+                } else if (viewingToday && start > nowSeconds && next == null) {
+                    next = item;
+                } else if (!viewingToday && next == null) {
                     next = item;
                 }
             }
         }
 
-        TimetableData.ClassItem focus = current != null ? current : next;
-
-        if (focus == null) {
-            focusLabel.setText("DAY COMPLETE");
-            focusSubject.setText("Nothing else scheduled 🎉");
-            focusMeta.setText(selectedDay + " · " + batch);
-            focusMinutes.setText("");
+        if (current != null) {
+            updateCurrentHero(current, next, nowSeconds, batch);
+        } else if (next != null) {
+            updateNextHero(next, viewingToday, nowSeconds, batch);
         } else {
-            boolean focusIsCurrent = current != null;
-            focusLabel.setText(focusIsCurrent ? "HAPPENING NOW" : "NEXT UP");
-            focusSubject.setText(focus.subject);
-
-            String teacher = focus.teacher.isEmpty() ? "" : "  ·  " + focus.teacher;
-            String room = focus.room.isEmpty() ? "" : "  ·  " + focus.room;
-            String batchText = focus.batch.isEmpty() ? "" : "  ·  " + focus.batch;
-
-            focusMeta.setText(
-                    formatTime(focus.start) + " – " + formatTime(focus.end)
-                            + room + batchText + teacher
-            );
-
-            int remaining = focusIsCurrent
-                    ? Math.max(0, toMinutes(focus.end) - nowMinutes)
-                    : Math.max(0, toMinutes(focus.start) - nowMinutes);
-            focusMinutes.setText(remaining + " min");
+            updateFinishedHero(selectedDay, viewingToday, batch);
         }
 
         dayPulse.setText(String.valueOf(scheduled));
@@ -427,7 +479,7 @@ public class MainActivity extends Activity {
         for (TimetableData.ClassItem item : entries) {
             boolean isCurrent = current != null && current.id.equals(item.id);
             boolean isNext = current == null && next != null && next.id.equals(item.id);
-            boolean isDone = viewingToday && item.isAcademic() && toMinutes(item.end) <= nowMinutes;
+            boolean isDone = viewingToday && item.isAcademic() && toSeconds(item.end) <= nowSeconds;
 
             scheduleContainer.addView(
                     item.isBreak()
@@ -435,6 +487,85 @@ public class MainActivity extends Activity {
                             : classCard(item, isCurrent, isNext, isDone)
             );
         }
+    }
+
+    private void updateCurrentHero(
+            TimetableData.ClassItem current,
+            TimetableData.ClassItem next,
+            int nowSeconds,
+            String batch
+    ) {
+        focusLabel.setText("HAPPENING NOW");
+        focusSubject.setText(current.subject);
+
+        String teacher = current.teacher.isEmpty() ? "" : "  ·  " + current.teacher;
+        String room = current.room.isEmpty() ? "" : "  ·  " + current.room;
+        String batchText = current.batch.isEmpty() ? "" : "  ·  " + current.batch;
+
+        focusMeta.setText(
+                formatTime(current.start) + " – " + formatTime(current.end)
+                        + room + batchText + teacher
+        );
+
+        int remaining = Math.max(0, toSeconds(current.end) - nowSeconds);
+        focusMinutes.setText(formatCountdown(remaining));
+        nextPanel.setVisibility(next == null ? View.GONE : View.VISIBLE);
+
+        if (next != null) {
+            nextSubject.setText(next.subject);
+            nextMeta.setText(
+                    formatTime(next.start) + " – " + formatTime(next.end)
+                            + formatLocationAndBatch(next)
+            );
+            nextCountdown.setText("Starts in " + formatCountdown(Math.max(0, toSeconds(next.start) - nowSeconds)));
+        }
+    }
+
+    private void updateNextHero(
+            TimetableData.ClassItem next,
+            boolean viewingToday,
+            int nowSeconds,
+            String batch
+    ) {
+        focusLabel.setText(viewingToday ? "NEXT LECTURE" : "SELECTED DAY");
+        focusSubject.setText(next.subject);
+
+        focusMeta.setText(
+                formatTime(next.start) + " – " + formatTime(next.end)
+                        + formatLocationAndBatch(next)
+        );
+
+        if (viewingToday) {
+            int untilStart = Math.max(0, toSeconds(next.start) - nowSeconds);
+            focusMinutes.setText(formatCountdown(untilStart));
+        } else {
+            focusMinutes.setText("");
+        }
+
+        nextPanel.setVisibility(View.GONE);
+    }
+
+    private void updateFinishedHero(String day, boolean viewingToday, String batch) {
+        focusLabel.setText(viewingToday ? "DAY COMPLETE" : "NO MORE CLASSES");
+        focusSubject.setText("Nothing else scheduled 🎉");
+        focusMeta.setText(day + " · " + batch);
+        focusMinutes.setText("");
+        nextPanel.setVisibility(View.GONE);
+    }
+
+    private String formatLocationAndBatch(TimetableData.ClassItem item) {
+        StringBuilder result = new StringBuilder();
+
+        if (!item.room.isEmpty()) {
+            result.append("  ·  ").append(item.room);
+        }
+        if (!item.batch.isEmpty()) {
+            result.append("  ·  ").append(item.batch);
+        }
+        if (!item.teacher.isEmpty()) {
+            result.append("  ·  ").append(item.teacher);
+        }
+        return result.toString();
     }
 
     private int calculateOpenGaps(List<TimetableData.ClassItem> entries) {
@@ -445,8 +576,8 @@ public class MainActivity extends Activity {
             if (!item.isAcademic()) continue;
 
             if (previousAcademic != null) {
-                int gap = toMinutes(item.start) - toMinutes(previousAcademic.end);
-                if (gap >= 30) result++;
+                int gap = toSeconds(item.start) - toSeconds(previousAcademic.end);
+                if (gap >= 30 * 60) result++;
             }
             previousAcademic = item;
         }
@@ -486,11 +617,9 @@ public class MainActivity extends Activity {
         card.setPadding(dp(13), dp(13), dp(13), dp(13));
 
         int cardColor = (isCurrent || isNext) ? SURFACE_2 : SURFACE;
-        card.setBackground(round(
-                cardColor,
-                (isCurrent || isNext) ? TEXT : BORDER,
-                15
-        ));
+        int borderColor = isCurrent ? ACCENT : ((isCurrent || isNext) ? TEXT : BORDER);
+
+        card.setBackground(round(cardColor, borderColor, 15));
 
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
         params.setMargins(0, 0, 0, dp(9));
@@ -513,9 +642,24 @@ public class MainActivity extends Activity {
         LinearLayout main = new LinearLayout(this);
         main.setOrientation(LinearLayout.VERTICAL);
 
+        LinearLayout titleLine = new LinearLayout(this);
+        titleLine.setOrientation(LinearLayout.HORIZONTAL);
+        titleLine.setGravity(Gravity.CENTER_VERTICAL);
+
         TextView subject = text(item.subject, 13, isDone ? SUBTLE : TEXT);
         subject.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        main.addView(subject);
+        titleLine.addView(subject, new LinearLayout.LayoutParams(0, -2, 1f));
+
+        if (isCurrent || isNext) {
+            TextView badge = text(isCurrent ? "NOW" : "NEXT", 9, TEXT);
+            badge.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+            badge.setGravity(Gravity.CENTER);
+            badge.setPadding(dp(5), dp(4), dp(5), dp(4));
+            badge.setBackground(round(Color.TRANSPARENT, isCurrent ? ACCENT : BORDER, 999));
+            titleLine.addView(badge, new LinearLayout.LayoutParams(dp(40), -2));
+        }
+
+        main.addView(titleLine);
 
         StringBuilder detailsText = new StringBuilder();
         if (!item.code.isEmpty()) {
@@ -540,18 +684,7 @@ public class MainActivity extends Activity {
         if (!item.room.isEmpty()) {
             TextView room = text("⌖ " + item.room, 10, MUTED);
             room.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
-            card.addView(room, new LinearLayout.LayoutParams(dp(75), -2));
-        }
-
-        if (isCurrent || isNext) {
-            TextView badge = text(isCurrent ? "NOW" : "NEXT", 9, TEXT);
-            badge.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-            badge.setGravity(Gravity.CENTER);
-            badge.setPadding(dp(5), dp(4), dp(5), dp(4));
-            badge.setBackground(round(Color.TRANSPARENT, BORDER, 999));
-            LinearLayout.LayoutParams badgeParams = new LinearLayout.LayoutParams(dp(38), -2);
-            badgeParams.setMargins(dp(7), 0, 0, 0);
-            card.addView(badge, badgeParams);
+            card.addView(room, new LinearLayout.LayoutParams(dp(78), -2));
         }
 
         card.setAlpha(isDone ? 0.48f : 1f);
@@ -586,6 +719,22 @@ public class MainActivity extends Activity {
                     selected ? TEXT : BORDER,
                     999
             ));
+        }
+    }
+
+    private void refreshDayButtons() {
+        View root = getWindow().getDecorView().findViewById(android.R.id.content);
+        if (!(root instanceof LinearLayout)) return;
+
+        LinearLayout appRoot = (LinearLayout) root;
+        for (int i = 0; i < appRoot.getChildCount(); i++) {
+            View child = appRoot.getChildAt(i);
+            if (child instanceof HorizontalScrollView) {
+                HorizontalScrollView scroll = (HorizontalScrollView) child;
+                if (scroll.getChildCount() > 0 && scroll.getChildAt(0) instanceof LinearLayout) {
+                    highlightDayButtons((LinearLayout) scroll.getChildAt(0));
+                }
+            }
         }
     }
 
@@ -624,14 +773,25 @@ public class MainActivity extends Activity {
         return d;
     }
 
-    private int toMinutes(String value) {
+    private int toSeconds(String value) {
         LocalTime t = LocalTime.parse(value, timeFormatter);
-        return t.getHour() * 60 + t.getMinute();
+        return t.toSecondOfDay();
     }
 
-    private int nowMinutes() {
-        LocalTime now = LocalTime.now(zone);
-        return now.getHour() * 60 + now.getMinute();
+    private int nowSeconds() {
+        return LocalTime.now(zone).toSecondOfDay();
+    }
+
+    private String formatCountdown(int totalSeconds) {
+        int safeSeconds = Math.max(0, totalSeconds);
+        int hours = safeSeconds / 3600;
+        int minutes = (safeSeconds % 3600) / 60;
+        int seconds = safeSeconds % 60;
+
+        if (hours > 0) {
+            return String.format("%02d:%02d:%02d", hours, minutes, seconds);
+        }
+        return String.format("%02d:%02d", minutes, seconds);
     }
 
     private String formatTime(String value) {
@@ -657,6 +817,16 @@ public class MainActivity extends Activity {
     private String todayNameOrMonday() {
         String today = todayName();
         return today.isEmpty() ? "Monday" : today;
+    }
+
+    private void updateLiveHeader() {
+        if (liveClock == null || liveDate == null) return;
+
+        LocalDate date = LocalDate.now(zone);
+        LocalTime time = LocalTime.now(zone);
+
+        liveClock.setText(time.format(clockFormatter));
+        liveDate.setText(date.format(dateFormatter));
     }
 
     private int dp(int value) {
