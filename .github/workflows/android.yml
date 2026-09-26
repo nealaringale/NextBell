@@ -32,13 +32,17 @@ jobs:
       - name: Prepare stable signing key
         env:
           KEYSTORE_B64: ${{ secrets.NEXTBELL_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.NEXTBELL_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.NEXTBELL_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.NEXTBELL_KEY_PASSWORD }}
         run: |
-          if [ -n "$KEYSTORE_B64" ]; then
-            echo "$KEYSTORE_B64" | base64 --decode > android/app/nextbell-upload.jks
-          else
-            echo "Stable signing key is not configured yet."
-            echo "The build will use the default debug key for this run."
+          set -euo pipefail
+          if [ -z "$KEYSTORE_B64" ] || [ -z "$KEYSTORE_PASSWORD" ] || [ -z "$KEY_ALIAS" ] || [ -z "$KEY_PASSWORD" ]; then
+            echo "ERROR: Stable signing secrets are not configured."
+            echo "Add NEXTBELL_KEYSTORE_BASE64, NEXTBELL_KEYSTORE_PASSWORD, NEXTBELL_KEY_ALIAS and NEXTBELL_KEY_PASSWORD."
+            exit 1
           fi
+          echo "$KEYSTORE_B64" | base64 --decode > android/app/nextbell-upload.jks
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
