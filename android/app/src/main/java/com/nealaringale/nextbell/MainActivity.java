@@ -298,7 +298,7 @@ public class MainActivity extends Activity {
                 SURFACE_2,
                 blend(SURFACE_2, BG, 0.45f),
                 BORDER,
-                28,
+                NAV_RADIUS,
                 GradientDrawable.Orientation.LEFT_RIGHT
         ));
         nav.setElevation(dp(16));
@@ -1206,25 +1206,56 @@ public class MainActivity extends Activity {
                 TimetableData.forRollAndDay(getRollNumber(), day);
 
         int now = isWeekend ? -1 : nowSeconds();
-        TimetableData.ClassItem current = null;
+        TimetableData.ClassItem currentClass = null;
+        TimetableData.ClassItem currentBreak = null;
         TimetableData.ClassItem next = null;
 
         for (TimetableData.ClassItem item : entries) {
-            if (!item.isAcademic()) continue;
-
             int start = toSeconds(item.start);
             int end = toSeconds(item.end);
 
             if (!isWeekend && start <= now && now < end) {
-                current = item;
-            } else if (isWeekend && next == null) {
+                if (item.isBreak()) {
+                    currentBreak = item;
+                } else if (item.isAcademic()) {
+                    currentClass = item;
+                }
+            } else if (isWeekend && item.isAcademic() && next == null) {
                 next = item;
-            } else if (!isWeekend && start > now && next == null) {
+            } else if (!isWeekend && item.isAcademic() && start > now && next == null) {
                 next = item;
             }
         }
 
-        if (current != null) {
+        if (currentBreak != null) {
+            int minutes = Math.max(1, (toSeconds(currentBreak.end) - toSeconds(currentBreak.start)) / 60);
+            boolean lunch = currentBreak.kind == TimetableData.Kind.LUNCH;
+            int breakAccent = lunch ? ACCENT_2 : ACCENT;
+
+            homeHero.setBackground(gradientRound(
+                    SURFACE,
+                    blend(SURFACE_2, breakAccent, 0.22f),
+                    breakAccent,
+                    CARD_RADIUS,
+                    GradientDrawable.Orientation.TL_BR
+            ));
+            heroLabel.setText(lunch ? "LUNCH BREAK" : "SHORT BREAK");
+            heroLabel.setTextColor(breakAccent);
+            heroSubject.setText(lunch ? "Take your lunch." : "Recharge for the next class.");
+            heroMeta.setText(
+                    formatTime(currentBreak.start) + " → " + formatTime(currentBreak.end)
+                            + "  •  " + minutes + " min"
+            );
+            heroTimeRange.setText("BREAK NOW");
+            heroRoomText.setText(lunch ? "TYPE\nLUNCH" : "TYPE\nBREAK");
+            heroWingText.setText("DURATION\n" + minutes + " MIN");
+            heroWingText.setTextColor(breakAccent);
+            heroCountdown.setText(
+                    formatCountdown(Math.max(0, toSeconds(currentBreak.end) - now))
+            );
+            heroCountdownLabel.setText("until break ends");
+            animateHero("break:" + currentBreak.id);
+        } else if (currentClass != null) {
             homeHero.setBackground(gradientRound(
                     SURFACE,
                     ACCENT_BG,
@@ -1233,24 +1264,26 @@ public class MainActivity extends Activity {
                     GradientDrawable.Orientation.TL_BR
             ));
             heroLabel.setText("HAPPENING NOW");
-            heroSubject.setText(current.subject);
-            heroMeta.setText(formatTeacher(current));
-            heroTimeRange.setText(formatTime(current.start) + " → " + formatTime(current.end));
-            setHeroLocation(current);
+            heroLabel.setTextColor(ACCENT);
+            heroSubject.setText(currentClass.subject);
+            heroMeta.setText(formatTeacher(currentClass));
+            heroTimeRange.setText(formatTime(currentClass.start) + " → " + formatTime(currentClass.end));
+            setHeroLocation(currentClass);
             heroCountdown.setText(
-                    formatCountdown(Math.max(0, toSeconds(current.end) - now))
+                    formatCountdown(Math.max(0, toSeconds(currentClass.end) - now))
             );
             heroCountdownLabel.setText("until it ends");
-            animateHero("current:" + current.id);
+            animateHero("current:" + currentClass.id);
         } else if (next != null) {
             homeHero.setBackground(gradientRound(
                     SURFACE,
                     SURFACE_2,
                     BORDER,
-                    24,
+                    CARD_RADIUS,
                     GradientDrawable.Orientation.TL_BR
             ));
             heroLabel.setText("NEXT CLASS");
+            heroLabel.setTextColor(ACCENT);
             heroSubject.setText(next.subject);
             heroMeta.setText(formatTeacher(next));
             heroTimeRange.setText(formatTime(next.start) + " → " + formatTime(next.end));
@@ -1273,10 +1306,11 @@ public class MainActivity extends Activity {
                     SURFACE,
                     SURFACE_2,
                     BORDER,
-                    24,
+                    CARD_RADIUS,
                     GradientDrawable.Orientation.TL_BR
             ));
             heroLabel.setText("DAY COMPLETE");
+            heroLabel.setTextColor(ACCENT);
             heroTimeRange.setText("—");
             heroSubject.setText("You're done for today.");
             heroMeta.setText("No more classes scheduled");
@@ -1291,13 +1325,25 @@ public class MainActivity extends Activity {
                         ? "MONDAY PREVIEW"
                         : "TODAY  •  " + formatTodayDate()
         );
-        homeSummary.setText(entries.size() + " blocks  •  " + getBatch());
+
+        int academicBlocks = 0;
+        int breakBlocks = 0;
+        for (TimetableData.ClassItem item : entries) {
+            if (item.isBreak()) {
+                breakBlocks++;
+            } else {
+                academicBlocks++;
+            }
+        }
+        homeSummary.setText(
+                academicBlocks + " sessions  •  " + breakBlocks + " breaks  •  " + getBatch()
+        );
 
         profileBadge.setText(getBatch() + "  •  Roll " + getRollNumber());
 
         homeSchedule.removeAllViews();
         for (TimetableData.ClassItem item : entries) {
-            boolean isCurrent = current != null && current.id.equals(item.id);
+            boolean isCurrent = currentClass != null && currentClass.id.equals(item.id);
             boolean isDone = !isWeekend
                     && item.isAcademic()
                     && toSeconds(item.end) <= now;
@@ -1523,24 +1569,34 @@ public class MainActivity extends Activity {
     private LinearLayout breakRow(TimetableData.ClassItem item) {
         boolean lunch = item.kind == TimetableData.Kind.LUNCH;
         int accent = lunch ? ACCENT_2 : ACCENT;
-        int fill = blend(BG, accent, themeIndex == 4 ? 0.10f : 0.08f);
+        int minutes = Math.max(1, (toSeconds(item.end) - toSeconds(item.start)) / 60);
 
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setPadding(dp(11), dp(8), dp(12), dp(8));
-        row.setBackground(round(fill, Color.TRANSPARENT, SMALL_RADIUS));
+        row.setPadding(0, dp(4), 0, dp(10));
+        row.setBackgroundColor(Color.TRANSPARENT);
+
+        View rail = new View(this);
+        rail.setBackground(round(
+                blend(accent, BG, 0.58f),
+                Color.TRANSPARENT,
+                999
+        ));
+        LinearLayout.LayoutParams railParams = new LinearLayout.LayoutParams(dp(3), dp(36));
+        railParams.setMargins(0, 0, dp(9), 0);
+        row.addView(rail, railParams);
 
         ImageView icon = new ImageView(this);
         icon.setImageResource(lunch ? R.drawable.ic_lunch : R.drawable.ic_coffee);
         icon.setColorFilter(accent);
-        icon.setPadding(dp(7), dp(7), dp(7), dp(7));
+        icon.setPadding(dp(6), dp(6), dp(6), dp(6));
         icon.setBackground(round(
-                blend(ACCENT_BG, accent, 0.20f),
+                blend(accent, BG, 0.86f),
                 Color.TRANSPARENT,
-                SMALL_RADIUS
+                999
         ));
-        row.addView(icon, new LinearLayout.LayoutParams(dp(38), dp(38)));
+        row.addView(icon, new LinearLayout.LayoutParams(dp(34), dp(34)));
 
         LinearLayout copy = new LinearLayout(this);
         copy.setOrientation(LinearLayout.VERTICAL);
@@ -1555,10 +1611,9 @@ public class MainActivity extends Activity {
         title.setLetterSpacing(0.08f);
         copy.addView(title);
 
-        int minutes = (toSeconds(item.end) - toSeconds(item.start)) / 60;
         TextView info = text(
-                formatTime(item.start) + "  →  " + formatTime(item.end) +
-                        "  •  " + minutes + " min",
+                formatTime(item.start) + " → " + formatTime(item.end)
+                        + "  •  " + minutes + " min",
                 9,
                 MUTED
         );
@@ -1572,17 +1627,14 @@ public class MainActivity extends Activity {
         badge.setGravity(Gravity.CENTER);
         badge.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
         badge.setLetterSpacing(0.07f);
-        badge.setPadding(dp(7), dp(6), dp(7), dp(6));
+        badge.setPadding(dp(8), dp(6), dp(8), dp(6));
         badge.setBackground(round(
-                blend(ACCENT_BG, accent, 0.16f),
+                blend(accent, BG, 0.84f),
                 Color.TRANSPARENT,
                 999
         ));
         row.addView(badge);
 
-        LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(-1, -2);
-        rowParams.setMargins(0, 0, 0, dp(8));
-        row.setLayoutParams(rowParams);
         return row;
     }
 
