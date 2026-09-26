@@ -486,19 +486,19 @@ public class MainActivity extends Activity {
                 new LinearLayout.LayoutParams(-1, dp(62));
         heroLocationParams.setMargins(0, dp(14), 0, 0);
 
-        TextView heroRoom = text("ROOM\n—", 11, TEXT);
-        heroRoom.setGravity(Gravity.CENTER_VERTICAL);
-        heroRoom.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
-        heroRoom.setPadding(dp(12), 0, dp(12), 0);
-        heroRoom.setBackground(round(SURFACE_2, Color.TRANSPARENT, 16));
-        heroRoom.setContentDescription("Classroom");
+        heroRoomText = text("ROOM\n—", 11, TEXT);
+        heroRoomText.setGravity(Gravity.CENTER_VERTICAL);
+        heroRoomText.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
+        heroRoomText.setPadding(dp(12), 0, dp(12), 0);
+        heroRoomText.setBackground(round(SURFACE_2, Color.TRANSPARENT, 16));
+        heroRoomText.setContentDescription("Classroom");
 
-        TextView heroWing = text("WING\n—", 11, ACCENT);
-        heroWing.setGravity(Gravity.CENTER_VERTICAL);
-        heroWing.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
-        heroWing.setPadding(dp(12), 0, dp(12), 0);
-        heroWing.setBackground(round(ACCENT_BG, Color.TRANSPARENT, 16));
-        heroWing.setContentDescription("College wing");
+        heroWingText = text("WING\n—", 11, ACCENT);
+        heroWingText.setGravity(Gravity.CENTER_VERTICAL);
+        heroWingText.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
+        heroWingText.setPadding(dp(12), 0, dp(12), 0);
+        heroWingText.setBackground(round(ACCENT_BG, Color.TRANSPARENT, 16));
+        heroWingText.setContentDescription("College wing");
 
         LinearLayout.LayoutParams locationHalf =
                 new LinearLayout.LayoutParams(0, -1, 1f);
