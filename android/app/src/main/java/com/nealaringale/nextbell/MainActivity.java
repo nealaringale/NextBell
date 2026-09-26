@@ -1436,8 +1436,9 @@ public class MainActivity extends Activity {
         return today.isEmpty() ? "Monday" : today;
     }
 
-    private View spacer(int width, int height) {
-        SpaceView view = new SpaceView(this, width, height);
+    private View spacer(int widthPx, int heightPx) {
+        View view = new View(this);
+        view.setLayoutParams(new LinearLayout.LayoutParams(widthPx, heightPx));
         return view;
     }
 
@@ -1475,15 +1476,5 @@ public class MainActivity extends Activity {
         return Math.round(value * getResources().getDisplayMetrics().density);
     }
 
-    private static class SpaceView extends View {
-        SpaceView(Activity activity, int widthDp, int heightDp) {
-            super(activity);
-            setLayoutParams(new LinearLayout.LayoutParams(
-                    activity.getResources().getDisplayMetrics().densityDpi > 0
-                            ? Math.round(widthDp * activity.getResources().getDisplayMetrics().density)
-                            : widthDp,
-                    Math.round(heightDp * activity.getResources().getDisplayMetrics().density)
-            ));
-        }
-    }
+
 }
