@@ -3,8 +3,10 @@ package com.nealaringale.nextbell;
 import android.Manifest;
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.net.Uri;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
@@ -760,8 +762,46 @@ public class MainActivity extends Activity {
                 9,
                 SUBTLE
         );
-        aboutVersion.setPadding(0, dp(5), 0, 0);
+        aboutVersion.setPadding(0, dp(5), 0, dp(12));
         aboutText.addView(aboutVersion);
+
+        TextView creator = text(
+                "Made by Neal Aringale",
+                11,
+                ACCENT
+        );
+        creator.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
+        aboutText.addView(creator);
+
+        TextView whatsapp = text(
+                "WhatsApp  ·  7499517574",
+                11,
+                TEXT
+        );
+        whatsapp.setPadding(0, dp(10), 0, 0);
+        whatsapp.setClickable(true);
+        whatsapp.setFocusable(true);
+        whatsapp.setOnClickListener(v -> openWhatsApp());
+        aboutText.addView(whatsapp);
+
+        TextView email = text(
+                "Email  ·  nealaringale@gmail.com",
+                11,
+                TEXT
+        );
+        email.setPadding(0, dp(8), 0, 0);
+        email.setClickable(true);
+        email.setFocusable(true);
+        email.setOnClickListener(v -> openEmail());
+        aboutText.addView(email);
+
+        TextView contactHint = text(
+                "Updates, feedback & bug fixes",
+                9,
+                MUTED
+        );
+        contactHint.setPadding(0, dp(4), 0, 0);
+        aboutText.addView(contactHint);
 
         aboutCard.addView(aboutText);
         page.addView(aboutCard, cardMargin());
@@ -1223,6 +1263,35 @@ public class MainActivity extends Activity {
         if (!item.room.isEmpty()) builder.append("  •  ").append(item.room);
         if (!item.batch.isEmpty()) builder.append("  •  ").append(item.batch);
         return builder.toString();
+    }
+
+    private void openWhatsApp() {
+        String phone = "917499517574";
+        String message = "Hi Neal, I have feedback about NextBell.";
+        Uri uri = Uri.parse(
+                "https://wa.me/" + phone + "?text=" + Uri.encode(message)
+        );
+
+        Intent intent = new Intent(Intent.ACTION_VIEW, uri);
+        try {
+            startActivity(intent);
+        } catch (Exception ignored) {
+            // The web URL remains the fallback when WhatsApp is unavailable.
+        }
+    }
+
+    private void openEmail() {
+        Uri uri = Uri.parse(
+                "mailto:nealaringale@gmail.com?subject=" +
+                        Uri.encode("NextBell feedback / bug report")
+        );
+
+        Intent intent = new Intent(Intent.ACTION_SENDTO, uri);
+        try {
+            startActivity(intent);
+        } catch (Exception ignored) {
+            // No email client installed; keep the screen unchanged.
+        }
     }
 
     private TextView avatarText() {
