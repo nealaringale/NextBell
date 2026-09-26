@@ -160,7 +160,40 @@ public class LiveStatusReceiver extends BroadcastReceiver {
     }
 
     private static String location(TimetableData.ClassItem item) {
-        return item.room.isEmpty() ? "" : "  ·  " + item.room;
+        StringBuilder result = new StringBuilder();
+
+        String room = roomNumber(item);
+        String wing = wing(item);
+
+        if (!room.isEmpty()) result.append("  ·  Room ").append(room);
+        if (!wing.isEmpty()) result.append("  ·  ").append(wing);
+
+        return result.toString();
+    }
+
+    private static String roomNumber(TimetableData.ClassItem item) {
+        if (item.room == null || item.room.isEmpty()) return "";
+
+        java.util.regex.Matcher matcher =
+                java.util.regex.Pattern.compile("\\b(\\d{3})\\b").matcher(item.room);
+        if (matcher.find()) return matcher.group(1);
+
+        return item.room.startsWith("Library") ? item.room : "";
+    }
+
+    private static String wing(TimetableData.ClassItem item) {
+        if (item.room == null || item.room.isEmpty()) return "";
+
+        java.util.regex.Matcher matcher =
+                java.util.regex.Pattern.compile(
+                        "Wing\\s+[A-Z]",
+                        java.util.regex.Pattern.CASE_INSENSITIVE
+                ).matcher(item.room);
+
+        if (matcher.find()) return matcher.group().replace("wing", "Wing");
+
+        if (item.room.matches("\\d{3}")) return "Wing C";
+        return "";
     }
 
     private static String formatTime(String value) {
