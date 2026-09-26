@@ -66,6 +66,8 @@ public class MainActivity extends Activity {
     private TextView heroMeta;
     private TextView heroCountdown;
     private TextView heroCountdownLabel;
+    private TextView heroRoomText;
+    private TextView heroWingText;
     private LinearLayout homeSchedule;
     private TextView homeDayLabel;
 
@@ -500,12 +502,12 @@ public class MainActivity extends Activity {
 
         LinearLayout.LayoutParams locationHalf =
                 new LinearLayout.LayoutParams(0, -1, 1f);
-        heroLocation.addView(heroRoom, locationHalf);
+        heroLocation.addView(heroRoomText, locationHalf);
 
         LinearLayout.LayoutParams wingParams =
                 new LinearLayout.LayoutParams(0, -1, 1f);
         wingParams.setMargins(dp(8), 0, 0, 0);
-        heroLocation.addView(heroWing, wingParams);
+        heroLocation.addView(heroWingText, wingParams);
 
         homeHero.addView(heroLocation, heroLocationParams);
 
@@ -1022,8 +1024,10 @@ public class MainActivity extends Activity {
             setHeroLocation(next);
 
             if (isWeekend) {
-                heroCountdown.setText(formatTime(next.start));
-                heroCountdownLabel.setText(day + " · " + getBatch());
+                long secondsUntil =
+                        secondsUntilNextWeekendClass(next);
+                heroCountdown.setText(formatHumanCountdown(secondsUntil));
+                heroCountdownLabel.setText("until Monday · " + getBatch());
             } else {
                 heroCountdown.setText(
                         formatCountdown(Math.max(0, toSeconds(next.start) - now))
