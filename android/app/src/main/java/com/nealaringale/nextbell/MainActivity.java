@@ -412,7 +412,7 @@ public class MainActivity extends Activity {
         titleBlock.addView(brand);
 
         greetingText = text(
-                greeting() + ", " + getName(),
+                greetingForHour(LocalTime.now(zone).getHour()) + ", " + getName(),
                 13,
                 MUTED
         );
