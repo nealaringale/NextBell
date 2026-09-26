@@ -10,7 +10,8 @@ android {
         applicationId "com.nealaringale.nextbell"
         minSdk 26
         targetSdk 35
-        versionCode 4
+        def ciRun = System.getenv("GITHUB_RUN_NUMBER")
+        versionCode = ciRun == null ? 4 : 1000 + ciRun.toInteger()
         versionName "0.4.0"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
