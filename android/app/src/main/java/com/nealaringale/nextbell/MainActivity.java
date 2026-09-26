@@ -1,14 +1,19 @@
 package com.nealaringale.nextbell;
 
 import android.app.Activity;
+import android.app.AlertDialog;
+import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.text.InputType;
 import android.view.Gravity;
 import android.view.View;
+import android.widget.Button;
+import android.widget.EditText;
 import android.widget.HorizontalScrollView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -19,14 +24,17 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
-import java.time.temporal.WeekFields;
-import java.util.ArrayList;
 import java.util.List;
 
 public class MainActivity extends Activity {
+    private static final String PREFS_NAME = "nextbell_profile";
+    private static final String KEY_ROLL_NUMBER = "roll_number";
+
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("HH:mm");
     private final ZoneId zone = ZoneId.of("Asia/Kolkata");
+
+    private SharedPreferences preferences;
 
     private LinearLayout scheduleContainer;
     private TextView focusLabel;
@@ -36,6 +44,7 @@ public class MainActivity extends Activity {
     private TextView dayPulse;
     private TextView completedText;
     private TextView freePeriodsText;
+    private TextView profileChip;
 
     private String selectedDay;
     private Runnable refreshRunnable;
@@ -47,11 +56,32 @@ public class MainActivity extends Activity {
     private final int TEXT = Color.rgb(245, 247, 251);
     private final int MUTED = Color.rgb(146, 154, 170);
     private final int SUBTLE = Color.rgb(110, 118, 134);
-    private final int SUCCESS = Color.rgb(126, 231, 135);
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        preferences = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+
+        if (!hasSavedRoll()) {
+            showSetupScreen();
+        } else {
+            openApp();
+        }
+    }
+
+    private boolean hasSavedRoll() {
+        return preferences.getInt(KEY_ROLL_NUMBER, -1) > 0;
+    }
+
+    private int getRollNumber() {
+        return preferences.getInt(KEY_ROLL_NUMBER, 34);
+    }
+
+    private void saveRollNumber(int rollNumber) {
+        preferences.edit().putInt(KEY_ROLL_NUMBER, rollNumber).apply();
+    }
+
+    private void openApp() {
         selectedDay = todayNameOrMonday();
         buildUi();
         refreshSchedule();
@@ -66,12 +96,85 @@ public class MainActivity extends Activity {
         handler.postDelayed(refreshRunnable, 30_000);
     }
 
-    @Override
-    protected void onDestroy() {
-        super.onDestroy();
-        if (refreshRunnable != null) {
-            handler.removeCallbacks(refreshRunnable);
-        }
+    private void showSetupScreen() {
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setGravity(Gravity.CENTER);
+        root.setPadding(dp(28), dp(28), dp(28), dp(28));
+        root.setBackgroundColor(BG);
+
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setPadding(dp(24), dp(26), dp(24), dp(24));
+        card.setBackground(round(SURFACE, BORDER, 22));
+
+        TextView mark = text("⌁", 34, TEXT);
+        mark.setGravity(Gravity.CENTER);
+        mark.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        LinearLayout.LayoutParams markParams = new LinearLayout.LayoutParams(-1, -2);
+        card.addView(mark, markParams);
+
+        TextView title = text("Welcome to NextBell", 25, TEXT);
+        title.setGravity(Gravity.CENTER);
+        title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        title.setPadding(0, dp(8), 0, 0);
+        card.addView(title);
+
+        TextView subtitle = text("Let's personalize your timetable.", 13, MUTED);
+        subtitle.setGravity(Gravity.CENTER);
+        subtitle.setPadding(0, dp(7), 0, dp(22));
+        card.addView(subtitle);
+
+        TextView label = text("ROLL NUMBER", 10, MUTED);
+        label.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        label.setLetterSpacing(0.12f);
+        card.addView(label);
+
+        EditText rollInput = new EditText(this);
+        rollInput.setSingleLine(true);
+        rollInput.setInputType(InputType.TYPE_CLASS_NUMBER);
+        rollInput.setTextSize(17);
+        rollInput.setTextColor(TEXT);
+        rollInput.setHintTextColor(SUBTLE);
+        rollInput.setHint("e.g. 34");
+        rollInput.setPadding(dp(14), dp(10), dp(14), dp(10));
+        rollInput.setBackground(round(SURFACE_2, BORDER, 12));
+        LinearLayout.LayoutParams inputParams = new LinearLayout.LayoutParams(-1, dp(52));
+        inputParams.setMargins(0, dp(8), 0, dp(14));
+        card.addView(rollInput, inputParams);
+
+        TextView note = text("We'll remember this on this phone. You can change it anytime from ⚙ Settings.", 11, SUBTLE);
+        note.setGravity(Gravity.CENTER);
+        note.setPadding(0, 0, 0, dp(17));
+        card.addView(note);
+
+        Button continueButton = new Button(this);
+        continueButton.setText("Continue");
+        continueButton.setTextSize(13);
+        continueButton.setTextColor(BG);
+        continueButton.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        continueButton.setAllCaps(false);
+        continueButton.setBackground(round(TEXT, TEXT, 13));
+        LinearLayout.LayoutParams buttonParams = new LinearLayout.LayoutParams(-1, dp(50));
+        card.addView(continueButton, buttonParams);
+
+        continueButton.setOnClickListener(v -> {
+            String raw = rollInput.getText().toString().trim();
+            try {
+                int roll = Integer.parseInt(raw);
+                if (roll < 1 || roll > 999) {
+                    rollInput.setError("Enter a valid roll number.");
+                    return;
+                }
+                saveRollNumber(roll);
+                openApp();
+            } catch (NumberFormatException e) {
+                rollInput.setError("Enter your roll number.");
+            }
+        });
+
+        root.addView(card, new LinearLayout.LayoutParams(-1, -2));
+        setContentView(root);
     }
 
     private void buildUi() {
@@ -98,11 +201,20 @@ public class MainActivity extends Activity {
 
         header.addView(headerText, headerTextParams);
 
-        TextView profile = text("B · B2\nRoll 34", 11, MUTED);
-        profile.setGravity(Gravity.CENTER);
-        profile.setPadding(dp(11), dp(7), dp(11), dp(7));
-        profile.setBackground(round(SURFACE_2, BORDER, 999));
-        header.addView(profile);
+        profileChip = text("B · B2\nRoll " + getRollNumber(), 11, MUTED);
+        profileChip.setGravity(Gravity.CENTER);
+        profileChip.setPadding(dp(10), dp(7), dp(10), dp(7));
+        profileChip.setBackground(round(SURFACE_2, BORDER, 999));
+        header.addView(profileChip);
+
+        TextView settingsButton = text("⚙", 22, TEXT);
+        settingsButton.setGravity(Gravity.CENTER);
+        settingsButton.setPadding(dp(10), dp(8), dp(6), dp(8));
+        settingsButton.setContentDescription("Settings");
+        settingsButton.setClickable(true);
+        settingsButton.setFocusable(true);
+        settingsButton.setOnClickListener(v -> showRollSettings());
+        header.addView(settingsButton, new LinearLayout.LayoutParams(dp(52), dp(52)));
 
         root.addView(header);
 
@@ -202,6 +314,46 @@ public class MainActivity extends Activity {
         setContentView(root);
     }
 
+    private void showRollSettings() {
+        final EditText input = new EditText(this);
+        input.setSingleLine(true);
+        input.setInputType(InputType.TYPE_CLASS_NUMBER);
+        input.setText(String.valueOf(getRollNumber()));
+        input.setSelectAllOnFocus(true);
+        input.setTextSize(17);
+
+        int padding = dp(6);
+        input.setPadding(padding, 0, padding, 0);
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle("Profile settings")
+                .setMessage("Change your roll number for this phone.")
+                .setView(input)
+                .setNegativeButton("Cancel", null)
+                .setPositiveButton("Save", null)
+                .create();
+
+        dialog.setOnShowListener(v -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(view -> {
+            try {
+                int roll = Integer.parseInt(input.getText().toString().trim());
+                if (roll < 1 || roll > 999) {
+                    input.setError("Enter a valid roll number.");
+                    return;
+                }
+
+                saveRollNumber(roll);
+                if (profileChip != null) {
+                    profileChip.setText("B · B2\nRoll " + roll);
+                }
+                dialog.dismiss();
+            } catch (NumberFormatException e) {
+                input.setError("Enter your roll number.");
+            }
+        }));
+
+        dialog.show();
+    }
+
     private void refreshSchedule() {
         List<TimetableData.ClassItem> classes = TimetableData.forDay(selectedDay);
         int nowMinutes = nowMinutes();
@@ -274,7 +426,7 @@ public class MainActivity extends Activity {
         TextView type = text(typeLetter(item.type), 10, TEXT);
         type.setGravity(Gravity.CENTER);
         type.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        type.setBackground(round(Color.rgb(36, 41, 50), Borderless(), 8));
+        type.setBackground(round(Color.rgb(36, 41, 50), Color.TRANSPARENT, 8));
         LinearLayout.LayoutParams typeParams = new LinearLayout.LayoutParams(dp(30), dp(30));
         typeParams.setMargins(0, 0, dp(10), 0);
         card.addView(type, typeParams);
@@ -357,8 +509,6 @@ public class MainActivity extends Activity {
         d.setCornerRadius(dp(radiusDp));
         return d;
     }
-
-    private int Borderless() { return Color.TRANSPARENT; }
 
     private int toMinutes(String value) {
         LocalTime t = LocalTime.parse(value, timeFormatter);
