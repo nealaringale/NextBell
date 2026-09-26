@@ -813,35 +813,43 @@ public class MainActivity extends Activity {
         creator.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
         aboutText.addView(creator);
 
-        TextView whatsapp = text(
-                "WhatsApp  ·  7499517574",
-                11,
-                TEXT
-        );
-        whatsapp.setPadding(0, dp(10), 0, 0);
-        whatsapp.setClickable(true);
-        whatsapp.setFocusable(true);
-        whatsapp.setOnClickListener(v -> openWhatsApp());
-        aboutText.addView(whatsapp);
-
-        TextView email = text(
-                "Email  ·  nealaringale@gmail.com",
-                11,
-                TEXT
-        );
-        email.setPadding(0, dp(8), 0, 0);
-        email.setClickable(true);
-        email.setFocusable(true);
-        email.setOnClickListener(v -> openEmail());
-        aboutText.addView(email);
-
         TextView contactHint = text(
                 "Updates, feedback & bug fixes",
                 9,
                 MUTED
         );
-        contactHint.setPadding(0, dp(4), 0, 0);
+        contactHint.setPadding(0, dp(5), 0, dp(12));
         aboutText.addView(contactHint);
+
+        LinearLayout feedbackRow = new LinearLayout(this);
+        feedbackRow.setOrientation(LinearLayout.HORIZONTAL);
+        feedbackRow.setGravity(Gravity.CENTER_VERTICAL);
+
+        TextView whatsappButton = contactButton(
+                "WhatsApp",
+                "7499517574",
+                ACCENT_BG,
+                ACCENT
+        );
+        feedbackRow.addView(
+                whatsappButton,
+                new LinearLayout.LayoutParams(0, dp(48), 1f)
+        );
+        whatsappButton.setOnClickListener(v -> openWhatsApp());
+
+        TextView emailButton = contactButton(
+                "Gmail",
+                "nealaringale@gmail.com",
+                SURFACE_2,
+                TEXT
+        );
+        LinearLayout.LayoutParams emailButtonParams =
+                new LinearLayout.LayoutParams(0, dp(48), 1f);
+        emailButtonParams.setMargins(dp(8), 0, 0, 0);
+        feedbackRow.addView(emailButton, emailButtonParams);
+        emailButton.setOnClickListener(v -> openEmail());
+
+        aboutText.addView(feedbackRow);
 
         aboutCard.addView(aboutText);
         page.addView(aboutCard, cardMargin());
@@ -1469,6 +1477,23 @@ public class MainActivity extends Activity {
         chip.setClickable(true);
         chip.setFocusable(true);
         return chip;
+    }
+
+    private TextView contactButton(
+            String label,
+            String detail,
+            int fill,
+            int textColor
+    ) {
+        TextView button = text(label + "\n" + detail, 10, textColor);
+        button.setGravity(Gravity.CENTER_VERTICAL);
+        button.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
+        button.setPadding(dp(14), 0, dp(10), 0);
+        button.setBackground(round(fill, Color.TRANSPARENT, 15));
+        button.setClickable(true);
+        button.setFocusable(true);
+        button.setContentDescription(label + " contact: " + detail);
+        return button;
     }
 
     private TextView actionButton(String label, boolean primary) {
