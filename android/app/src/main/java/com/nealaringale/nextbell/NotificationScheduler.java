@@ -57,6 +57,8 @@ public final class NotificationScheduler {
                 (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
         if (alarmManager == null) return;
 
+        scheduleDailyMoneyAlert(context, alarmManager);
+
         Set<String> reminderIds = new HashSet<>();
         Set<String> liveIds = new HashSet<>();
         LocalDate today = LocalDate.now(ZONE);
@@ -246,6 +248,58 @@ public final class NotificationScheduler {
                 .remove(KEY_SCHEDULED_ALARMS)
                 .remove(KEY_LIVE_ALARMS)
                 .apply();
+    }
+
+    public static void scheduleDailyMoneyAlert(Context context, AlarmManager alarmManager) {
+        SharedPreferences prefs =
+                context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+
+        Intent intent = new Intent(context, ExpenseDailyAlertReceiver.class);
+        PendingIntent pending = PendingIntent.getBroadcast(
+                context,
+                7717,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+        );
+
+        if (!ExpenseStore.dailyAlertsEnabled(prefs)
+                || ExpenseStore.dailyAlertThresholdPaise(prefs) <= 0L) {
+            alarmManager.cancel(pending);
+            pending.cancel();
+            return;
+        }
+
+        LocalDate today = LocalDate.now(ZONE);
+        LocalDateTime target = today.atTime(20, 0);
+        long trigger = target.atZone(ZONE).toInstant().toEpochMilli();
+        if (trigger <= System.currentTimeMillis()) {
+            trigger = today.plusDays(1).atTime(20, 0)
+                    .atZone(ZONE).toInstant().toEpochMilli();
+        }
+
+        alarmManager.setAndAllowWhileIdle(
+                AlarmManager.RTC_WAKEUP,
+                trigger,
+                pending
+        );
+    }
+
+    public static void cancelDailyMoneyAlert(Context context) {
+        AlarmManager alarmManager =
+                (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
+        if (alarmManager == null) return;
+
+        Intent intent = new Intent(context, ExpenseDailyAlertReceiver.class);
+        PendingIntent pending = PendingIntent.getBroadcast(
+                context,
+                7717,
+                intent,
+                PendingIntent.FLAG_NO_CREATE | PendingIntent.FLAG_IMMUTABLE
+        );
+        if (pending != null) {
+            alarmManager.cancel(pending);
+            pending.cancel();
+        }
     }
 
     public static void ensureChannel(Context context) {
