@@ -3062,7 +3062,7 @@ public class MainActivity extends Activity {
         });
     }
 
-    private static final class SpendingChartView extends View {
+    private class SpendingChartView extends View {
         private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final RectF bounds = new RectF();
         private java.util.Map<String, Long> totals = new java.util.HashMap<>();
