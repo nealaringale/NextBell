@@ -175,6 +175,20 @@ public class MainActivity extends Activity {
     }
 
     @Override
+    protected void onResume() {
+        super.onResume();
+        if (preferences != null && "settings".equals(selectedScreen)) {
+            buildSettingsScreen();
+            updateBottomNav();
+        }
+        if (preferences != null
+                && NotificationAutoTracker.isEnabled(preferences)
+                && NotificationAutoTracker.hasAccess(this)) {
+            NotificationAutoTracker.importActiveNotifications(this);
+        }
+    }
+
+    @Override
     protected void onDestroy() {
         super.onDestroy();
         if (refreshRunnable != null) handler.removeCallbacks(refreshRunnable);
