@@ -129,7 +129,7 @@ public final class TimetableData {
 
                         entry("mon-b2", "08:20", "10:20",
                                 "Fundamental of Programming Languages", "FPL",
-                                "YR (as printed)", "109 · Wing B", "B2", "B2",
+                                "Prof. Sanket Sontakke", "109 · Wing B", "B2", "B2",
                                 Kind.PRACTICAL),
 
                         entry("mon-b3", "08:20", "10:20",
@@ -283,7 +283,7 @@ public final class TimetableData {
 
                         entry("thu-pm-b2", "13:30", "15:30",
                                 "Engineering Graphics", "EG",
-                                "Prof. Santosh Dabhole", "310 · Wing C", "B2", "B2",
+                                "Prof. Santosh Dabhole", "210 · Wing C", "B2", "B2",
                                 Kind.PRACTICAL),
 
                         entry("thu-pm-b3", "13:30", "15:30",
