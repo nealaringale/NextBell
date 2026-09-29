@@ -251,6 +251,8 @@ public final class NotificationScheduler {
     }
 
     public static void scheduleDailyMoneyAlert(Context context, AlarmManager alarmManager) {
+        if (alarmManager == null) return;
+
         SharedPreferences prefs =
                 context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
 
