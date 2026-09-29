@@ -1599,6 +1599,16 @@ public class MainActivity extends Activity {
         amountParams.setMargins(0, dp(16), 0, dp(15));
         sheet.addView(amount, amountParams);
 
+        final String[] splitSummary = {""};
+        TextView splitStatus = dialogAction("SPLIT EXPENSE", false);
+        LinearLayout.LayoutParams splitStatusParams = new LinearLayout.LayoutParams(-1, dp(42));
+        splitStatusParams.setMargins(0, 0, 0, dp(14));
+        sheet.addView(splitStatus, splitStatusParams);
+        splitStatus.setOnClickListener(v -> {
+            tap(v);
+            showSplitExpenseDialog(amount, splitStatus, splitSummary);
+        });
+
         TextView catLabel = dialogSectionLabel("CATEGORY");
         sheet.addView(catLabel);
 
@@ -1764,7 +1774,7 @@ public class MainActivity extends Activity {
                         paise,
                         selectedDate[0],
                         selectedCategory[0],
-                        note.getText().toString().trim(),
+                        buildExpenseNote(note.getText().toString().trim(), splitSummary[0]),
                         selectedPayment[0],
                         merchant,
                         source,
@@ -1781,6 +1791,520 @@ public class MainActivity extends Activity {
                 shake(v);
             }
         });
+    }
+
+    private void showDailyLimitEditor() {
+        LinearLayout sheet = dialogSheet();
+
+        ImageView icon = dialogIcon(R.drawable.ic_wallet, ACCENT);
+        sheet.addView(icon, dialogMarginParams(48, 0, 0, 14));
+
+        TextView title = text("Daily spending limit", 23, TEXT);
+        title.setTypeface(Typeface.DEFAULT_BOLD);
+        sheet.addView(title);
+
+        TextView subtitle = text(
+                "Your streak counts days that stay at or below this limit.",
+                10,
+                MUTED
+        );
+        subtitle.setPadding(0, dp(5), 0, dp(15));
+        sheet.addView(subtitle);
+
+        EditText input = field("e.g. 350", true);
+        input.setInputType(
+                InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL
+        );
+        input.setTextSize(28);
+        input.setGravity(Gravity.CENTER);
+        long current = ExpenseStore.dailyLimitPaise(preferences);
+        if (current > 0L) input.setText(amountRupeesInput(current));
+        sheet.addView(input, new LinearLayout.LayoutParams(-1, dp(68)));
+
+        TextView hint = text(
+                "Examples: ₹250 for a strict day • ₹350 for a flexible student budget",
+                9,
+                SUBTLE
+        );
+        hint.setPadding(0, dp(8), 0, 0);
+        sheet.addView(hint);
+
+        LinearLayout actions = new LinearLayout(this);
+        actions.setGravity(Gravity.CENTER_VERTICAL);
+        TextView clear = dialogTextAction("CLEAR");
+        TextView cancel = dialogTextAction("CANCEL");
+        TextView save = dialogAction("SAVE LIMIT", true);
+        actions.addView(clear, new LinearLayout.LayoutParams(0, dp(48), 0.82f));
+        actions.addView(cancel, new LinearLayout.LayoutParams(0, dp(48), 0.82f));
+        LinearLayout.LayoutParams saveParams = new LinearLayout.LayoutParams(0, dp(48), 1.12f);
+        saveParams.setMargins(dp(7), 0, 0, 0);
+        actions.addView(save, saveParams);
+        LinearLayout.LayoutParams actionsParams = new LinearLayout.LayoutParams(-1, dp(48));
+        actionsParams.setMargins(0, dp(18), 0, 0);
+        sheet.addView(actions, actionsParams);
+
+        Dialog dialog = showBottomSheet(sheet);
+        input.requestFocus();
+
+        clear.setOnClickListener(v -> {
+            ExpenseStore.setDailyLimitPaise(preferences, 0L);
+            hideKeyboard();
+            dialog.dismiss();
+            refreshExpensesScreen();
+        });
+        cancel.setOnClickListener(v -> {
+            hideKeyboard();
+            dialog.dismiss();
+        });
+        save.setOnClickListener(v -> {
+            try {
+                long paise = ExpenseStore.parseAmountToPaise(input.getText().toString());
+                ExpenseStore.setDailyLimitPaise(preferences, paise);
+                hideKeyboard();
+                dialog.dismiss();
+                refreshExpensesScreen();
+            } catch (Exception ignored) {
+                input.setError("Enter a valid daily limit.");
+                shake(v);
+            }
+        });
+    }
+
+    private void showDailyAlertEditor() {
+        LinearLayout sheet = dialogSheet();
+
+        ImageView icon = dialogIcon(R.drawable.ic_calendar, ACCENT);
+        sheet.addView(icon, dialogMarginParams(48, 0, 0, 14));
+
+        TextView title = text("Daily spending alerts", 23, TEXT);
+        title.setTypeface(Typeface.DEFAULT_BOLD);
+        sheet.addView(title);
+
+        TextView subtitle = text(
+                "At 8 PM, NextBell can tell you when today's spending reaches the alert threshold or exceeds your daily limit.",
+                10,
+                MUTED
+        );
+        subtitle.setPadding(0, dp(5), 0, dp(15));
+        sheet.addView(subtitle);
+
+        long current = ExpenseStore.dailyAlertThresholdPaise(preferences);
+        boolean enabled = ExpenseStore.dailyAlertsEnabled(preferences);
+        final long[] selected = { enabled ? current : 0L };
+
+        TextView state = text(
+                selected[0] > 0L ? "ALERT AT  " + formatRupees(selected[0]) : "ALERTS OFF",
+                16,
+                TEXT
+        );
+        state.setTypeface(Typeface.DEFAULT_BOLD);
+        state.setGravity(Gravity.CENTER);
+        state.setBackground(round(SURFACE_2, Color.TRANSPARENT, SMALL_RADIUS));
+        sheet.addView(state, new LinearLayout.LayoutParams(-1, dp(64)));
+
+        LinearLayout choices = new LinearLayout(this);
+        choices.setOrientation(LinearLayout.HORIZONTAL);
+        String[] labels = {"OFF", "₹50", "₹100"};
+        long[] values = {0L, 5000L, 10000L};
+        for (int i = 0; i < labels.length; i++) {
+            int index = i;
+            TextView chip = dialogChoiceChip(labels[i], values[i] == selected[0]);
+            LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(0, dp(44), 1f);
+            if (i > 0) cp.setMargins(dp(7), 0, 0, 0);
+            choices.addView(chip, cp);
+            chip.setOnClickListener(v -> {
+                selected[0] = values[index];
+                state.setText(selected[0] > 0L
+                        ? "ALERT AT  " + formatRupees(selected[0])
+                        : "ALERTS OFF");
+                for (int j = 0; j < choices.getChildCount(); j++) {
+                    TextView other = (TextView) choices.getChildAt(j);
+                    boolean activeChoice = j == index;
+                    other.setBackground(choiceBackground(activeChoice));
+                    other.setTextColor(activeChoice ? ACCENT : TEXT);
+                }
+                tap(v);
+            });
+        }
+        LinearLayout.LayoutParams choicesParams = new LinearLayout.LayoutParams(-1, dp(44));
+        choicesParams.setMargins(0, dp(14), 0, 0);
+        sheet.addView(choices, choicesParams);
+
+        TextView note = text(
+                "The alert is local-only and uses your normal NextBell notification permission.",
+                8,
+                SUBTLE
+        );
+        note.setPadding(0, dp(9), 0, 0);
+        sheet.addView(note);
+
+        TextView save = dialogAction("SAVE ALERT SETTINGS", true);
+        LinearLayout.LayoutParams saveParams = new LinearLayout.LayoutParams(-1, dp(48));
+        saveParams.setMargins(0, dp(18), 0, 0);
+        sheet.addView(save, saveParams);
+
+        Dialog dialog = showBottomSheet(sheet);
+        save.setOnClickListener(v -> {
+            tap(v);
+            ExpenseStore.setDailyAlertsEnabled(preferences, selected[0] > 0L);
+            ExpenseStore.setDailyAlertThresholdPaise(preferences, selected[0]);
+            ExpenseStore.setLastAlertNotifiedDate(
+                    preferences,
+                    selected[0] > 0L ? "" : ExpenseStore.lastAlertNotifiedDate(preferences)
+            );
+            NotificationScheduler.scheduleUpcoming(this);
+            dialog.dismiss();
+            refreshExpensesScreen();
+        });
+    }
+
+    private void showRecurringManager() {
+        LinearLayout sheet = dialogSheet();
+
+        ImageView icon = dialogIcon(R.drawable.ic_wallet, ACCENT_2);
+        sheet.addView(icon, dialogMarginParams(48, 0, 0, 14));
+
+        TextView title = text("Recurring expenses", 23, TEXT);
+        title.setTypeface(Typeface.DEFAULT_BOLD);
+        sheet.addView(title);
+
+        TextView subtitle = text(
+                "Rent, subscriptions and bills are generated once per month on their due day.",
+                10,
+                MUTED
+        );
+        subtitle.setPadding(0, dp(5), 0, dp(12));
+        sheet.addView(subtitle);
+
+        LinearLayout quick = new LinearLayout(this);
+        quick.setGravity(Gravity.CENTER_VERTICAL);
+
+        TextView rent = dialogAction("+ RENT", false);
+        TextView bill = dialogAction("+ BILL", false);
+        quick.addView(rent, new LinearLayout.LayoutParams(0, dp(42), 1f));
+        LinearLayout.LayoutParams billParams = new LinearLayout.LayoutParams(0, dp(42), 1f);
+        billParams.setMargins(dp(7), 0, 0, 0);
+        quick.addView(bill, billParams);
+        sheet.addView(quick, new LinearLayout.LayoutParams(-1, dp(42)));
+
+        rent.setOnClickListener(v -> {
+            tap(v);
+            showRecurringEditor(null, "Rent", "Home & Bills", 5);
+        });
+        bill.setOnClickListener(v -> {
+            tap(v);
+            showRecurringEditor(null, "Internet / Wi-Fi", "Home & Bills", 10);
+        });
+
+        LinearLayout list = new LinearLayout(this);
+        list.setOrientation(LinearLayout.VERTICAL);
+        List<RecurringExpenseStore.Rule> rules = RecurringExpenseStore.load(preferences);
+
+        if (rules.isEmpty()) {
+            TextView empty = text(
+                    "No recurring expenses yet. Start with rent or a regular bill above.",
+                    9,
+                    MUTED
+            );
+            empty.setPadding(0, dp(15), 0, dp(15));
+            list.addView(empty);
+        } else {
+            for (RecurringExpenseStore.Rule rule : rules) {
+                LinearLayout row = new LinearLayout(this);
+                row.setGravity(Gravity.CENTER_VERTICAL);
+                row.setPadding(0, dp(9), 0, dp(9));
+
+                LinearLayout copy = new LinearLayout(this);
+                copy.setOrientation(LinearLayout.VERTICAL);
+
+                TextView rowTitle = text(rule.title, 11, TEXT);
+                rowTitle.setTypeface(Typeface.DEFAULT_BOLD);
+                copy.addView(rowTitle);
+
+                TextView rowMeta = text(
+                        formatRupees(rule.amountPaise) + "  •  Day " + rule.dayOfMonth
+                                + "  •  " + rule.category
+                                + (rule.active ? "" : "  •  PAUSED"),
+                        8,
+                        rule.active ? MUTED : SUBTLE
+                );
+                rowMeta.setPadding(0, dp(3), 0, 0);
+                copy.addView(rowMeta);
+
+                row.addView(copy, new LinearLayout.LayoutParams(0, -2, 1f));
+
+                TextView edit = dialogTextAction("EDIT");
+                row.addView(edit, new LinearLayout.LayoutParams(dp(62), dp(42)));
+                edit.setOnClickListener(v -> {
+                    tap(v);
+                    dialog.dismiss();
+                    showRecurringEditor(rule, null, null, rule.dayOfMonth);
+                });
+
+                LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(-1, -2);
+                rp.setMargins(0, dp(2), 0, 0);
+                list.addView(row, rp);
+            }
+        }
+
+        sheet.addView(list);
+
+        TextView add = dialogAction("+ ADD RECURRING", true);
+        LinearLayout.LayoutParams addParams = new LinearLayout.LayoutParams(-1, dp(48));
+        addParams.setMargins(0, dp(12), 0, 0);
+        sheet.addView(add, addParams);
+
+        TextView done = dialogTextAction("DONE");
+        LinearLayout.LayoutParams doneParams = new LinearLayout.LayoutParams(-1, dp(42));
+        doneParams.setMargins(0, dp(6), 0, 0);
+        sheet.addView(done, doneParams);
+
+        Dialog dialog = showBottomSheet(sheet);
+        add.setOnClickListener(v -> {
+            tap(v);
+            dialog.dismiss();
+            showRecurringEditor(null, null, null, 1);
+        });
+        done.setOnClickListener(v -> dialog.dismiss());
+    }
+
+    private void showRecurringEditor(
+            RecurringExpenseStore.Rule existing,
+            String presetTitle,
+            String presetCategory,
+            int presetDay
+    ) {
+        LinearLayout sheet = dialogSheet();
+
+        ImageView icon = dialogIcon(R.drawable.ic_wallet, ACCENT);
+        sheet.addView(icon, dialogMarginParams(48, 0, 0, 14));
+
+        TextView title = text(
+                existing == null ? "Add recurring expense" : "Edit recurring expense",
+                23,
+                TEXT
+        );
+        title.setTypeface(Typeface.DEFAULT_BOLD);
+        sheet.addView(title);
+
+        TextView subtitle = text(
+                "Generated once per month on the selected day. Day 28 is the latest supported due date.",
+                9,
+                MUTED
+        );
+        subtitle.setPadding(0, dp(5), 0, dp(15));
+        sheet.addView(subtitle);
+
+        EditText name = field("Name — e.g. Rent", false);
+        if (existing != null) name.setText(existing.title);
+        else if (presetTitle != null) name.setText(presetTitle);
+        sheet.addView(name, new LinearLayout.LayoutParams(-1, dp(50)));
+
+        EditText amount = field("Amount", true);
+        amount.setInputType(
+                InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL
+        );
+        if (existing != null) amount.setText(amountRupeesInput(existing.amountPaise));
+        LinearLayout.LayoutParams amountParams = new LinearLayout.LayoutParams(-1, dp(50));
+        amountParams.setMargins(0, dp(9), 0, 0);
+        sheet.addView(amount, amountParams);
+
+        EditText day = field("Day of month (1–28)", true);
+        day.setText(String.valueOf(existing == null ? presetDay : existing.dayOfMonth));
+        LinearLayout.LayoutParams dayParams = new LinearLayout.LayoutParams(-1, dp(50));
+        dayParams.setMargins(0, dp(9), 0, 0);
+        sheet.addView(day, dayParams);
+
+        TextView category = choiceField(
+                "Category",
+                existing != null ? existing.category
+                        : (presetCategory == null ? "Home & Bills" : presetCategory)
+        );
+        LinearLayout.LayoutParams categoryParams = fieldLikeParams();
+        categoryParams.setMargins(0, dp(9), 0, 0);
+        sheet.addView(category, categoryParams);
+
+        TextView payment = choiceField(
+                "Payment method",
+                existing == null ? "UPI" : existing.paymentMode
+        );
+        LinearLayout.LayoutParams paymentParams = fieldLikeParams();
+        paymentParams.setMargins(0, dp(9), 0, 0);
+        sheet.addView(payment, paymentParams);
+
+        EditText note = field("Optional note", false);
+        if (existing != null) note.setText(existing.note);
+        LinearLayout.LayoutParams noteParams = new LinearLayout.LayoutParams(-1, dp(48));
+        noteParams.setMargins(0, dp(9), 0, 0);
+        sheet.addView(note, noteParams);
+
+        final boolean[] active = { existing == null || existing.active };
+        TextView state = dialogAction(active[0] ? "ACTIVE" : "PAUSED", false);
+        LinearLayout.LayoutParams stateParams = new LinearLayout.LayoutParams(-1, dp(42));
+        stateParams.setMargins(0, dp(10), 0, 0);
+        sheet.addView(state, stateParams);
+        state.setOnClickListener(v -> {
+            active[0] = !active[0];
+            state.setText(active[0] ? "ACTIVE" : "PAUSED");
+            tap(v);
+        });
+
+        category.setOnClickListener(v ->
+                showExpenseChoice(
+                        "Choose category",
+                        ExpenseStore.CATEGORIES,
+                        category
+                )
+        );
+        payment.setOnClickListener(v ->
+                showExpenseChoice(
+                        "Paid with",
+                        ExpenseStore.PAYMENT_MODES,
+                        payment
+                )
+        );
+
+        LinearLayout actions = new LinearLayout(this);
+        actions.setGravity(Gravity.CENTER_VERTICAL);
+        TextView cancel = dialogTextAction("CANCEL");
+        TextView save = dialogAction("SAVE RECURRING", true);
+        actions.addView(cancel, new LinearLayout.LayoutParams(0, dp(48), 0.9f));
+        LinearLayout.LayoutParams saveParams = new LinearLayout.LayoutParams(0, dp(48), 1.25f);
+        saveParams.setMargins(dp(8), 0, 0, 0);
+        actions.addView(save, saveParams);
+        if (existing != null) {
+            TextView remove = dialogTextAction("DELETE");
+            LinearLayout.LayoutParams removeParams = new LinearLayout.LayoutParams(0, dp(48), 0.72f);
+            removeParams.setMargins(dp(8), 0, 0, 0);
+            actions.addView(remove, removeParams);
+            remove.setOnClickListener(v -> {
+                tap(v);
+                RecurringExpenseStore.delete(preferences, existing.id);
+                dialog.dismiss();
+                showRecurringManager();
+            });
+        }
+        LinearLayout.LayoutParams actionsParams = new LinearLayout.LayoutParams(-1, dp(48));
+        actionsParams.setMargins(0, dp(16), 0, 0);
+        sheet.addView(actions, actionsParams);
+
+        Dialog dialog = showBottomSheet(sheet);
+        cancel.setOnClickListener(v -> dialog.dismiss());
+
+        save.setOnClickListener(v -> {
+            try {
+                String titleValue = name.getText().toString().trim();
+                if (titleValue.isEmpty()) throw new IllegalArgumentException("name");
+
+                long paise = ExpenseStore.parseAmountToPaise(amount.getText().toString());
+                int dayValue = Integer.parseInt(day.getText().toString().trim());
+                if (paise <= 0L || dayValue < 1 || dayValue > 28) {
+                    throw new IllegalArgumentException("value");
+                }
+
+                long id = existing == null
+                        ? System.currentTimeMillis()
+                        : existing.id;
+
+                RecurringExpenseStore.upsert(
+                        preferences,
+                        new RecurringExpenseStore.Rule(
+                                id,
+                                titleValue,
+                                paise,
+                                dayValue,
+                                category.getText().toString(),
+                                payment.getText().toString(),
+                                note.getText().toString().trim(),
+                                active[0],
+                                existing == null ? "" : existing.lastGeneratedMonth
+                        )
+                );
+
+                hideKeyboard();
+                dialog.dismiss();
+                refreshExpensesScreen();
+            } catch (Exception ignored) {
+                name.setError("Check the recurring expense details.");
+                shake(v);
+            }
+        });
+    }
+
+    private void showSplitExpenseDialog(
+            EditText amountTarget,
+            TextView statusTarget,
+            String[] splitSummary
+    ) {
+        LinearLayout sheet = dialogSheet();
+
+        ImageView icon = dialogIcon(R.drawable.ic_wallet, ACCENT_2);
+        sheet.addView(icon, dialogMarginParams(48, 0, 0, 14));
+
+        TextView title = text("Split expense", 23, TEXT);
+        title.setTypeface(Typeface.DEFAULT_BOLD);
+        sheet.addView(title);
+
+        TextView subtitle = text(
+                "Record only your share while keeping the original total in the note.",
+                10,
+                MUTED
+        );
+        subtitle.setPadding(0, dp(5), 0, dp(14));
+        sheet.addView(subtitle);
+
+        EditText total = field("Total amount", true);
+        total.setInputType(
+                InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL
+        );
+        total.setText(amountTarget.getText().toString());
+        total.setTextSize(22);
+        total.setGravity(Gravity.CENTER);
+        sheet.addView(total, new LinearLayout.LayoutParams(-1, dp(58)));
+
+        EditText people = field("Number of people", true);
+        people.setText("2");
+        LinearLayout.LayoutParams peopleParams = new LinearLayout.LayoutParams(-1, dp(50));
+        peopleParams.setMargins(0, dp(9), 0, 0);
+        sheet.addView(people, peopleParams);
+
+        TextView result = text("YOUR SHARE  •  —", 13, ACCENT);
+        result.setTypeface(Typeface.DEFAULT_BOLD);
+        result.setGravity(Gravity.CENTER);
+        result.setPadding(0, dp(15), 0, dp(12));
+        sheet.addView(result);
+
+        TextView apply = dialogAction("USE MY SHARE", true);
+        sheet.addView(apply, new LinearLayout.LayoutParams(-1, dp(48)));
+
+        Dialog dialog = showBottomSheet(sheet);
+        apply.setOnClickListener(v -> {
+            try {
+                long totalPaise = ExpenseStore.parseAmountToPaise(total.getText().toString());
+                int count = Integer.parseInt(people.getText().toString().trim());
+                if (totalPaise <= 0L || count < 2 || count > 100) {
+                    throw new IllegalArgumentException("split");
+                }
+
+                long sharePaise = Math.round(totalPaise / (double) count);
+                result.setText("YOUR SHARE  •  " + formatRupees(sharePaise));
+                amountTarget.setText(amountRupeesInput(sharePaise));
+                splitSummary[0] = "Split " + count + " ways • total " + formatRupees(totalPaise);
+                statusTarget.setText("SPLIT  •  " + count + " ways");
+                tap(v);
+                dialog.dismiss();
+            } catch (Exception ignored) {
+                total.setError("Enter a valid total.");
+                shake(v);
+            }
+        });
+    }
+
+    private String buildExpenseNote(String note, String splitSummary) {
+        String base = note == null ? "" : note.trim();
+        if (splitSummary == null || splitSummary.trim().isEmpty()) return base;
+        if (base.isEmpty()) return splitSummary.trim();
+        return base + "  •  " + splitSummary.trim();
     }
 
     private void showExpenseChoice(
