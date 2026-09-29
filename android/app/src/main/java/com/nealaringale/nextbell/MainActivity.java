@@ -21,7 +21,6 @@ import android.view.Gravity;
 import android.view.View;
 import android.view.animation.DecelerateInterpolator;
 import android.view.Window;
-import android.view.ViewParent;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.HorizontalScrollView;
@@ -961,12 +960,6 @@ public class MainActivity extends Activity {
             expenseBudgetMeta.setText("Set one to track your remaining allowance.");
         }
 
-        ViewParent parent = expenseListHost.getParent();
-        if (parent instanceof LinearLayout) {
-            LinearLayout listCard = (LinearLayout) parent;
-            View breakdownTag = listCard.getParent();
-        }
-
         // The breakdown card is immediately before the transactions header.
         expenseListHost.removeAllViews();
 
@@ -1316,7 +1309,7 @@ public class MainActivity extends Activity {
     }
 
     private TextView choiceField(String label, String value) {
-        TextView field = text(label + "   •   " + value, 13, TEXT);
+        TextView field = text(value, 13, TEXT);
         field.setGravity(Gravity.CENTER_VERTICAL);
         field.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
         field.setPadding(dp(13), 0, dp(13), 0);
@@ -1326,6 +1319,7 @@ public class MainActivity extends Activity {
                 Color.TRANSPARENT,
                 SMALL_RADIUS
         ));
+        field.setContentDescription(label + ": " + value);
         field.setClickable(true);
         field.setFocusable(true);
         return field;
