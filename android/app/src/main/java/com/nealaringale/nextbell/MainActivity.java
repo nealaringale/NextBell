@@ -103,6 +103,12 @@ public class MainActivity extends Activity {
     private TextView expenseTransactionCount;
     private TextView expenseDailyAverage;
     private SpendingChartView expenseChart;
+    private TextView expenseWeeklySpend;
+    private TextView expenseVsLastMonth;
+    private TextView expenseStreak;
+    private TextView expenseDailyLimitStatus;
+    private TextView expenseDailyAlertStatus;
+    private TextView expenseRecurringStatus;
     private LocalDate expenseMonth = LocalDate.now(zone).withDayOfMonth(1);
 
     private String lastHomeScheduleSignature = "";
@@ -904,6 +910,60 @@ public class MainActivity extends Activity {
 
         page.addView(autoStatus, sectionParams(0, 14));
 
+        LinearLayout toolsCard = cardColumn();
+        TextView toolsTitle = text("Daily controls", 15, TEXT);
+        toolsTitle.setTypeface(Typeface.DEFAULT_BOLD);
+        toolsCard.addView(toolsTitle);
+
+        TextView toolsHint = text(
+                "Set a daily limit, choose your alert threshold, or manage recurring bills.",
+                9,
+                MUTED
+        );
+        toolsHint.setPadding(0, dp(4), 0, dp(12));
+        toolsCard.addView(toolsHint);
+
+        LinearLayout limitRow = new LinearLayout(this);
+        limitRow.setGravity(Gravity.CENTER_VERTICAL);
+        expenseDailyLimitStatus = text("Daily limit  •  Not set", 10, TEXT);
+        expenseDailyLimitStatus.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
+        limitRow.addView(expenseDailyLimitStatus, new LinearLayout.LayoutParams(0, dp(42), 1f));
+        TextView limitButton = actionButton("SET LIMIT", false);
+        limitRow.addView(limitButton, new LinearLayout.LayoutParams(dp(96), dp(42)));
+        limitButton.setOnClickListener(v -> {
+            tap(v);
+            showDailyLimitEditor();
+        });
+        toolsCard.addView(limitRow);
+
+        LinearLayout alertRow = new LinearLayout(this);
+        alertRow.setGravity(Gravity.CENTER_VERTICAL);
+        expenseDailyAlertStatus = text("Daily alerts  •  ₹50", 10, TEXT);
+        expenseDailyAlertStatus.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
+        alertRow.addView(expenseDailyAlertStatus, new LinearLayout.LayoutParams(0, dp(42), 1f));
+        TextView alertButton = actionButton("ALERT", false);
+        alertRow.addView(alertButton, new LinearLayout.LayoutParams(dp(82), dp(42)));
+        alertButton.setOnClickListener(v -> {
+            tap(v);
+            showDailyAlertEditor();
+        });
+        toolsCard.addView(alertRow, new LinearLayout.LayoutParams(-1, dp(42)));
+
+        LinearLayout recurringRow = new LinearLayout(this);
+        recurringRow.setGravity(Gravity.CENTER_VERTICAL);
+        expenseRecurringStatus = text("Recurring  •  0 bills", 10, TEXT);
+        expenseRecurringStatus.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
+        recurringRow.addView(expenseRecurringStatus, new LinearLayout.LayoutParams(0, dp(42), 1f));
+        TextView recurringButton = actionButton("MANAGE", false);
+        recurringRow.addView(recurringButton, new LinearLayout.LayoutParams(dp(90), dp(42)));
+        recurringButton.setOnClickListener(v -> {
+            tap(v);
+            showRecurringManager();
+        });
+        toolsCard.addView(recurringRow, new LinearLayout.LayoutParams(-1, dp(42)));
+
+        page.addView(toolsCard, sectionParams(0, 14));
+
         LinearLayout summary = cardColumn();
         summary.setPadding(dp(18), dp(17), dp(18), dp(17));
 
@@ -961,6 +1021,39 @@ public class MainActivity extends Activity {
         summary.addView(expenseBudgetMeta);
 
         page.addView(summary, cardMargin());
+
+        page.addView(sectionLabel("INSIGHTS"), sectionParams(0, 8));
+
+        LinearLayout insightsCard = cardColumn();
+        TextView insightsTitle = text("Your spending pulse", 15, TEXT);
+        insightsTitle.setTypeface(Typeface.DEFAULT_BOLD);
+        insightsCard.addView(insightsTitle);
+
+        TextView insightsHint = text(
+                "Quick comparisons for the current week and month.",
+                9,
+                MUTED
+        );
+        insightsHint.setPadding(0, dp(4), 0, dp(12));
+        insightsCard.addView(insightsHint);
+
+        LinearLayout row1 = new LinearLayout(this);
+        row1.setGravity(Gravity.CENTER_VERTICAL);
+        expenseWeeklySpend = metricText("THIS WEEK", "₹0", TEXT);
+        expenseVsLastMonth = metricText("VS LAST MONTH", "—", ACCENT);
+        row1.addView(expenseWeeklySpend, new LinearLayout.LayoutParams(0, dp(58), 1f));
+        row1.addView(expenseVsLastMonth, new LinearLayout.LayoutParams(0, dp(58), 1f));
+        insightsCard.addView(row1);
+
+        LinearLayout row2 = new LinearLayout(this);
+        row2.setGravity(Gravity.CENTER_VERTICAL);
+        expenseStreak = metricText("STREAK", "—", TEXT);
+        TextView categoryTrendHint = metricText("CATEGORY TRENDS", "Shown below", ACCENT_2);
+        row2.addView(expenseStreak, new LinearLayout.LayoutParams(0, dp(58), 1f));
+        row2.addView(categoryTrendHint, new LinearLayout.LayoutParams(0, dp(58), 1f));
+        insightsCard.addView(row2);
+
+        page.addView(insightsCard, sectionParams(0, 20));
 
         page.addView(sectionLabel("BREAKDOWN"), sectionParams(0, 8));
 
