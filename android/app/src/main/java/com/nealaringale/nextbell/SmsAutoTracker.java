@@ -90,7 +90,7 @@ public final class SmsAutoTracker {
                 if (importOne(context, sender, body, date)) imported++;
             }
 
-            context.getSharedPreferences(MainActivity.PREFS_NAME_PUBLIC, Context.MODE_PRIVATE)
+            context.getSharedPreferences("nextbell_profile", Context.MODE_PRIVATE)
                     .edit()
                     .putLong(PREF_LAST_SYNC, System.currentTimeMillis())
                     .apply();
@@ -108,7 +108,7 @@ public final class SmsAutoTracker {
             String body,
             long smsTime
     ) {
-        if (!isEnabled(context.getSharedPreferences(MainActivity.PREFS_NAME_PUBLIC, Context.MODE_PRIVATE))
+        if (!isEnabled(context.getSharedPreferences("nextbell_profile", Context.MODE_PRIVATE))
                 || !hasPermission(context)) {
             return false;
         }
@@ -118,7 +118,7 @@ public final class SmsAutoTracker {
         if (parsed == null) return false;
 
         SharedPreferences prefs =
-                context.getSharedPreferences(MainActivity.PREFS_NAME_PUBLIC, Context.MODE_PRIVATE);
+                context.getSharedPreferences("nextbell_profile", Context.MODE_PRIVATE);
 
         if (ExpenseStore.hasFingerprint(prefs, parsed.fingerprint)) return false;
 
