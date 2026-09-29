@@ -1977,6 +1977,8 @@ public class MainActivity extends Activity {
         subtitle.setPadding(0, dp(5), 0, dp(12));
         sheet.addView(subtitle);
 
+        final Dialog[] managerDialog = {null};
+
         LinearLayout quick = new LinearLayout(this);
         quick.setGravity(Gravity.CENTER_VERTICAL);
 
@@ -1990,14 +1992,14 @@ public class MainActivity extends Activity {
 
         rent.setOnClickListener(v -> {
             tap(v);
+            if (managerDialog[0] != null) managerDialog[0].dismiss();
             showRecurringEditor(null, "Rent", "Home & Bills", 5);
         });
         bill.setOnClickListener(v -> {
             tap(v);
+            if (managerDialog[0] != null) managerDialog[0].dismiss();
             showRecurringEditor(null, "Internet / Wi-Fi", "Home & Bills", 10);
         });
-
-        final Dialog[] managerDialog = {null};
 
         LinearLayout list = new LinearLayout(this);
         list.setOrientation(LinearLayout.VERTICAL);
@@ -2195,6 +2197,7 @@ public class MainActivity extends Activity {
         sheet.addView(actions, actionsParams);
 
         Dialog dialog = showBottomSheet(sheet);
+        editorDialog[0] = dialog;
         cancel.setOnClickListener(v -> dialog.dismiss());
 
         save.setOnClickListener(v -> {
