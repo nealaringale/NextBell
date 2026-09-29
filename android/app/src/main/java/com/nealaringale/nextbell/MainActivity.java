@@ -181,11 +181,7 @@ public class MainActivity extends Activity {
             buildSettingsScreen();
             updateBottomNav();
         }
-        if (preferences != null
-                && NotificationAutoTracker.isEnabled(preferences)
-                && NotificationAutoTracker.hasAccess(this)) {
-            NotificationAutoTracker.importActiveNotifications(this);
-        }
+
     }
 
     @Override
@@ -299,11 +295,6 @@ public class MainActivity extends Activity {
         buildShell();
         navigate(selectedScreen);
         requestNotificationPermissionIfNeeded();
-
-        if (NotificationAutoTracker.isEnabled(preferences)
-                && NotificationAutoTracker.hasAccess(this)) {
-            NotificationAutoTracker.importActiveNotifications(this);
-        }
 
         if (refreshRunnable != null) {
             handler.removeCallbacks(refreshRunnable);
@@ -1273,88 +1264,6 @@ public class MainActivity extends Activity {
         return row;
     }
 
-    private void showAutoTrackDisclosure() {
-        LinearLayout sheet = dialogSheet();
-
-        ImageView icon = dialogIcon(R.drawable.ic_wallet, ACCENT_2);
-        sheet.addView(icon, dialogMarginParams(48, 0, 0, 14));
-
-        TextView title = text("Auto-track payments", 23, TEXT);
-        title.setTypeface(Typeface.DEFAULT_BOLD);
-        sheet.addView(title);
-
-        TextView intro = text(
-                "NextBell can read eligible payment notifications and turn them into expenses automatically.",
-                10,
-                MUTED
-        );
-        intro.setPadding(0, dp(5), 0, dp(15));
-        sheet.addView(intro);
-
-        String[] headings = {"SMART", "LOCAL", "PRIVATE"};
-        String[] descriptions = {
-                "Understands UPI, cards, bank debits and merchant names — from big apps to local shops when the notification includes the details.",
-                "Works on this phone. No bank login, password, or payment account connection is required.",
-                "Only the parsed expense is stored. Raw notification text is not stored by NextBell."
-        };
-
-        for (int i = 0; i < headings.length; i++) {
-            LinearLayout point = new LinearLayout(this);
-            point.setOrientation(LinearLayout.HORIZONTAL);
-            point.setPadding(0, dp(7), 0, dp(7));
-
-            TextView mark = text("0" + (i + 1), 9, ACCENT);
-            mark.setGravity(Gravity.CENTER);
-            mark.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
-            mark.setBackground(round(ACCENT_BG, Color.TRANSPARENT, 999));
-            point.addView(mark, new LinearLayout.LayoutParams(dp(32), dp(32)));
-
-            LinearLayout copy = new LinearLayout(this);
-            copy.setOrientation(LinearLayout.VERTICAL);
-            copy.setPadding(dp(10), 0, 0, 0);
-
-            TextView h = text(headings[i], 9, TEXT);
-            h.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
-            h.setLetterSpacing(0.10f);
-            copy.addView(h);
-
-            TextView d = text(descriptions[i], 9, MUTED);
-            d.setPadding(0, dp(3), 0, 0);
-            copy.addView(d);
-
-            point.addView(copy, new LinearLayout.LayoutParams(0, -2, 1f));
-            sheet.addView(point);
-        }
-
-        TextView policy = text(
-                "Android will open its Notification Access screen. You choose whether NextBell can read notifications.",
-                8,
-                SUBTLE
-        );
-        policy.setPadding(0, dp(8), 0, dp(12));
-        sheet.addView(policy);
-
-        LinearLayout actions = new LinearLayout(this);
-        actions.setGravity(Gravity.CENTER_VERTICAL);
-
-        TextView cancel = dialogTextAction("NOT NOW");
-        TextView enable = dialogAction("OPEN ACCESS", true);
-        actions.addView(cancel, new LinearLayout.LayoutParams(0, dp(48), 0.85f));
-        LinearLayout.LayoutParams enableParams = new LinearLayout.LayoutParams(0, dp(48), 1.2f);
-        enableParams.setMargins(dp(8), 0, 0, 0);
-        actions.addView(enable, enableParams);
-        sheet.addView(actions, new LinearLayout.LayoutParams(-1, dp(48)));
-
-        Dialog dialog = showBottomSheet(sheet);
-        cancel.setOnClickListener(v -> dialog.dismiss());
-        enable.setOnClickListener(v -> {
-            tap(v);
-            dialog.dismiss();
-            NotificationAutoTracker.setEnabled(preferences, true);
-            NotificationAutoTracker.openAccessSettings(this);
-        });
-    }
-
     private void showExpenseActions(ExpenseStore.Expense expense) {
         LinearLayout sheet = dialogSheet();
 
@@ -2223,24 +2132,19 @@ public class MainActivity extends Activity {
 
         page.addView(notificationCard, sectionParams(0, 16));
 
-        page.addView(sectionLabel("MONEY AUTOMATION"), sectionParams(0, 7));
+        page.addView(sectionLabel("MONEY"), sectionParams(0, 7));
 
         LinearLayout autoCard = settingRow(R.drawable.ic_wallet, ACCENT_2);
 
         LinearLayout autoText = new LinearLayout(this);
         autoText.setOrientation(LinearLayout.VERTICAL);
 
-        TextView autoTitle = text("Auto-track payments", 14, TEXT);
+        TextView autoTitle = text("Automatic payment tracking", 14, TEXT);
         autoTitle.setTypeface(Typeface.DEFAULT_BOLD);
         autoText.addView(autoTitle);
 
-        boolean smsEnabled = NotificationAutoTracker.isEnabled(preferences)
-                && NotificationAutoTracker.hasAccess(this);
-
         TextView autoDescription = text(
-                smsEnabled
-                        ? "Reads payment notifications on-device and adds matching expenses automatically."
-                        : "Detect UPI, card, bank and merchant payment notifications automatically.",
+                "Safe sideload build: NextBell does not read SMS or notifications. Add expenses manually in Money.",
                 10,
                 MUTED
         );
@@ -2248,39 +2152,14 @@ public class MainActivity extends Activity {
         autoDescription.setPadding(0, dp(4), 0, 0);
         autoText.addView(autoDescription);
 
-        TextView privacyText = text(
-                "Private by design • raw notification text is never stored by NextBell.",
-                8,
-                SUBTLE
-        );
-        privacyText.setPadding(0, dp(3), 0, 0);
-        autoText.addView(privacyText);
+        TextView safeBadge = text("SAFE MODE", 8, ACCENT);
+        safeBadge.setGravity(Gravity.CENTER);
+        safeBadge.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
+        safeBadge.setPadding(dp(9), 0, dp(9), 0);
+        safeBadge.setBackground(round(ACCENT_BG, Color.TRANSPARENT, PILL_RADIUS()));
 
         autoCard.addView(autoText, new LinearLayout.LayoutParams(0, -2, 1f));
-
-        TextView autoAction = actionButton(
-                smsEnabled ? "ON" : "SET UP",
-                smsEnabled
-        );
-        autoCard.addView(
-                autoAction,
-                new LinearLayout.LayoutParams(dp(82), CONTROL_HEIGHT_DP())
-        );
-
-        autoAction.setOnClickListener(v -> {
-            tap(v);
-            if (smsEnabled) {
-                NotificationAutoTracker.setEnabled(preferences, false);
-                Toast.makeText(
-                        this,
-                        "Automatic payment tracking turned off.",
-                        Toast.LENGTH_SHORT
-                ).show();
-                buildSettingsScreen();
-                return;
-            }
-            showAutoTrackDisclosure();
-        });
+        autoCard.addView(safeBadge, new LinearLayout.LayoutParams(-2, dp(32)));
 
         page.addView(autoCard, sectionParams(0, 22));
 
