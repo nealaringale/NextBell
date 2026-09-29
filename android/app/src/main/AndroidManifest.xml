@@ -26,6 +26,10 @@
             android:exported="false" />
 
         <receiver
+            android:name=".ExpenseDailyAlertReceiver"
+            android:exported="false" />
+
+        <receiver
             android:name=".LiveStatusReceiver"
             android:exported="false" />
 
