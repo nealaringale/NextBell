@@ -3,6 +3,7 @@ package com.nealaringale.nextbell;
 import android.Manifest;
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.app.DatePickerDialog;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
@@ -20,6 +21,7 @@ import android.view.Gravity;
 import android.view.View;
 import android.view.animation.DecelerateInterpolator;
 import android.view.Window;
+import android.view.ViewParent;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.HorizontalScrollView;
@@ -34,7 +36,9 @@ import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
+import java.math.BigDecimal;
 import java.util.List;
+import java.text.NumberFormat;
 import java.util.Locale;
 
 public class MainActivity extends Activity {
@@ -80,6 +84,14 @@ public class MainActivity extends Activity {
     private LinearLayout weekSchedule;
     private TextView weekDayTitle;
     private String weekSelectedDay;
+
+    private LinearLayout expenseListHost;
+    private TextView expenseMonthTitle;
+    private TextView expenseMonthTotal;
+    private TextView expenseBudgetLabel;
+    private TextView expenseBudgetMeta;
+    private TextView expenseTransactionCount;
+    private LocalDate expenseMonth = LocalDate.now(zone).withDayOfMonth(1);
 
     private int themeIndex;
     private String selectedScreen = "home";
@@ -305,6 +317,7 @@ public class MainActivity extends Activity {
 
         nav.addView(navItem("home", "Home", R.drawable.ic_home), navWeight());
         nav.addView(navItem("week", "Week", R.drawable.ic_calendar), navWeight());
+        nav.addView(navItem("expenses", "Money", R.drawable.ic_wallet), navWeight());
         nav.addView(navItem("settings", "Settings", R.drawable.ic_settings), navWeight());
         return nav;
     }
@@ -347,7 +360,16 @@ public class MainActivity extends Activity {
             View child = bottomNav.getChildAt(i);
             if (!(child instanceof LinearLayout)) continue;
 
-            String id = i == 0 ? "home" : (i == 1 ? "week" : "settings");
+            String id;
+            if (i == 0) {
+                id = "home";
+            } else if (i == 1) {
+                id = "week";
+            } else if (i == 2) {
+                id = "expenses";
+            } else {
+                id = "settings";
+            }
             boolean selected = id.equals(selectedScreen);
             LinearLayout item = (LinearLayout) child;
             ImageView icon = (ImageView) item.getChildAt(0);
@@ -385,6 +407,8 @@ public class MainActivity extends Activity {
             buildHomeScreen();
         } else if ("week".equals(screen)) {
             buildWeekScreen();
+        } else if ("expenses".equals(screen)) {
+            buildExpensesScreen();
         } else {
             buildSettingsScreen();
         }
@@ -752,6 +776,620 @@ public class MainActivity extends Activity {
         addBottomSpace(page);
         updateWeekDayChips(dayRow);
         refreshWeekSchedule();
+    }
+
+    private void buildExpensesScreen() {
+        expenseMonth = expenseMonth.withDayOfMonth(1);
+
+        LinearLayout page = scrollPage();
+
+        LinearLayout header = new LinearLayout(this);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+
+        LinearLayout headerText = new LinearLayout(this);
+        headerText.setOrientation(LinearLayout.VERTICAL);
+        header.addView(headerText, new LinearLayout.LayoutParams(0, -2, 1f));
+
+        TextView eyebrow = sectionLabel("MONEY");
+        eyebrow.setTextColor(ACCENT);
+        headerText.addView(eyebrow);
+
+        TextView title = text("Expenses", 29, TEXT);
+        title.setTypeface(Typeface.DEFAULT_BOLD);
+        title.setPadding(0, dp(5), 0, 0);
+        headerText.addView(title);
+
+        TextView subtitle = text(
+                "A clear view of where your student money goes.",
+                10,
+                MUTED
+        );
+        subtitle.setPadding(0, dp(5), 0, 0);
+        headerText.addView(subtitle);
+
+        TextView add = actionButton("+  ADD", true);
+        LinearLayout.LayoutParams addParams = new LinearLayout.LayoutParams(dp(86), dp(42));
+        addParams.setMargins(dp(10), 0, 0, 0);
+        header.addView(add, addParams);
+        add.setOnClickListener(v -> {
+            tap(v);
+            showExpenseEditor(null);
+        });
+
+        page.addView(header);
+
+        LinearLayout monthRow = new LinearLayout(this);
+        monthRow.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams monthParams = new LinearLayout.LayoutParams(-1, dp(48));
+        monthParams.setMargins(0, dp(18), 0, dp(12));
+
+        TextView previous = actionButton("‹", false);
+        TextView next = actionButton("›", false);
+        monthRow.addView(previous, new LinearLayout.LayoutParams(dp(46), dp(42)));
+
+        expenseMonthTitle = text("", 14, TEXT);
+        expenseMonthTitle.setGravity(Gravity.CENTER);
+        expenseMonthTitle.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
+        monthRow.addView(expenseMonthTitle, new LinearLayout.LayoutParams(0, -1, 1f));
+
+        monthRow.addView(next, new LinearLayout.LayoutParams(dp(46), dp(42)));
+
+        previous.setOnClickListener(v -> {
+            tap(v);
+            expenseMonth = expenseMonth.minusMonths(1);
+            refreshExpensesScreen();
+        });
+        next.setOnClickListener(v -> {
+            tap(v);
+            expenseMonth = expenseMonth.plusMonths(1);
+            refreshExpensesScreen();
+        });
+        page.addView(monthRow, monthParams);
+
+        LinearLayout summary = cardColumn();
+        summary.setPadding(dp(18), dp(17), dp(18), dp(17));
+
+        TextView summaryLabel = sectionLabel("SPENT THIS MONTH");
+        summary.addView(summaryLabel);
+
+        expenseMonthTotal = text("₹0", 32, TEXT);
+        expenseMonthTotal.setTypeface(Typeface.DEFAULT_BOLD);
+        expenseMonthTotal.setPadding(0, dp(6), 0, 0);
+        summary.addView(expenseMonthTotal);
+
+        LinearLayout summaryMeta = new LinearLayout(this);
+        summaryMeta.setGravity(Gravity.CENTER_VERTICAL);
+        expenseTransactionCount = text("0 transactions", 9, MUTED);
+        summaryMeta.addView(expenseTransactionCount, new LinearLayout.LayoutParams(0, -2, 1f));
+
+        TextView budget = actionButton("SET BUDGET", false);
+        summaryMeta.addView(budget, new LinearLayout.LayoutParams(dp(108), dp(36)));
+        budget.setOnClickListener(v -> {
+            tap(v);
+            showBudgetEditor();
+        });
+        summary.addView(summaryMeta, new LinearLayout.LayoutParams(-1, dp(36)));
+
+        expenseBudgetLabel = text("No monthly budget set", 10, TEXT);
+        expenseBudgetLabel.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
+        expenseBudgetLabel.setPadding(0, dp(13), 0, 0);
+        summary.addView(expenseBudgetLabel);
+
+        expenseBudgetMeta = text("Set one to track your remaining allowance.", 9, MUTED);
+        expenseBudgetMeta.setPadding(0, dp(3), 0, 0);
+        summary.addView(expenseBudgetMeta);
+
+        page.addView(summary, cardMargin());
+
+        page.addView(sectionLabel("BREAKDOWN"), sectionParams(0, 8));
+
+        LinearLayout breakdown = cardColumn();
+        TextView breakdownTitle = text("Where it's going", 15, TEXT);
+        breakdownTitle.setTypeface(Typeface.DEFAULT_BOLD);
+        breakdown.addView(breakdownTitle);
+
+        TextView breakdownHint = text(
+                "Your biggest categories this month.",
+                9,
+                MUTED
+        );
+        breakdownHint.setPadding(0, dp(4), 0, dp(12));
+        breakdown.addView(breakdownHint);
+
+        LinearLayout categoryHost = new LinearLayout(this);
+        categoryHost.setOrientation(LinearLayout.VERTICAL);
+        breakdown.addView(categoryHost);
+        // Stored in the same host as the list container through a tag to keep the class lightweight.
+        breakdown.setTag(categoryHost);
+
+        page.addView(breakdown, sectionParams(0, 20));
+
+        LinearLayout txHeader = new LinearLayout(this);
+        txHeader.setGravity(Gravity.CENTER_VERTICAL);
+        TextView txTitle = text("Transactions", 15, TEXT);
+        txTitle.setTypeface(Typeface.DEFAULT_BOLD);
+        txHeader.addView(txTitle, new LinearLayout.LayoutParams(0, -2, 1f));
+
+        expenseListHost = new LinearLayout(this);
+        expenseListHost.setOrientation(LinearLayout.VERTICAL);
+
+        page.addView(txHeader, sectionParams(0, 8));
+
+        LinearLayout listCard = cardColumn();
+        listCard.setPadding(dp(13), dp(13), dp(13), dp(13));
+        listCard.addView(expenseListHost);
+        page.addView(listCard, sectionParams(0, 8));
+
+        addBottomSpace(page);
+        refreshExpensesScreen();
+    }
+
+    private void refreshExpensesScreen() {
+        if (expenseMonthTitle == null || expenseListHost == null) return;
+
+        expenseMonth = expenseMonth.withDayOfMonth(1);
+        String monthText = expenseMonth.format(
+                DateTimeFormatter.ofPattern("MMMM yyyy", Locale.ENGLISH)
+        );
+        expenseMonthTitle.setText(monthText.toUpperCase(Locale.ENGLISH));
+
+        List<ExpenseStore.Expense> expenses =
+                ExpenseStore.forMonth(preferences, expenseMonth);
+        long total = ExpenseStore.totalPaise(expenses);
+        long budget = ExpenseStore.budgetPaise(preferences, expenseMonth);
+
+        expenseMonthTotal.setText(formatRupees(total));
+        expenseTransactionCount.setText(
+                expenses.size() + (expenses.size() == 1 ? " transaction" : " transactions")
+        );
+
+        if (budget > 0) {
+            long remaining = budget - total;
+            if (remaining >= 0) {
+                expenseBudgetLabel.setText("Budget  •  " + formatRupees(budget));
+                expenseBudgetMeta.setText(
+                        formatRupees(remaining) + " remaining"
+                );
+            } else {
+                expenseBudgetLabel.setText("Budget  •  " + formatRupees(budget));
+                expenseBudgetMeta.setText(
+                        formatRupees(-remaining) + " over budget"
+                );
+            }
+        } else {
+            expenseBudgetLabel.setText("No monthly budget set");
+            expenseBudgetMeta.setText("Set one to track your remaining allowance.");
+        }
+
+        ViewParent parent = expenseListHost.getParent();
+        if (parent instanceof LinearLayout) {
+            LinearLayout listCard = (LinearLayout) parent;
+            View breakdownTag = listCard.getParent();
+        }
+
+        // The breakdown card is immediately before the transactions header.
+        expenseListHost.removeAllViews();
+
+        if (expenses.isEmpty()) {
+            LinearLayout empty = new LinearLayout(this);
+            empty.setOrientation(LinearLayout.VERTICAL);
+            empty.setGravity(Gravity.CENTER_HORIZONTAL);
+            empty.setPadding(0, dp(18), 0, dp(18));
+
+            ImageView icon = new ImageView(this);
+            icon.setImageResource(R.drawable.ic_wallet);
+            icon.setColorFilter(ACCENT);
+            icon.setPadding(dp(8), dp(8), dp(8), dp(8));
+            icon.setBackground(round(ACCENT_BG, Color.TRANSPARENT, 999));
+            empty.addView(icon, new LinearLayout.LayoutParams(dp(50), dp(50)));
+
+            TextView title = text(
+                    "No expenses yet",
+                    13,
+                    TEXT
+            );
+            title.setTypeface(Typeface.DEFAULT_BOLD);
+            title.setPadding(0, dp(9), 0, 0);
+            empty.addView(title);
+
+            TextView hint = text(
+                    "Tap + ADD to record your first expense.",
+                    9,
+                    MUTED
+            );
+            hint.setPadding(0, dp(4), 0, 0);
+            empty.addView(hint);
+
+            expenseListHost.addView(empty);
+        } else {
+            LocalDate previousDate = null;
+            for (ExpenseStore.Expense expense : expenses) {
+                if (previousDate == null || !previousDate.equals(expense.date)) {
+                    TextView date = text(dateLabel(expense.date), 9, SUBTLE);
+                    date.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
+                    date.setLetterSpacing(0.08f);
+                    date.setPadding(dp(3), dp(7), dp(3), dp(7));
+                    expenseListHost.addView(date);
+                    previousDate = expense.date;
+                }
+                expenseListHost.addView(expenseRow(expense));
+            }
+        }
+
+        refreshExpenseBreakdown(expenses);
+    }
+
+    private void refreshExpenseBreakdown(List<ExpenseStore.Expense> expenses) {
+        // Locate the breakdown host from the card structure.
+        if (contentHost == null || contentHost.getChildCount() == 0) return;
+
+        View rootView = contentHost.getChildAt(0);
+        if (!(rootView instanceof ScrollView)) return;
+
+        LinearLayout body = (LinearLayout) ((ScrollView) rootView).getChildAt(0);
+        LinearLayout categoryHost = null;
+
+        for (int i = 0; i < body.getChildCount(); i++) {
+            View child = body.getChildAt(i);
+            if (child instanceof LinearLayout) {
+                Object tag = child.getTag();
+                if (tag instanceof LinearLayout) {
+                    categoryHost = (LinearLayout) tag;
+                    break;
+                }
+            }
+        }
+
+        if (categoryHost == null) return;
+        categoryHost.removeAllViews();
+
+        java.util.Map<String, Long> totals = ExpenseStore.categoryTotals(expenses);
+        long max = 0L;
+        for (long value : totals.values()) max = Math.max(max, value);
+
+        if (max == 0L) {
+            TextView empty = text(
+                    "Add expenses to see your spending pattern.",
+                    10,
+                    MUTED
+            );
+            empty.setPadding(0, dp(8), 0, dp(2));
+            categoryHost.addView(empty);
+            return;
+        }
+
+        for (int i = 0; i < ExpenseStore.CATEGORIES.length; i++) {
+            String category = ExpenseStore.CATEGORIES[i];
+            long amount = totals.get(category);
+            if (amount <= 0) continue;
+
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.VERTICAL);
+            row.setPadding(0, dp(4), 0, dp(7));
+
+            LinearLayout top = new LinearLayout(this);
+            top.setGravity(Gravity.CENTER_VERTICAL);
+
+            TextView name = text(category, 10, TEXT);
+            name.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
+            top.addView(name, new LinearLayout.LayoutParams(0, -2, 1f));
+
+            TextView value = text(formatRupees(amount), 10, MUTED);
+            value.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
+            top.addView(value);
+            row.addView(top);
+
+            LinearLayout track = new LinearLayout(this);
+            track.setOrientation(LinearLayout.HORIZONTAL);
+            track.setBackground(round(blend(SURFACE_2, BG, 0.10f), Color.TRANSPARENT, 999));
+
+            float ratio = Math.max(0.03f, Math.min(1f, (float) amount / (float) max));
+            View fill = new View(this);
+            fill.setBackground(round(
+                    i % 2 == 0 ? ACCENT : ACCENT_2,
+                    Color.TRANSPARENT,
+                    999
+            ));
+            track.addView(fill, new LinearLayout.LayoutParams(0, dp(6), ratio));
+            track.addView(spacer(1, dp(6)), new LinearLayout.LayoutParams(0, dp(6), 1f - ratio));
+            row.addView(track, new LinearLayout.LayoutParams(-1, dp(6)));
+
+            categoryHost.addView(row);
+        }
+    }
+
+    private LinearLayout expenseRow(ExpenseStore.Expense expense) {
+        LinearLayout row = new LinearLayout(this);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(dp(5), dp(10), dp(5), dp(10));
+        row.setClickable(true);
+        row.setFocusable(true);
+        row.setBackground(ripple(
+                Color.TRANSPARENT,
+                blend(SURFACE_2, BG, 0.20f),
+                Color.TRANSPARENT,
+                SMALL_RADIUS
+        ));
+        row.setOnClickListener(v -> {
+            tap(v);
+            showExpenseActions(expense);
+        });
+
+        TextView categoryMark = text(
+                expense.category.substring(0, 1).toUpperCase(Locale.ENGLISH),
+                11,
+                BG
+        );
+        categoryMark.setGravity(Gravity.CENTER);
+        categoryMark.setTypeface(Typeface.DEFAULT_BOLD);
+        categoryMark.setBackground(round(
+                expense.category.equals("Food") ? ACCENT : ACCENT_2,
+                Color.TRANSPARENT,
+                999
+        ));
+        row.addView(categoryMark, new LinearLayout.LayoutParams(dp(38), dp(38)));
+
+        LinearLayout copy = new LinearLayout(this);
+        copy.setOrientation(LinearLayout.VERTICAL);
+        copy.setPadding(dp(11), 0, 0, 0);
+
+        TextView category = text(expense.category, 11, TEXT);
+        category.setTypeface(Typeface.DEFAULT_BOLD);
+        copy.addView(category);
+
+        String detail = expense.note.trim();
+        if (detail.isEmpty()) detail = expense.paymentMode;
+        else detail = detail + "  •  " + expense.paymentMode;
+
+        TextView note = text(detail, 8, MUTED);
+        note.setMaxLines(1);
+        note.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        note.setPadding(0, dp(3), 0, 0);
+        copy.addView(note);
+
+        row.addView(copy, new LinearLayout.LayoutParams(0, -2, 1f));
+
+        TextView amount = text(formatRupees(expense.amountPaise), 12, TEXT);
+        amount.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
+        amount.setGravity(Gravity.END);
+        row.addView(amount);
+
+        return row;
+    }
+
+    private void showExpenseActions(ExpenseStore.Expense expense) {
+        new AlertDialog.Builder(this)
+                .setTitle(expense.category + "  •  " + formatRupees(expense.amountPaise))
+                .setItems(
+                        new String[]{"Edit expense", "Delete expense"},
+                        (dialog, which) -> {
+                            if (which == 0) {
+                                showExpenseEditor(expense);
+                            } else {
+                                new AlertDialog.Builder(this)
+                                        .setTitle("Delete expense?")
+                                        .setMessage(
+                                                formatRupees(expense.amountPaise)
+                                                        + " • " + expense.category
+                                        )
+                                        .setNegativeButton("Cancel", null)
+                                        .setPositiveButton("Delete", (d, w) -> {
+                                            ExpenseStore.delete(preferences, expense.id);
+                                            refreshExpensesScreen();
+                                        })
+                                        .show();
+                            }
+                        }
+                )
+                .show();
+    }
+
+    private void showExpenseEditor(ExpenseStore.Expense existing) {
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(dp(2), 0, dp(2), 0);
+
+        EditText amount = field("0.00", true);
+        amount.setInputType(
+                InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL
+        );
+        amount.setHint("0.00");
+        if (existing != null) {
+            amount.setText(amountRupeesInput(existing.amountPaise));
+        }
+        box.addView(amount, fieldParams());
+
+        TextView category = choiceField(
+                "Category",
+                existing == null ? "Food" : existing.category
+        );
+        LinearLayout.LayoutParams choiceParams = fieldLikeParams();
+        choiceParams.setMargins(0, dp(9), 0, 0);
+        box.addView(category, choiceParams);
+
+        TextView payment = choiceField(
+                "Payment",
+                existing == null ? "UPI" : existing.paymentMode
+        );
+        LinearLayout.LayoutParams paymentParams = fieldLikeParams();
+        paymentParams.setMargins(0, dp(9), 0, 0);
+        box.addView(payment, paymentParams);
+
+        LocalDate[] selectedDate = {
+                existing == null ? LocalDate.now(zone) : existing.date
+        };
+        TextView date = choiceField("Date", formatLongDate(selectedDate[0]));
+        LinearLayout.LayoutParams dateParams = fieldLikeParams();
+        dateParams.setMargins(0, dp(9), 0, 0);
+        box.addView(date, dateParams);
+
+        EditText note = field("e.g. Lunch at college", false);
+        if (existing != null) note.setText(existing.note);
+        LinearLayout.LayoutParams noteParams = fieldParams();
+        noteParams.setMargins(0, dp(9), 0, 0);
+        box.addView(note, noteParams);
+
+        category.setOnClickListener(v ->
+                showExpenseChoice("Category", ExpenseStore.CATEGORIES, category)
+        );
+        payment.setOnClickListener(v ->
+                showExpenseChoice("Payment", ExpenseStore.PAYMENT_MODES, payment)
+        );
+        date.setOnClickListener(v -> {
+            DatePickerDialog picker = new DatePickerDialog(
+                    this,
+                    (view, year, month, day) -> {
+                        selectedDate[0] = LocalDate.of(year, month + 1, day);
+                        date.setText(formatLongDate(selectedDate[0]));
+                    },
+                    selectedDate[0].getYear(),
+                    selectedDate[0].getMonthValue() - 1,
+                    selectedDate[0].getDayOfMonth()
+            );
+            picker.show();
+        });
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle(existing == null ? "Add expense" : "Edit expense")
+                .setView(box)
+                .setNegativeButton("Cancel", null)
+                .setPositiveButton(existing == null ? "Add" : "Save", null)
+                .create();
+
+        dialog.setOnShowListener(d -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+                .setOnClickListener(v -> {
+                    try {
+                        long paise = ExpenseStore.parseAmountToPaise(
+                                amount.getText().toString()
+                        );
+                        if (paise <= 0) {
+                            amount.setError("Enter an amount greater than ₹0");
+                            return;
+                        }
+
+                        long id = existing == null
+                                ? System.currentTimeMillis()
+                                : existing.id;
+
+                        ExpenseStore.Expense updated = new ExpenseStore.Expense(
+                                id,
+                                paise,
+                                selectedDate[0],
+                                category.getText().toString(),
+                                note.getText().toString().trim(),
+                                payment.getText().toString()
+                        );
+
+                        ExpenseStore.upsert(preferences, updated);
+                        expenseMonth = selectedDate[0].withDayOfMonth(1);
+                        dialog.dismiss();
+                        refreshExpensesScreen();
+                    } catch (Exception ignored) {
+                        amount.setError("Enter a valid amount, e.g. 120.50");
+                    }
+                }));
+
+        dialog.show();
+    }
+
+    private void showExpenseChoice(
+            String title,
+            String[] options,
+            TextView target
+    ) {
+        String current = target.getText().toString();
+        int selected = 0;
+        for (int i = 0; i < options.length; i++) {
+            if (options[i].equals(current)) {
+                selected = i;
+                break;
+            }
+        }
+
+        new AlertDialog.Builder(this)
+                .setTitle(title)
+                .setSingleChoiceItems(options, selected, (dialog, which) -> {
+                    target.setText(options[which]);
+                    dialog.dismiss();
+                })
+                .show();
+    }
+
+    private TextView choiceField(String label, String value) {
+        TextView field = text(label + "   •   " + value, 13, TEXT);
+        field.setGravity(Gravity.CENTER_VERTICAL);
+        field.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
+        field.setPadding(dp(13), 0, dp(13), 0);
+        field.setBackground(ripple(
+                SURFACE_2,
+                blend(SURFACE_2, BG, 0.18f),
+                Color.TRANSPARENT,
+                SMALL_RADIUS
+        ));
+        field.setClickable(true);
+        field.setFocusable(true);
+        return field;
+    }
+
+    private LinearLayout.LayoutParams fieldLikeParams() {
+        return new LinearLayout.LayoutParams(-1, dp(50));
+    }
+
+    private void showBudgetEditor() {
+        EditText input = field("0.00", true);
+        input.setInputType(
+                InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL
+        );
+        long current = ExpenseStore.budgetPaise(preferences, expenseMonth);
+        if (current > 0) input.setText(amountRupeesInput(current));
+
+        new AlertDialog.Builder(this)
+                .setTitle("Monthly budget")
+                .setMessage("Set a spending limit for " +
+                        expenseMonth.format(DateTimeFormatter.ofPattern("MMMM yyyy", Locale.ENGLISH)) + ".")
+                .setView(input)
+                .setNegativeButton("Cancel", null)
+                .setNeutralButton("Clear", (dialog, which) -> {
+                    ExpenseStore.setBudgetPaise(preferences, expenseMonth, 0L);
+                    refreshExpensesScreen();
+                })
+                .setPositiveButton("Save", (dialog, which) -> {
+                    try {
+                        long paise = ExpenseStore.parseAmountToPaise(input.getText().toString());
+                        ExpenseStore.setBudgetPaise(preferences, expenseMonth, paise);
+                        refreshExpensesScreen();
+                    } catch (Exception ignored) {
+                        input.setError("Enter a valid budget.");
+                    }
+                })
+                .show();
+    }
+
+    private String dateLabel(LocalDate date) {
+        LocalDate today = LocalDate.now(zone);
+        if (date.equals(today)) return "TODAY";
+        if (date.equals(today.minusDays(1))) return "YESTERDAY";
+        return date.format(DateTimeFormatter.ofPattern("EEE, d MMM", Locale.ENGLISH))
+                .toUpperCase(Locale.ENGLISH);
+    }
+
+    private String formatLongDate(LocalDate date) {
+        return date.format(DateTimeFormatter.ofPattern("d MMM yyyy", Locale.ENGLISH));
+    }
+
+    private String amountRupeesInput(long paise) {
+        BigDecimal value = BigDecimal.valueOf(paise, 2);
+        return value.stripTrailingZeros().toPlainString();
+    }
+
+    private String formatRupees(long paise) {
+        long whole = Math.abs(paise) / 100L;
+        int cents = (int) (Math.abs(paise) % 100L);
+        String value = NumberFormat.getIntegerInstance(Locale.ENGLISH).format(whole);
+        if (cents > 0) {
+            value += "." + (cents < 10 ? "0" : "") + cents;
+        }
+        return (paise < 0 ? "-₹" : "₹") + value;
     }
 
     private void buildSettingsScreen() {
@@ -1190,6 +1828,8 @@ public class MainActivity extends Activity {
             refreshHome();
         } else if ("week".equals(selectedScreen)) {
             refreshWeekSchedule();
+        } else if ("expenses".equals(selectedScreen)) {
+            refreshExpensesScreen();
         }
     }
 
