@@ -31,8 +31,9 @@ public final class NotificationAutoTracker {
 
     public static boolean hasAccess(Context context) {
         ComponentName component = new ComponentName(context, PaymentNotificationListener.class);
-        return android.app.NotificationManager.get(context)
-                .isNotificationListenerAccessGranted(component);
+        android.app.NotificationManager manager =
+                (android.app.NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+        return manager != null && manager.isNotificationListenerAccessGranted(component);
     }
 
     public static void openAccessSettings(Context context) {
