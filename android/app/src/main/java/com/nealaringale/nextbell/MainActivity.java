@@ -880,44 +880,28 @@ public class MainActivity extends Activity {
         LinearLayout autoStatus = new LinearLayout(this);
         autoStatus.setGravity(Gravity.CENTER_VERTICAL);
         autoStatus.setPadding(dp(13), dp(10), dp(13), dp(10));
-        boolean smsActive = NotificationAutoTracker.isEnabled(preferences)
-                && NotificationAutoTracker.hasAccess(this);
         autoStatus.setBackground(round(
-                smsActive ? ACCENT_BG : SURFACE_2,
+                SURFACE_2,
                 Color.TRANSPARENT,
                 SMALL_RADIUS
         ));
 
         TextView autoStatusTitle = text(
-                smsActive ? "AUTO-TRACKING ON" : "AUTO-TRACKING OFF",
+                "SAFE MODE  •  AUTO-TRACKING OFF",
                 9,
-                smsActive ? ACCENT_2 : MUTED
+                MUTED
         );
         autoStatusTitle.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
-        autoStatusTitle.setLetterSpacing(0.08f);
+        autoStatusTitle.setLetterSpacing(0.06f);
         autoStatus.addView(autoStatusTitle, new LinearLayout.LayoutParams(0, -2, 1f));
 
         TextView sync = text(
-                smsActive ? "NOTIFICATIONS • ON-DEVICE" : "SET UP IN SETTINGS",
+                "MANUAL ENTRY • LOCAL ONLY",
                 8,
                 SUBTLE
         );
         autoStatus.addView(sync);
 
-        autoStatus.setClickable(true);
-        autoStatus.setOnClickListener(v -> {
-            tap(v);
-            if (smsActive) {
-                NotificationAutoTracker.importActiveNotifications(this);
-                Toast.makeText(
-                        MainActivity.this,
-                        "Checking recent payment notifications…",
-                        Toast.LENGTH_SHORT
-                ).show();
-            } else {
-                showAutoTrackDisclosure();
-            }
-        });
         page.addView(autoStatus, sectionParams(0, 14));
 
         LinearLayout summary = cardColumn();
