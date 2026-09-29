@@ -1528,6 +1528,7 @@ public class MainActivity extends Activity {
         sheet.addView(actions);
 
         Dialog dialog = showBottomSheet(sheet);
+        editorDialog[0] = dialog;
         cancel.setOnClickListener(v -> dialog.dismiss());
         confirm.setOnClickListener(v -> {
             tap(v);
@@ -1996,6 +1997,8 @@ public class MainActivity extends Activity {
             showRecurringEditor(null, "Internet / Wi-Fi", "Home & Bills", 10);
         });
 
+        final Dialog[] managerDialog = {null};
+
         LinearLayout list = new LinearLayout(this);
         list.setOrientation(LinearLayout.VERTICAL);
         List<RecurringExpenseStore.Rule> rules = RecurringExpenseStore.load(preferences);
@@ -2037,7 +2040,7 @@ public class MainActivity extends Activity {
                 row.addView(edit, new LinearLayout.LayoutParams(dp(62), dp(42)));
                 edit.setOnClickListener(v -> {
                     tap(v);
-                    dialog.dismiss();
+                    if (managerDialog[0] != null) managerDialog[0].dismiss();
                     showRecurringEditor(rule, null, null, rule.dayOfMonth);
                 });
 
@@ -2060,6 +2063,7 @@ public class MainActivity extends Activity {
         sheet.addView(done, doneParams);
 
         Dialog dialog = showBottomSheet(sheet);
+        managerDialog[0] = dialog;
         add.setOnClickListener(v -> {
             tap(v);
             dialog.dismiss();
@@ -2164,6 +2168,8 @@ public class MainActivity extends Activity {
                 )
         );
 
+        final Dialog[] editorDialog = {null};
+
         LinearLayout actions = new LinearLayout(this);
         actions.setGravity(Gravity.CENTER_VERTICAL);
         TextView cancel = dialogTextAction("CANCEL");
@@ -2180,7 +2186,7 @@ public class MainActivity extends Activity {
             remove.setOnClickListener(v -> {
                 tap(v);
                 RecurringExpenseStore.delete(preferences, existing.id);
-                dialog.dismiss();
+                if (editorDialog[0] != null) editorDialog[0].dismiss();
                 showRecurringManager();
             });
         }
