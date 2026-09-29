@@ -43,6 +43,10 @@ public final class SmsAutoTracker {
                 == PackageManager.PERMISSION_GRANTED;
     }
 
+    public static long lastSync(SharedPreferences prefs) {
+        return prefs.getLong(PREF_LAST_SYNC, 0L);
+    }
+
     public static void syncInbox(Context context, Callback callback) {
         Context app = context.getApplicationContext();
         EXECUTOR.execute(() -> {
