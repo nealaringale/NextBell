@@ -903,15 +903,12 @@ public class MainActivity extends Activity {
         autoStatus.setOnClickListener(v -> {
             tap(v);
             if (smsActive) {
-                NotificationAutoTracker.importActiveNotifications(this, imported -> runOnUiThread(() -> {
-                    Toast.makeText(
-                            MainActivity.this,
-                            imported == 0 ? "No new expenses found."
-                                    : imported + " new expense" + (imported == 1 ? "" : "s") + " imported.",
-                            Toast.LENGTH_SHORT
-                    ).show();
-                    refreshExpensesScreen();
-                }));
+                NotificationAutoTracker.importActiveNotifications(this);
+                Toast.makeText(
+                        MainActivity.this,
+                        "Checking recent payment notifications…",
+                        Toast.LENGTH_SHORT
+                ).show();
             } else {
                 showAutoTrackDisclosure();
             }
