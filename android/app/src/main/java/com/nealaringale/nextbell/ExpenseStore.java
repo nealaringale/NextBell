@@ -169,10 +169,10 @@ public final class ExpenseStore {
         if (merchant == null || merchant.trim().isEmpty() || !isKnownCategory(category)) return;
 
         String key = merchantKey(merchant);
-        org.json.JSONObject aliases = new org.json.JSONObject(
-                prefs.getString("expense_merchant_categories", "{}")
-        );
         try {
+            org.json.JSONObject aliases = new org.json.JSONObject(
+                    prefs.getString("expense_merchant_categories", "{}")
+            );
             aliases.put(key, category);
             prefs.edit().putString("expense_merchant_categories", aliases.toString()).apply();
         } catch (Exception ignored) {
