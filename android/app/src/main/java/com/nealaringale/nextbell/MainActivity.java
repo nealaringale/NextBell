@@ -38,6 +38,7 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
@@ -866,6 +867,52 @@ public class MainActivity extends Activity {
         });
         page.addView(monthRow, monthParams);
 
+        LinearLayout autoStatus = new LinearLayout(this);
+        autoStatus.setGravity(Gravity.CENTER_VERTICAL);
+        autoStatus.setPadding(dp(13), dp(10), dp(13), dp(10));
+        boolean smsActive = SmsAutoTracker.isEnabled(preferences)
+                && SmsAutoTracker.hasPermission(this);
+        autoStatus.setBackground(round(
+                smsActive ? ACCENT_BG : SURFACE_2,
+                Color.TRANSPARENT,
+                SMALL_RADIUS
+        ));
+
+        TextView autoStatusTitle = text(
+                smsActive ? "AUTO-TRACKING ON" : "AUTO-TRACKING OFF",
+                9,
+                smsActive ? ACCENT_2 : MUTED
+        );
+        autoStatusTitle.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
+        autoStatusTitle.setLetterSpacing(0.08f);
+        autoStatus.addView(autoStatusTitle, new LinearLayout.LayoutParams(0, -2, 1f));
+
+        TextView sync = text(
+                smsActive ? "SMS • ON-DEVICE" : "SET UP IN SETTINGS",
+                8,
+                SUBTLE
+        );
+        autoStatus.addView(sync);
+
+        autoStatus.setClickable(true);
+        autoStatus.setOnClickListener(v -> {
+            tap(v);
+            if (smsActive) {
+                SmsAutoTracker.syncInbox(this, imported -> runOnUiThread(() -> {
+                    Toast.makeText(
+                            MainActivity.this,
+                            imported == 0 ? "No new expenses found."
+                                    : imported + " new expense" + (imported == 1 ? "" : "s") + " imported.",
+                            Toast.LENGTH_SHORT
+                    ).show();
+                    refreshExpensesScreen();
+                }));
+            } else {
+                showSmsDisclosure();
+            }
+        });
+        page.addView(autoStatus, sectionParams(0, 14));
+
         LinearLayout summary = cardColumn();
         summary.setPadding(dp(18), dp(17), dp(18), dp(17));
 
@@ -1180,13 +1227,19 @@ public class MainActivity extends Activity {
         copy.setOrientation(LinearLayout.VERTICAL);
         copy.setPadding(dp(11), 0, 0, 0);
 
-        TextView category = text(expense.category, 11, TEXT);
+        String primaryText = expense.merchant.trim().isEmpty()
+                ? expense.category
+                : expense.merchant.trim();
+        TextView category = text(primaryText, 11, TEXT);
         category.setTypeface(Typeface.DEFAULT_BOLD);
+        category.setMaxLines(1);
+        category.setEllipsize(android.text.TextUtils.TruncateAt.END);
         copy.addView(category);
 
-        String detail = expense.note.trim();
-        if (detail.isEmpty()) detail = expense.paymentMode;
-        else detail = detail + "  •  " + expense.paymentMode;
+        String detail = expense.category;
+        if (!expense.paymentMode.isEmpty()) detail += "  •  " + expense.paymentMode;
+        if ("SMS".equals(expense.source)) detail += "  •  AUTO";
+        else if (!expense.note.trim().isEmpty()) detail += "  •  " + expense.note.trim();
 
         TextView note = text(detail, 8, MUTED);
         note.setMaxLines(1);
@@ -1202,6 +1255,116 @@ public class MainActivity extends Activity {
         row.addView(amount);
 
         return row;
+    }
+
+    private void showSmsDisclosure() {
+        LinearLayout sheet = dialogSheet();
+
+        ImageView icon = dialogIcon(R.drawable.ic_wallet, ACCENT_2);
+        sheet.addView(icon, dialogMarginParams(48, 0, 0, 14));
+
+        TextView title = text("Auto-track payments", 23, TEXT);
+        title.setTypeface(Typeface.DEFAULT_BOLD);
+        sheet.addView(title);
+
+        TextView intro = text(
+                "NextBell can look for transaction SMS and turn eligible payments into expenses automatically.",
+                10,
+                MUTED
+        );
+        intro.setPadding(0, dp(5), 0, dp(15));
+        sheet.addView(intro);
+
+        LinearLayout[] points = new LinearLayout[3];
+        String[] headings = {
+                "SMART",
+                "LOCAL",
+                "PRIVATE"
+        };
+        String[] descriptions = {
+                "Understands UPI, cards, bank debits and merchant names — including local shops when the SMS identifies them.",
+                "Runs on this phone. No bank login and no server is needed to parse a payment.",
+                "NextBell stores the expense result, not your SMS history or raw message body."
+        };
+
+        for (int i = 0; i < 3; i++) {
+            LinearLayout point = new LinearLayout(this);
+            point.setOrientation(LinearLayout.HORIZONTAL);
+            point.setPadding(0, dp(7), 0, dp(7));
+
+            TextView mark = text("0" + (i + 1), 9, ACCENT);
+            mark.setGravity(Gravity.CENTER);
+            mark.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
+            mark.setBackground(round(ACCENT_BG, Color.TRANSPARENT, 999));
+            point.addView(mark, new LinearLayout.LayoutParams(dp(32), dp(32)));
+
+            LinearLayout copy = new LinearLayout(this);
+            copy.setOrientation(LinearLayout.VERTICAL);
+            copy.setPadding(dp(10), 0, 0, 0);
+
+            TextView h = text(headings[i], 9, TEXT);
+            h.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
+            h.setLetterSpacing(0.10f);
+            copy.addView(h);
+
+            TextView d = text(descriptions[i], 9, MUTED);
+            d.setPadding(0, dp(3), 0, 0);
+            copy.addView(d);
+
+            point.addView(copy, new LinearLayout.LayoutParams(0, -2, 1f));
+            sheet.addView(point);
+            points[i] = point;
+        }
+
+        TextView policy = text(
+                "SMS access is sensitive. NextBell requests it only for this money-tracking feature.",
+                8,
+                SUBTLE
+        );
+        policy.setPadding(0, dp(8), 0, dp(12));
+        sheet.addView(policy);
+
+        LinearLayout actions = new LinearLayout(this);
+        actions.setGravity(Gravity.CENTER_VERTICAL);
+
+        TextView cancel = dialogTextAction("NOT NOW");
+        TextView enable = dialogAction("ENABLE", true);
+        actions.addView(cancel, new LinearLayout.LayoutParams(0, dp(48), 0.8f));
+        LinearLayout.LayoutParams enableParams = new LinearLayout.LayoutParams(0, dp(48), 1.2f);
+        enableParams.setMargins(dp(8), 0, 0, 0);
+        actions.addView(enable, enableParams);
+        sheet.addView(actions, new LinearLayout.LayoutParams(-1, dp(48)));
+
+        Dialog dialog = showBottomSheet(sheet);
+        cancel.setOnClickListener(v -> dialog.dismiss());
+        enable.setOnClickListener(v -> {
+            tap(v);
+            dialog.dismiss();
+
+            if (SmsAutoTracker.hasPermission(this)
+                    && SmsAutoTracker.hasReceivePermission(this)) {
+                SmsAutoTracker.setEnabled(preferences, true);
+                SmsAutoTracker.syncInbox(this, imported -> runOnUiThread(() -> {
+                    Toast.makeText(
+                            MainActivity.this,
+                            imported == 0 ? "You're up to date."
+                                    : imported + " expenses imported.",
+                            Toast.LENGTH_SHORT
+                    ).show();
+                    if ("expenses".equals(selectedScreen)) refreshExpensesScreen();
+                    if ("settings".equals(selectedScreen)) buildSettingsScreen();
+                }));
+                return;
+            }
+
+            requestPermissions(
+                    new String[]{
+                            Manifest.permission.READ_SMS,
+                            Manifest.permission.RECEIVE_SMS
+                    },
+                    7002
+            );
+        });
     }
 
     private void showExpenseActions(ExpenseStore.Expense expense) {
@@ -1504,13 +1667,28 @@ public class MainActivity extends Activity {
                 }
 
                 long id = existing == null ? System.currentTimeMillis() : existing.id;
+                String merchant = existing == null ? "" : existing.merchant;
+                String source = existing == null ? "MANUAL" : existing.source;
+                float confidence = existing == null ? 1.0f : existing.confidence;
+                String fingerprint = existing == null ? "" : existing.fingerprint;
+
+                ExpenseStore.learnMerchantCategory(
+                        preferences,
+                        merchant,
+                        selectedCategory[0]
+                );
+
                 ExpenseStore.upsert(preferences, new ExpenseStore.Expense(
                         id,
                         paise,
                         selectedDate[0],
                         selectedCategory[0],
                         note.getText().toString().trim(),
-                        selectedPayment[0]
+                        selectedPayment[0],
+                        merchant,
+                        source,
+                        confidence,
+                        fingerprint
                 ));
 
                 expenseMonth = selectedDate[0].withDayOfMonth(1);
@@ -2055,7 +2233,68 @@ public class MainActivity extends Activity {
             notificationCard.addView(status, new LinearLayout.LayoutParams(dp(48), dp(32)));
         }
 
-        page.addView(notificationCard, sectionParams(0, 22));
+        page.addView(notificationCard, sectionParams(0, 16));
+
+        page.addView(sectionLabel("MONEY AUTOMATION"), sectionParams(0, 7));
+
+        LinearLayout autoCard = settingRow(R.drawable.ic_wallet, ACCENT_2);
+
+        LinearLayout autoText = new LinearLayout(this);
+        autoText.setOrientation(LinearLayout.VERTICAL);
+
+        TextView autoTitle = text("Auto-track payments", 14, TEXT);
+        autoTitle.setTypeface(Typeface.DEFAULT_BOLD);
+        autoText.addView(autoTitle);
+
+        boolean smsEnabled = SmsAutoTracker.isEnabled(preferences)
+                && SmsAutoTracker.hasPermission(this);
+
+        TextView autoDescription = text(
+                smsEnabled
+                        ? "Reads payment SMS on-device and adds matching expenses automatically."
+                        : "Detect UPI, card, bank and merchant payment SMS automatically.",
+                10,
+                MUTED
+        );
+        autoDescription.setMaxLines(2);
+        autoDescription.setPadding(0, dp(4), 0, 0);
+        autoText.addView(autoDescription);
+
+        TextView privacyText = text(
+                "Private by design • raw SMS is never stored by NextBell.",
+                8,
+                SUBTLE
+        );
+        privacyText.setPadding(0, dp(3), 0, 0);
+        autoText.addView(privacyText);
+
+        autoCard.addView(autoText, new LinearLayout.LayoutParams(0, -2, 1f));
+
+        TextView autoAction = actionButton(
+                smsEnabled ? "ON" : "SET UP",
+                smsEnabled
+        );
+        autoCard.addView(
+                autoAction,
+                new LinearLayout.LayoutParams(dp(82), CONTROL_HEIGHT_DP())
+        );
+
+        autoAction.setOnClickListener(v -> {
+            tap(v);
+            if (smsEnabled) {
+                SmsAutoTracker.setEnabled(preferences, false);
+                Toast.makeText(
+                        this,
+                        "Automatic payment tracking turned off.",
+                        Toast.LENGTH_SHORT
+                ).show();
+                buildSettingsScreen();
+                return;
+            }
+            showSmsDisclosure();
+        });
+
+        page.addView(autoCard, sectionParams(0, 22));
 
         page.addView(sectionLabel("ABOUT & FEEDBACK"), sectionParams(0, 7));
 
@@ -3349,11 +3588,48 @@ public class MainActivity extends Activity {
             int[] grantResults
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+
         if (requestCode == 7001) {
             NotificationScheduler.scheduleUpcoming(this);
             if ("settings".equals(selectedScreen)) {
                 buildSettingsScreen();
                 updateBottomNav();
+            }
+            return;
+        }
+
+        if (requestCode == 7002) {
+            boolean granted = SmsAutoTracker.hasPermission(this)
+                    && SmsAutoTracker.hasReceivePermission(this);
+
+            if (granted) {
+                SmsAutoTracker.setEnabled(preferences, true);
+                Toast.makeText(
+                        this,
+                        "Auto-tracking enabled — scanning your recent payment SMS.",
+                        Toast.LENGTH_SHORT
+                ).show();
+                SmsAutoTracker.syncInbox(this, imported -> runOnUiThread(() -> {
+                    Toast.makeText(
+                            MainActivity.this,
+                            imported == 0
+                                    ? "You're up to date."
+                                    : imported + (imported == 1
+                                    ? " expense imported."
+                                    : " expenses imported."),
+                            Toast.LENGTH_SHORT
+                    ).show();
+                    if ("expenses".equals(selectedScreen)) refreshExpensesScreen();
+                    if ("settings".equals(selectedScreen)) buildSettingsScreen();
+                }));
+            } else {
+                SmsAutoTracker.setEnabled(preferences, false);
+                Toast.makeText(
+                        this,
+                        "SMS access wasn't granted. Auto-tracking remains off.",
+                        Toast.LENGTH_LONG
+                ).show();
+                if ("settings".equals(selectedScreen)) buildSettingsScreen();
             }
         }
     }
