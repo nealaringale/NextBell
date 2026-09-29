@@ -401,15 +401,13 @@ public class MainActivity extends Activity {
         page.setPadding(dp(24), dp(28), dp(24), dp(28));
         page.setBackgroundColor(BG);
 
-        LinearLayout logo = new LinearLayout(this);
-        logo.setGravity(Gravity.CENTER);
-        logo.setBackground(round(ACCENT, ACCENT, 20));
-        TextView logoText = text("NB", 22, BG);
-        logoText.setTypeface(Typeface.DEFAULT_BOLD);
-        logo.addView(logoText);
+        ImageView logo = new ImageView(this);
+        logo.setImageResource(R.drawable.ic_nextbell_logo);
+        logo.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        logo.setContentDescription("NextBell logo");
 
         LinearLayout.LayoutParams logoParams =
-                new LinearLayout.LayoutParams(dp(68), dp(68));
+                new LinearLayout.LayoutParams(dp(82), dp(82));
         logoParams.gravity = Gravity.CENTER_HORIZONTAL;
         page.addView(logo, logoParams);
 
