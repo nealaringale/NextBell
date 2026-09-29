@@ -41,7 +41,7 @@ public final class SmsTransactionParser {
     }
 
     private static final Pattern CURRENCY_AMOUNT = Pattern.compile(
-            "(?:₹|rs\.?|inr\.?)[ ]*([0-9][0-9,]*(?:\\.[0-9]{1,2})?)",
+            "(?:₹|rs\\.?|inr\\.?)[ ]*([0-9][0-9,]*(?:\\.[0-9]{1,2})?)",
             Pattern.CASE_INSENSITIVE
     );
     private static final Pattern KEYWORD_AMOUNT = Pattern.compile(
@@ -50,11 +50,11 @@ public final class SmsTransactionParser {
             Pattern.CASE_INSENSITIVE
     );
     private static final Pattern MERCHANT_AFTER_WORD = Pattern.compile(
-            "(?:at|to|for|towards|merchant)[ :\-]+([A-Za-z0-9][A-Za-z0-9 &._'()/#@-]{2,48})",
+            "(?:at|to|for|towards|merchant)[ :\\-]+([A-Za-z0-9][A-Za-z0-9 &._'()/#@-]{2,48})",
             Pattern.CASE_INSENSITIVE
     );
     private static final Pattern VPA = Pattern.compile(
-            "\\b([A-Za-z0-9][A-Za-z0-9._-]{2,})@[A-Za-z][A-Za-z0-9._-]{1,}\b"
+            "\\b([A-Za-z0-9][A-Za-z0-9._-]{2,})@[A-Za-z][A-Za-z0-9._-]{1,}\\b"
     );
 
     private static final String[] DEBIT_WORDS = {
