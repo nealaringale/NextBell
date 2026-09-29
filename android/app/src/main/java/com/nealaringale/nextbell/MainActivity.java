@@ -1528,7 +1528,6 @@ public class MainActivity extends Activity {
         sheet.addView(actions);
 
         Dialog dialog = showBottomSheet(sheet);
-        editorDialog[0] = dialog;
         cancel.setOnClickListener(v -> dialog.dismiss());
         confirm.setOnClickListener(v -> {
             tap(v);
