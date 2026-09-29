@@ -66,7 +66,13 @@ public final class SmsAutoTracker {
         if (!hasPermission(context)) return 0;
 
         int imported = 0;
-        long since = System.currentTimeMillis() - 365L * 24L * 60L * 60L * 1000L;
+        SharedPreferences prefs =
+                context.getSharedPreferences("nextbell_profile", Context.MODE_PRIVATE);
+        long defaultSince = System.currentTimeMillis() - 365L * 24L * 60L * 60L * 1000L;
+        long lastSync = prefs.getLong(PREF_LAST_SYNC, 0L);
+        long since = lastSync > 0
+                ? Math.max(defaultSince, lastSync - 10L * 60L * 1000L)
+                : defaultSince;
         Uri inbox = Telephony.Sms.Inbox.CONTENT_URI;
 
         Cursor cursor = null;
