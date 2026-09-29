@@ -212,6 +212,14 @@ public final class SmsTransactionParser {
         return "Other";
     }
 
+    private static String paymentModeKey(String normalizedText) {
+        String lower = normalizedText.toLowerCase(Locale.ENGLISH);
+        if (containsAny(lower, new String[]{"upi", "vpa"})) return "upi";
+        if (containsAny(lower, new String[]{"card", "atm"})) return "card";
+        if (containsAny(lower, new String[]{"imps", "neft", "rtgs"})) return "bank";
+        return "other";
+    }
+
     private static boolean containsAny(String value, String[] words) {
         for (String word : words) {
             if (value.contains(word)) return true;
@@ -229,12 +237,14 @@ public final class SmsTransactionParser {
     private static String fingerprint(String sender, long amountPaise, long smsTime,
                                       String merchant, String normalizedText) {
         try {
-            String input = String.valueOf(sender) + "|" + amountPaise + "|"
-                    + LocalDate.ofInstant(
-                            java.time.Instant.ofEpochMilli(smsTime),
-                            ZoneId.of("Asia/Kolkata")
-                    ) + "|" + merchant.toLowerCase(Locale.ENGLISH)
-                    + "|" + normalizedText.toLowerCase(Locale.ENGLISH);
+            LocalDate date = LocalDate.ofInstant(
+                    java.time.Instant.ofEpochMilli(smsTime),
+                    ZoneId.of("Asia/Kolkata")
+            );
+            long minuteBucket = smsTime / 60_000L;
+            String input = amountPaise + "|" + date + "|" + minuteBucket
+                    + "|" + merchant.toLowerCase(Locale.ENGLISH)
+                    + "|" + paymentModeKey(normalizedText);
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             byte[] hash = digest.digest(input.getBytes(java.nio.charset.StandardCharsets.UTF_8));
             StringBuilder out = new StringBuilder();
