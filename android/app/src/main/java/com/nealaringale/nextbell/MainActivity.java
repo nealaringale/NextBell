@@ -286,6 +286,16 @@ public class MainActivity extends Activity {
         navigate(selectedScreen);
         requestNotificationPermissionIfNeeded();
 
+        if (SmsAutoTracker.isEnabled(preferences)
+                && SmsAutoTracker.hasPermission(this)
+                && SmsAutoTracker.hasReceivePermission(this)) {
+            SmsAutoTracker.syncInbox(this, imported -> {
+                if (imported > 0 && "expenses".equals(selectedScreen)) {
+                    runOnUiThread(() -> refreshExpensesScreen());
+                }
+            });
+        }
+
         if (refreshRunnable != null) {
             handler.removeCallbacks(refreshRunnable);
         }
