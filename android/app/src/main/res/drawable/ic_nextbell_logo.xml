@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="512"
+    android:viewportHeight="512">
+    <path
+        android:fillColor="#090A10"
+        android:strokeColor="#FF9D34"
+        android:strokeWidth="5"
+        android:pathData="M90,8 L422,8 A82,82 0,0 1,504,90 L504,422 A82,82 0,0 1,422,504 L90,504 A82,82 0,0 1,8,422 L8,90 A82,82 0,0 1,90,8 Z" />
+    <path
+        android:fillColor="#FFD45A"
+        android:pathData="M201,138 C201,116 219,98 241,98 L341,98 C363,98 381,116 381,138 L381,165 L201,165 Z" />
+    <path
+        android:fillColor="#FF8D28"
+        android:pathData="M275,98 L341,98 C363,98 381,116 381,138 L381,165 L301,165 Z" />
+    <path
+        android:fillColor="#FFB01F"
+        android:pathData="M151,181 C151,166 163,154 178,154 L381,154 C394,154 405,164 405,178 L423,214 C433,234 441,253 445,274 L449,295 L132,295 L142,262 C147,244 153,226 162,207 Z" />
+    <path
+        android:fillColor="#F43B32"
+        android:pathData="M333,154 L381,154 C394,154 405,164 405,178 L423,214 C433,234 441,253 445,274 L449,295 L394,295 C385,279 374,264 364,248 C351,227 345,203 341,182 Z" />
+    <path
+        android:fillColor="#FFB52B"
+        android:pathData="M128,289 C112,289 99,302 99,318 C99,334 112,347 128,347 L424,347 C440,347 453,334 453,318 C453,302 440,289 424,289 Z" />
+    <path
+        android:fillColor="#FF392F"
+        android:pathData="M305,289 L424,289 C440,289 453,302 453,318 C453,334 440,347 424,347 L310,347 C332,335 341,317 335,301 C330,294 318,290 305,289 Z" />
+    <path
+        android:fillColor="#FF9C24"
+        android:pathData="M242,361 C242,348 252,338 265,338 L287,338 C300,338 310,348 310,361 L310,373 C310,390 296,404 279,404 C262,404 248,390 248,373 Z" />
+    <path
+        android:fillColor="#FFFFC6"
+        android:pathData="M154,187 C155,174 164,164 177,163 L243,163 L236,174 L177,174 C169,174 164,179 162,187 Z" />
+</vector>
