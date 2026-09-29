@@ -3,8 +3,6 @@
 
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-    <uses-permission android:name="android.permission.READ_SMS" />
-    <uses-permission android:name="android.permission.RECEIVE_SMS" />
 
     <application
         android:allowBackup="true"
@@ -23,13 +21,15 @@
             </intent-filter>
         </activity>
 
-        <receiver
-            android:name=".SmsTransactionReceiver"
-            android:exported="false">
-            <intent-filter android:priority="999">
-                <action android:name="android.provider.Telephony.SMS_RECEIVED" />
+        <service
+            android:name=".PaymentNotificationListener"
+            android:exported="false"
+            android:label="NextBell payment detection"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
             </intent-filter>
-        </receiver>
+        </service>
 
         <receiver
             android:name=".ClassReminderReceiver"
