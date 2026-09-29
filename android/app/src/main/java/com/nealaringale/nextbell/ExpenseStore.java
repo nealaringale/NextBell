@@ -16,6 +16,10 @@ import java.util.Map;
 public final class ExpenseStore {
     private static final String KEY_EXPENSES = "expenses_v1";
     private static final String KEY_BUDGET_PREFIX = "expense_budget_";
+    private static final String KEY_DAILY_LIMIT = "expense_daily_limit";
+    private static final String KEY_ALERT_THRESHOLD = "expense_alert_threshold";
+    private static final String KEY_ALERT_ENABLED = "expense_alert_enabled";
+    private static final String KEY_ALERT_LAST_NOTIFIED = "expense_alert_last_notified";
 
     public static final String[] CATEGORIES = {
             "Food & Drinks",
@@ -267,6 +271,82 @@ public final class ExpenseStore {
             if (category.equals(value)) return true;
         }
         return false;
+    }
+
+    public static long totalForDate(SharedPreferences prefs, LocalDate date) {
+        long total = 0L;
+        for (Expense expense : load(prefs)) {
+            if (date.equals(expense.date)) {
+                if (Long.MAX_VALUE - total < expense.amountPaise) return Long.MAX_VALUE;
+                total += expense.amountPaise;
+            }
+        }
+        return total;
+    }
+
+    public static long totalBetween(SharedPreferences prefs, LocalDate startInclusive, LocalDate endExclusive) {
+        long total = 0L;
+        for (Expense expense : load(prefs)) {
+            if (!expense.date.isBefore(startInclusive) && expense.date.isBefore(endExclusive)) {
+                if (Long.MAX_VALUE - total < expense.amountPaise) return Long.MAX_VALUE;
+                total += expense.amountPaise;
+            }
+        }
+        return total;
+    }
+
+    public static long dailyLimitPaise(SharedPreferences prefs) {
+        return prefs.getLong(KEY_DAILY_LIMIT, 0L);
+    }
+
+    public static void setDailyLimitPaise(SharedPreferences prefs, long paise) {
+        prefs.edit().putLong(KEY_DAILY_LIMIT, Math.max(0L, paise)).apply();
+    }
+
+    public static long dailyAlertThresholdPaise(SharedPreferences prefs) {
+        return prefs.getLong(KEY_ALERT_THRESHOLD, 5000L);
+    }
+
+    public static void setDailyAlertThresholdPaise(SharedPreferences prefs, long paise) {
+        prefs.edit().putLong(KEY_ALERT_THRESHOLD, Math.max(0L, paise)).apply();
+    }
+
+    public static boolean dailyAlertsEnabled(SharedPreferences prefs) {
+        return prefs.getBoolean(KEY_ALERT_ENABLED, true);
+    }
+
+    public static void setDailyAlertsEnabled(SharedPreferences prefs, boolean enabled) {
+        prefs.edit().putBoolean(KEY_ALERT_ENABLED, enabled).apply();
+    }
+
+    public static String lastAlertNotifiedDate(SharedPreferences prefs) {
+        return prefs.getString(KEY_ALERT_LAST_NOTIFIED, "");
+    }
+
+    public static void setLastAlertNotifiedDate(SharedPreferences prefs, String date) {
+        prefs.edit().putString(KEY_ALERT_LAST_NOTIFIED, date == null ? "" : date).apply();
+    }
+
+    public static int spendingStreakDays(SharedPreferences prefs, LocalDate endDate) {
+        long limit = dailyLimitPaise(prefs);
+        if (limit <= 0L) return 0;
+
+        int streak = 0;
+        LocalDate cursor = endDate;
+        for (int i = 0; i < 366; i++) {
+            long dayTotal = totalForDate(prefs, cursor);
+            if (dayTotal <= limit) {
+                streak++;
+                cursor = cursor.minusDays(1);
+            } else {
+                break;
+            }
+        }
+        return streak;
+    }
+
+    public static Map<String, Long> categoryTotalsForMonth(SharedPreferences prefs, LocalDate monthAnchor) {
+        return categoryTotals(forMonth(prefs, monthAnchor));
     }
 
     public static long parseAmountToPaise(String raw) {
