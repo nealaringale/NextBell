@@ -41,15 +41,31 @@ public final class ExpenseStore {
         public String category;
         public String note;
         public String paymentMode;
+        public String merchant;
+        public String source;
+        public float confidence;
+        public String fingerprint;
 
         public Expense(long id, long amountPaise, LocalDate date,
                        String category, String note, String paymentMode) {
+            this(id, amountPaise, date, category, note, paymentMode,
+                    "", "MANUAL", 1.0f, "");
+        }
+
+        public Expense(long id, long amountPaise, LocalDate date,
+                       String category, String note, String paymentMode,
+                       String merchant, String source,
+                       float confidence, String fingerprint) {
             this.id = id;
             this.amountPaise = amountPaise;
             this.date = date;
             this.category = category;
             this.note = note;
             this.paymentMode = paymentMode;
+            this.merchant = merchant == null ? "" : merchant;
+            this.source = source == null ? "MANUAL" : source;
+            this.confidence = confidence;
+            this.fingerprint = fingerprint == null ? "" : fingerprint;
         }
     }
 
@@ -69,7 +85,11 @@ public final class ExpenseStore {
                         LocalDate.parse(item.optString("date")),
                         normalizeCategory(item.optString("category", "Other")),
                         item.optString("note", ""),
-                        item.optString("paymentMode", "UPI")
+                        item.optString("paymentMode", "UPI"),
+                        item.optString("merchant", ""),
+                        item.optString("source", "MANUAL"),
+                        (float) item.optDouble("confidence", 1.0),
+                        item.optString("fingerprint", "")
                 ));
             }
         } catch (Exception ignored) {
@@ -93,6 +113,10 @@ public final class ExpenseStore {
                 item.put("category", expense.category);
                 item.put("note", expense.note);
                 item.put("paymentMode", expense.paymentMode);
+                item.put("merchant", expense.merchant);
+                item.put("source", expense.source);
+                item.put("confidence", expense.confidence);
+                item.put("fingerprint", expense.fingerprint);
                 array.put(item);
             } catch (Exception ignored) {
                 // Skip only an invalid object; other expenses remain persisted.
@@ -123,6 +147,56 @@ public final class ExpenseStore {
         expenses.removeIf(expense -> expense.id == id);
         save(prefs, expenses);
     }
+    public static boolean hasFingerprint(SharedPreferences prefs, String fingerprint) {
+        if (fingerprint == null || fingerprint.isEmpty()) return false;
+        for (Expense expense : load(prefs)) {
+            if (fingerprint.equals(expense.fingerprint)) return true;
+        }
+        return false;
+    }
+
+    public static int deleteByFingerprint(SharedPreferences prefs, String fingerprint) {
+        if (fingerprint == null || fingerprint.isEmpty()) return 0;
+        List<Expense> expenses = load(prefs);
+        int before = expenses.size();
+        expenses.removeIf(expense -> fingerprint.equals(expense.fingerprint));
+        if (expenses.size() != before) save(prefs, expenses);
+        return before - expenses.size();
+    }
+
+    public static void learnMerchantCategory(SharedPreferences prefs,
+                                              String merchant, String category) {
+        if (merchant == null || merchant.trim().isEmpty() || !isKnownCategory(category)) return;
+
+        String key = merchantKey(merchant);
+        org.json.JSONObject aliases = new org.json.JSONObject(
+                prefs.getString("expense_merchant_categories", "{}")
+        );
+        try {
+            aliases.put(key, category);
+            prefs.edit().putString("expense_merchant_categories", aliases.toString()).apply();
+        } catch (Exception ignored) {
+        }
+    }
+
+    public static String learnedMerchantCategory(SharedPreferences prefs, String merchant) {
+        if (merchant == null || merchant.trim().isEmpty()) return "";
+        try {
+            org.json.JSONObject aliases = new org.json.JSONObject(
+                    prefs.getString("expense_merchant_categories", "{}")
+            );
+            return aliases.optString(merchantKey(merchant), "");
+        } catch (Exception ignored) {
+            return "";
+        }
+    }
+
+    private static String merchantKey(String merchant) {
+        return merchant.trim().toLowerCase(java.util.Locale.ENGLISH)
+                .replaceAll("\\s+", " ")
+                .replaceAll("[^a-z0-9 ]", "");
+    }
+
 
     public static List<Expense> forMonth(SharedPreferences prefs, LocalDate monthAnchor) {
         List<Expense> result = new ArrayList<>();
