@@ -1102,6 +1102,13 @@ public class MainActivity extends Activity {
         if (expenseMonthTitle == null || expenseListHost == null) return;
 
         expenseMonth = expenseMonth.withDayOfMonth(1);
+
+        // Generate due recurring expenses once their billing day arrives.
+        RecurringExpenseStore.generateDue(
+                preferences,
+                LocalDate.now(zone)
+        );
+
         String monthText = expenseMonth.format(
                 DateTimeFormatter.ofPattern("MMMM yyyy", Locale.ENGLISH)
         );
@@ -1144,6 +1151,8 @@ public class MainActivity extends Activity {
             expenseBudgetLabel.setText("No monthly budget set");
             expenseBudgetMeta.setText("Set one to track your remaining allowance.");
         }
+
+        refreshMoneyInsights();
 
         // The breakdown card is immediately before the transactions header.
         expenseListHost.removeAllViews();
@@ -1195,6 +1204,90 @@ public class MainActivity extends Activity {
         }
 
         refreshExpenseBreakdown(expenses);
+    }
+
+    private void refreshMoneyInsights() {
+        if (expenseWeeklySpend == null || expenseVsLastMonth == null || expenseStreak == null) {
+            return;
+        }
+
+        LocalDate today = LocalDate.now(zone);
+        LocalDate weekStart = today.minusDays(today.getDayOfWeek().getValue() - 1L);
+        long weekTotal = ExpenseStore.totalBetween(
+                preferences,
+                weekStart,
+                today.plusDays(1)
+        );
+        long currentMonthTotal = ExpenseStore.totalPaise(
+                ExpenseStore.forMonth(preferences, expenseMonth)
+        );
+        long previousMonthTotal = ExpenseStore.totalPaise(
+                ExpenseStore.forMonth(preferences, expenseMonth.minusMonths(1))
+        );
+
+        expenseWeeklySpend.setText("THIS WEEK\n" + formatRupees(weekTotal));
+
+        if (previousMonthTotal <= 0L) {
+            expenseVsLastMonth.setText("VS LAST MONTH\nNew");
+        } else {
+            long diff = currentMonthTotal - previousMonthTotal;
+            long percent = Math.round(
+                    (diff * 100.0d) / (double) previousMonthTotal
+            );
+            String prefix = percent > 0 ? "+" : "";
+            expenseVsLastMonth.setText(
+                    "VS LAST MONTH\n" + prefix + percent + "%"
+            );
+            expenseVsLastMonth.setTextColor(percent > 0 ? ACCENT_2 : ACCENT);
+        }
+
+        long limit = ExpenseStore.dailyLimitPaise(preferences);
+        if (limit > 0L) {
+            int streak = ExpenseStore.spendingStreakDays(preferences, today);
+            expenseStreak.setText(
+                    "STREAK\n" + streak + (streak == 1 ? " day" : " days")
+            );
+        } else {
+            expenseStreak.setText("STREAK\nSet daily limit");
+        }
+
+        expenseDailyLimitStatus.setText(
+                limit > 0L
+                        ? "Daily limit  •  " + formatRupees(limit)
+                        : "Daily limit  •  Not set"
+        );
+
+        boolean alerts = ExpenseStore.dailyAlertsEnabled(preferences);
+        long threshold = ExpenseStore.dailyAlertThresholdPaise(preferences);
+        expenseDailyAlertStatus.setText(
+                alerts && threshold > 0L
+                        ? "Daily alerts  •  " + formatRupees(threshold)
+                        : "Daily alerts  •  OFF"
+        );
+
+        List<RecurringExpenseStore.Rule> rules = RecurringExpenseStore.load(preferences);
+        int activeCount = 0;
+        for (RecurringExpenseStore.Rule rule : rules) {
+            if (rule.active) activeCount++;
+        }
+        int dueCount = RecurringExpenseStore.dueCount(preferences, today);
+        expenseRecurringStatus.setText(
+                "Recurring  •  " + activeCount + " " + (activeCount == 1 ? "bill" : "bills")
+                        + (dueCount > 0 ? "  •  " + dueCount + " due" : "")
+        );
+    }
+
+    private String categoryTrendLabel(long current, long previous) {
+        if (previous <= 0L) return "NEW";
+        long diff = current - previous;
+        long percent = Math.round((diff * 100.0d) / (double) previous);
+        if (percent == 0L) return "FLAT";
+        return (percent > 0 ? "+" : "") + percent + "% vs last month";
+    }
+
+    private int trendColor(long current, long previous) {
+        if (previous <= 0L) return ACCENT_2;
+        return current > previous ? ACCENT_2 : ACCENT;
     }
 
     private void refreshExpenseBreakdown(List<ExpenseStore.Expense> expenses) {
@@ -1254,7 +1347,21 @@ public class MainActivity extends Activity {
 
             TextView value = text(formatRupees(amount), 10, MUTED);
             value.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
-            top.addView(value);
+            value.setGravity(Gravity.END);
+            long previousAmount = ExpenseStore.categoryTotalsForMonth(
+                    preferences,
+                    expenseMonth.minusMonths(1)
+            ).get(category);
+            TextView trend = text(categoryTrendLabel(amount, previousAmount), 8, trendColor(amount, previousAmount));
+            trend.setGravity(Gravity.END);
+            trend.setPadding(0, dp(2), 0, 0);
+
+            LinearLayout valueBox = new LinearLayout(this);
+            valueBox.setOrientation(LinearLayout.VERTICAL);
+            valueBox.setGravity(Gravity.END);
+            valueBox.addView(value);
+            valueBox.addView(trend);
+            top.addView(valueBox);
             row.addView(top);
 
             LinearLayout track = new LinearLayout(this);
@@ -1322,7 +1429,7 @@ public class MainActivity extends Activity {
 
         String detail = expense.category;
         if (!expense.paymentMode.isEmpty()) detail += "  •  " + expense.paymentMode;
-        if ("SMS".equals(expense.source)) detail += "  •  AUTO";
+        if ("SMS".equals(expense.source) || "NOTIFICATION".equals(expense.source)) detail += "  •  AUTO";
         else if (!expense.note.trim().isEmpty()) detail += "  •  " + expense.note.trim();
 
         TextView note = text(detail, 8, MUTED);
