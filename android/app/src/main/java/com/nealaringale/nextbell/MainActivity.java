@@ -814,7 +814,7 @@ public class MainActivity extends Activity {
         eyebrow.setTextColor(ACCENT);
         headerText.addView(eyebrow);
 
-        TextView title = text("Expenses", 29, TEXT);
+        TextView title = text("Expenses", themeHeadingSize(), TEXT);
         title.setTypeface(Typeface.DEFAULT_BOLD);
         title.setPadding(0, dp(5), 0, 0);
         headerText.addView(title);
@@ -1477,16 +1477,14 @@ public class MainActivity extends Activity {
         sheet.addView(actions, actionsParams);
 
         Dialog dialog = showBottomSheet(sheet);
-        dialog.setOnShowListener(x -> {
-            amount.requestFocus();
-            amount.postDelayed(() -> {
-                InputMethodManager imm = (InputMethodManager)
-                        getSystemService(Context.INPUT_METHOD_SERVICE);
-                if (imm != null) {
-                    imm.showSoftInput(amount, InputMethodManager.SHOW_IMPLICIT);
-                }
-            }, 220);
-        });
+        amount.requestFocus();
+        amount.postDelayed(() -> {
+            InputMethodManager imm = (InputMethodManager)
+                    getSystemService(Context.INPUT_METHOD_SERVICE);
+            if (imm != null) {
+                imm.showSoftInput(amount, InputMethodManager.SHOW_IMPLICIT);
+            }
+        }, 220);
 
         cancel.setOnClickListener(v -> {
             ((InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE))
@@ -1656,7 +1654,7 @@ public class MainActivity extends Activity {
         sheet.addView(actions, actionsParams);
 
         Dialog dialog = showBottomSheet(sheet);
-        dialog.setOnShowListener(x -> input.requestFocus());
+        input.requestFocus();
 
         clear.setOnClickListener(v -> {
             ExpenseStore.setBudgetPaise(preferences, expenseMonth, 0L);
@@ -1724,15 +1722,6 @@ public class MainActivity extends Activity {
         sheet.setScaleX(0.985f);
         sheet.setScaleY(0.985f);
 
-        dialog.setOnShowListener(d -> sheet.animate()
-                .alpha(1f)
-                .translationY(0)
-                .scaleX(1f)
-                .scaleY(1f)
-                .setDuration(340)
-                .setInterpolator(new OvershootInterpolator(0.75f))
-                .start());
-
         dialog.setOnDismissListener(d -> sheet.animate()
                 .alpha(0f)
                 .translationY(dp(55))
@@ -1740,6 +1729,14 @@ public class MainActivity extends Activity {
                 .start());
 
         dialog.show();
+        sheet.animate()
+                .alpha(1f)
+                .translationY(0)
+                .scaleX(1f)
+                .scaleY(1f)
+                .setDuration(340)
+                .setInterpolator(new OvershootInterpolator(0.75f))
+                .start();
         return dialog;
     }
 
@@ -2337,48 +2334,94 @@ public class MainActivity extends Activity {
     }
 
     private void showEditProfile() {
-        LinearLayout box = new LinearLayout(this);
-        box.setOrientation(LinearLayout.VERTICAL);
-        box.setPadding(dp(2), 0, dp(2), 0);
+        LinearLayout sheet = dialogSheet();
 
-        EditText nameInput = field(getName(), false);
+        ImageView icon = dialogIcon(R.drawable.ic_settings, ACCENT);
+        sheet.addView(icon, dialogMarginParams(48, 0, 0, 14));
+
+        TextView title = text("Edit profile", 23, TEXT);
+        title.setTypeface(Typeface.DEFAULT_BOLD);
+        sheet.addView(title);
+
+        TextView subtitle = text(
+                "Update the details NextBell uses for your timetable.",
+                10,
+                MUTED
+        );
+        subtitle.setPadding(0, dp(5), 0, dp(15));
+        sheet.addView(subtitle);
+
+        EditText nameInput = field("Your name", false);
         nameInput.setText(getName());
         nameInput.setSelection(nameInput.length());
+        LinearLayout.LayoutParams nameParams = new LinearLayout.LayoutParams(-1, dp(50));
+        sheet.addView(nameInput, nameParams);
 
-        EditText rollInput = field(String.valueOf(getRollNumber()), true);
+        EditText rollInput = field("Roll number", true);
         rollInput.setText(String.valueOf(getRollNumber()));
-        rollInput.setSelection(rollInput.length());
+        LinearLayout.LayoutParams rollParams = new LinearLayout.LayoutParams(-1, dp(50));
+        rollParams.setMargins(0, dp(9), 0, 0);
+        sheet.addView(rollInput, rollParams);
 
-        box.addView(nameInput, fieldParams());
-        box.addView(rollInput, fieldParamsWithTop());
+        TextView batch = text(
+                "Your batch: " + getBatch() + "  •  " +
+                        TimetableData.rollRangeForBatch(getBatch()),
+                9,
+                MUTED
+        );
+        batch.setPadding(0, dp(8), 0, 0);
+        sheet.addView(batch);
 
-        new AlertDialog.Builder(this)
-                .setTitle("Edit profile")
-                .setView(box)
-                .setNegativeButton("Cancel", null)
-                .setPositiveButton("Save", (dialog, which) -> {
-                    String name = nameInput.getText().toString().trim();
-                    String rollRaw = rollInput.getText().toString().trim();
+        LinearLayout actions = new LinearLayout(this);
+        actions.setGravity(Gravity.CENTER_VERTICAL);
+        TextView cancel = dialogTextAction("CANCEL");
+        TextView save = dialogAction("SAVE CHANGES", true);
+        actions.addView(cancel, new LinearLayout.LayoutParams(0, dp(48), 1f));
+        LinearLayout.LayoutParams saveParams = new LinearLayout.LayoutParams(0, dp(48), 1.35f);
+        saveParams.setMargins(dp(8), 0, 0, 0);
+        actions.addView(save, saveParams);
+        LinearLayout.LayoutParams actionsParams = new LinearLayout.LayoutParams(-1, dp(48));
+        actionsParams.setMargins(0, dp(17), 0, 0);
+        sheet.addView(actions, actionsParams);
 
-                    if (name.isEmpty()) {
-                        name = getName();
-                    }
+        Dialog dialog = showBottomSheet(sheet);
+        nameInput.requestFocus();
+        nameInput.postDelayed(() -> {
+            InputMethodManager imm = (InputMethodManager)
+                    getSystemService(Context.INPUT_METHOD_SERVICE);
+            if (imm != null) {
+                imm.showSoftInput(nameInput, InputMethodManager.SHOW_IMPLICIT);
+            }
+        }, 220);
 
-                    try {
-                        int roll = Integer.parseInt(rollRaw);
-                        if (roll < 1 || roll > 999) {
-                            throw new NumberFormatException();
-                        }
+        cancel.setOnClickListener(v -> {
+            hideKeyboard();
+            dialog.dismiss();
+        });
 
-                        saveProfile(name, roll);
-                        weekSelectedDay = todayNameOrMonday();
-                        NotificationScheduler.scheduleUpcoming(this);
-                        navigate("settings");
-                    } catch (NumberFormatException ignored) {
-                        rollInput.setError("Enter a valid roll number.");
-                    }
-                })
-                .show();
+        save.setOnClickListener(v -> {
+            String name = nameInput.getText().toString().trim();
+            if (name.isEmpty()) {
+                nameInput.setError("Enter your name.");
+                shake(save);
+                return;
+            }
+
+            try {
+                int roll = Integer.parseInt(rollInput.getText().toString().trim());
+                if (roll < 1 || roll > 999) throw new NumberFormatException();
+
+                saveProfile(name, roll);
+                weekSelectedDay = todayNameOrMonday();
+                NotificationScheduler.scheduleUpcoming(this);
+                hideKeyboard();
+                dialog.dismiss();
+                navigate("settings");
+            } catch (NumberFormatException ignored) {
+                rollInput.setError("Enter a valid roll number.");
+                shake(save);
+            }
+        });
     }
 
     private void refreshLiveUi() {
