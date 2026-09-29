@@ -18,7 +18,16 @@ public final class ExpenseStore {
     private static final String KEY_BUDGET_PREFIX = "expense_budget_";
 
     public static final String[] CATEGORIES = {
-            "Food", "Travel", "College", "Shopping", "Bills", "Health", "Other"
+            "Food & Drinks",
+            "Travel",
+            "College",
+            "Home & Bills",
+            "Mobile",
+            "Personal",
+            "Fun & Social",
+            "Shopping",
+            "Health",
+            "Other"
     };
 
     public static final String[] PAYMENT_MODES = {
@@ -58,7 +67,7 @@ public final class ExpenseStore {
                         item.optLong("id"),
                         item.optLong("amountPaise"),
                         LocalDate.parse(item.optString("date")),
-                        item.optString("category", "Other"),
+                        normalizeCategory(item.optString("category", "Other")),
                         item.optString("note", ""),
                         item.optString("paymentMode", "UPI")
                 ));
@@ -164,6 +173,26 @@ public final class ExpenseStore {
 
     private static String monthKey(LocalDate monthAnchor) {
         return monthAnchor.withDayOfMonth(1).toString().substring(0, 7);
+    }
+
+    private static String normalizeCategory(String value) {
+        if (value == null) return "Other";
+        switch (value) {
+            case "Food": return "Food & Drinks";
+            case "College & Study": return "College";
+            case "Bills": return "Home & Bills";
+            case "Mobile & Data": return "Mobile";
+            case "Personal Care": return "Personal";
+            case "Entertainment": return "Fun & Social";
+            default: return isKnownCategory(value) ? value : "Other";
+        }
+    }
+
+    private static boolean isKnownCategory(String value) {
+        for (String category : CATEGORIES) {
+            if (category.equals(value)) return true;
+        }
+        return false;
     }
 
     public static long parseAmountToPaise(String raw) {
