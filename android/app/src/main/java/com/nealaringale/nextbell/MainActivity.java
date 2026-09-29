@@ -8,7 +8,10 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.net.Uri;
+import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.Paint;
+import android.graphics.RectF;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.StateListDrawable;
@@ -20,6 +23,7 @@ import android.text.InputType;
 import android.view.Gravity;
 import android.view.View;
 import android.view.animation.DecelerateInterpolator;
+import android.view.animation.OvershootInterpolator;
 import android.view.Window;
 import android.widget.EditText;
 import android.widget.FrameLayout;
@@ -90,7 +94,13 @@ public class MainActivity extends Activity {
     private TextView expenseBudgetLabel;
     private TextView expenseBudgetMeta;
     private TextView expenseTransactionCount;
+    private TextView expenseDailyAverage;
+    private SpendingChartView expenseChart;
     private LocalDate expenseMonth = LocalDate.now(zone).withDayOfMonth(1);
+
+    private String lastHomeScheduleSignature = "";
+    private String lastWeekScheduleSignature = "";
+    private int lastScreenIndex = 0;
 
     private int themeIndex;
     private String selectedScreen = "home";
@@ -345,8 +355,8 @@ public class MainActivity extends Activity {
         caption.setPadding(0, dp(3), 0, 0);
         item.addView(caption);
 
+        installPressAnimation(item);
         item.setOnClickListener(v -> {
-            tap(v);
             navigate(id);
         });
         return item;
@@ -380,7 +390,7 @@ public class MainActivity extends Activity {
                     selected ? ACCENT_BG : Color.TRANSPARENT,
                     blend(ACCENT_BG, BG, 0.32f),
                     selected ? ACCENT : Color.TRANSPARENT,
-                    20
+                    Math.max(10, SMALL_RADIUS)
             ));
             item.animate()
                     .scaleX(selected ? 1.03f : 1f)
@@ -403,8 +413,10 @@ public class MainActivity extends Activity {
         }
 
         if ("home".equals(screen)) {
+            lastHomeScheduleSignature = "";
             buildHomeScreen();
         } else if ("week".equals(screen)) {
+            lastWeekScheduleSignature = "";
             buildWeekScreen();
         } else if ("expenses".equals(screen)) {
             buildExpensesScreen();
@@ -413,7 +425,10 @@ public class MainActivity extends Activity {
         }
 
         updateBottomNav();
-        animatePageIn(contentHost);
+        boolean forward = screenIndex(screen) >= lastScreenIndex;
+        if (screen.equals(selectedScreen) && "home".equals(screen)) forward = false;
+        animateScreenTransition(contentHost, forward);
+        lastScreenIndex = screenIndex(screen);
         refreshLiveUi();
     }
 
@@ -542,7 +557,7 @@ public class MainActivity extends Activity {
         eyebrow.setTextColor(ACCENT);
         titleBlock.addView(eyebrow);
 
-        TextView brand = text("NextBell", 29, TEXT);
+        TextView brand = text("NextBell", themeHeadingSize(), TEXT);
         brand.setTypeface(Typeface.DEFAULT_BOLD);
         brand.setPadding(0, dp(3), 0, 0);
         titleBlock.addView(brand);
@@ -589,8 +604,8 @@ public class MainActivity extends Activity {
         profileBadge.setPadding(dp(13), dp(7), dp(13), dp(7));
         profileBadge.setBackground(ripple(ACCENT_BG, blend(ACCENT_BG, BG, 0.35f), Color.TRANSPARENT, 999));
         profileBadge.setClickable(true);
+        installPressAnimation(profileBadge);
         profileBadge.setOnClickListener(v -> {
-            tap(v);
             navigate("settings");
         });
         profileRow.addView(profileBadge);
@@ -721,7 +736,7 @@ public class MainActivity extends Activity {
         eyebrow.setTextColor(ACCENT);
         page.addView(eyebrow);
 
-        TextView title = text("Your week", 29, TEXT);
+        TextView title = text("Your week", themeHeadingSize(), TEXT);
         title.setTypeface(Typeface.DEFAULT_BOLD);
         title.setPadding(0, dp(5), 0, 0);
         page.addView(title);
@@ -851,15 +866,38 @@ public class MainActivity extends Activity {
         TextView summaryLabel = sectionLabel("SPENT THIS MONTH");
         summary.addView(summaryLabel);
 
-        expenseMonthTotal = text("₹0", 32, TEXT);
+        LinearLayout spendHero = new LinearLayout(this);
+        spendHero.setGravity(Gravity.CENTER_VERTICAL);
+
+        LinearLayout spendCopy = new LinearLayout(this);
+        spendCopy.setOrientation(LinearLayout.VERTICAL);
+
+        expenseMonthTotal = text("₹0", 34, TEXT);
         expenseMonthTotal.setTypeface(Typeface.DEFAULT_BOLD);
         expenseMonthTotal.setPadding(0, dp(6), 0, 0);
-        summary.addView(expenseMonthTotal);
+        spendCopy.addView(expenseMonthTotal);
+
+        TextView spendCaption = text("monthly spend", 9, MUTED);
+        spendCaption.setPadding(0, dp(2), 0, 0);
+        spendCopy.addView(spendCaption);
+
+        spendHero.addView(spendCopy, new LinearLayout.LayoutParams(0, -2, 1f));
+
+        expenseChart = new SpendingChartView(this);
+        expenseChart.setContentDescription("Monthly spending by category");
+        spendHero.addView(expenseChart, new LinearLayout.LayoutParams(dp(118), dp(118)));
+
+        summary.addView(spendHero);
 
         LinearLayout summaryMeta = new LinearLayout(this);
         summaryMeta.setGravity(Gravity.CENTER_VERTICAL);
         expenseTransactionCount = text("0 transactions", 9, MUTED);
         summaryMeta.addView(expenseTransactionCount, new LinearLayout.LayoutParams(0, -2, 1f));
+
+        expenseDailyAverage = text("₹0 / day", 9, MUTED);
+        expenseDailyAverage.setGravity(Gravity.CENTER_VERTICAL | Gravity.END);
+        expenseDailyAverage.setPadding(0, 0, dp(8), 0);
+        summaryMeta.addView(expenseDailyAverage);
 
         TextView budget = actionButton("SET BUDGET", false);
         summaryMeta.addView(budget, new LinearLayout.LayoutParams(dp(108), dp(36)));
@@ -941,6 +979,16 @@ public class MainActivity extends Activity {
         expenseTransactionCount.setText(
                 expenses.size() + (expenses.size() == 1 ? " transaction" : " transactions")
         );
+
+        int daysElapsed = expenseMonth.equals(LocalDate.now(zone).withDayOfMonth(1))
+                ? Math.max(1, LocalDate.now(zone).getDayOfMonth())
+                : expenseMonth.lengthOfMonth();
+        long dailyAverage = total / daysElapsed;
+        expenseDailyAverage.setText(formatRupees(dailyAverage) + " / day");
+
+        if (expenseChart != null) {
+            expenseChart.setData(ExpenseStore.categoryTotals(expenses), total);
+        }
 
         if (budget > 0) {
             long remaining = budget - total;
@@ -1393,7 +1441,7 @@ public class MainActivity extends Activity {
         eyebrow.setTextColor(ACCENT);
         page.addView(eyebrow);
 
-        TextView title = text("Settings", 29, TEXT);
+        TextView title = text("Settings", themeHeadingSize(), TEXT);
         title.setTypeface(Typeface.DEFAULT_BOLD);
         title.setPadding(0, dp(5), 0, 0);
         page.addView(title);
@@ -1586,11 +1634,23 @@ public class MainActivity extends Activity {
         scroll.setFillViewport(true);
         scroll.setVerticalScrollBarEnabled(false);
         scroll.setOverScrollMode(View.OVER_SCROLL_NEVER);
-        scroll.setBackgroundColor(BG);
+        scroll.setBackground(gradientRound(
+                BG,
+                blend(BG, ACCENT, themeIndex == 4 ? 0.035f : 0.055f),
+                Color.TRANSPARENT,
+                0,
+                themeGradientOrientation()
+        ));
 
         LinearLayout body = new LinearLayout(this);
         body.setOrientation(LinearLayout.VERTICAL);
-        body.setPadding(dp(20), dp(18), dp(20), dp(30));
+        int horizontalPadding = themeContentPadding();
+        body.setPadding(
+                dp(horizontalPadding),
+                dp(themeTopPadding()),
+                dp(horizontalPadding),
+                dp(30)
+        );
         scroll.addView(body);
 
         contentHost.removeAllViews();
@@ -1619,7 +1679,7 @@ public class MainActivity extends Activity {
                 SURFACE_2,
                 BORDER,
                 CARD_RADIUS,
-                GradientDrawable.Orientation.TL_BR
+                themeGradientOrientation()
         ));
         card.setElevation(dp(CARD_ELEVATION));
         return card;
@@ -1644,6 +1704,7 @@ public class MainActivity extends Activity {
         icon.setPadding(dp(7), dp(7), dp(7), dp(7));
         icon.setBackground(round(ACCENT_BG, Color.TRANSPARENT, SMALL_RADIUS));
         card.addView(icon, new LinearLayout.LayoutParams(dp(46), dp(46)));
+        installPressAnimation(card);
         return card;
     }
 
@@ -1733,8 +1794,8 @@ public class MainActivity extends Activity {
         selectedText.setPadding(0, dp(5), 0, 0);
         card.addView(selectedText);
 
+        installPressAnimation(card);
         card.setOnClickListener(v -> {
-            tap(v);
             if (themeIndex == index) return;
 
             themeIndex = index;
@@ -1742,8 +1803,10 @@ public class MainActivity extends Activity {
             applyTheme();
 
             String keepScreen = selectedScreen;
+            lastScreenIndex = screenIndex(keepScreen);
             buildShell();
             selectedScreen = keepScreen;
+            animateThemeRefresh();
             navigate(keepScreen);
         });
 
@@ -1860,7 +1923,8 @@ public class MainActivity extends Activity {
         }
 
         if (currentBreak != null) {
-            int minutes = Math.max(1, (toSeconds(currentBreak.end) - toSeconds(currentBreak.start)) / 60);
+            int minutes = Math.max(1,
+                    (toSeconds(currentBreak.end) - toSeconds(currentBreak.start)) / 60);
             boolean lunch = currentBreak.kind == TimetableData.Kind.LUNCH;
             int breakAccent = lunch ? ACCENT_2 : ACCENT;
 
@@ -1869,7 +1933,7 @@ public class MainActivity extends Activity {
                     blend(SURFACE_2, breakAccent, 0.22f),
                     breakAccent,
                     CARD_RADIUS,
-                    GradientDrawable.Orientation.TL_BR
+                    themeGradientOrientation()
             ));
             heroLabel.setText(lunch ? "LUNCH BREAK" : "SHORT BREAK");
             heroLabel.setTextColor(breakAccent);
@@ -1879,8 +1943,8 @@ public class MainActivity extends Activity {
                             + "  •  " + minutes + " min"
             );
             heroTimeRange.setText("BREAK NOW");
-            heroRoomText.setText(lunch ? "TYPE\nLUNCH" : "TYPE\nBREAK");
-            heroWingText.setText("DURATION\n" + minutes + " MIN");
+            heroRoomText.setText(lunch ? "TYPE\\nLUNCH" : "TYPE\\nBREAK");
+            heroWingText.setText("DURATION\\n" + minutes + " MIN");
             heroWingText.setTextColor(breakAccent);
             heroCountdown.setText(
                     formatCountdown(Math.max(0, toSeconds(currentBreak.end) - now))
@@ -1893,13 +1957,15 @@ public class MainActivity extends Activity {
                     ACCENT_BG,
                     ACCENT,
                     CARD_RADIUS,
-                    GradientDrawable.Orientation.TL_BR
+                    themeGradientOrientation()
             ));
             heroLabel.setText("HAPPENING NOW");
             heroLabel.setTextColor(ACCENT);
             heroSubject.setText(currentClass.subject);
             heroMeta.setText(formatTeacher(currentClass));
-            heroTimeRange.setText(formatTime(currentClass.start) + " → " + formatTime(currentClass.end));
+            heroTimeRange.setText(
+                    formatTime(currentClass.start) + " → " + formatTime(currentClass.end)
+            );
             setHeroLocation(currentClass);
             heroCountdown.setText(
                     formatCountdown(Math.max(0, toSeconds(currentClass.end) - now))
@@ -1912,7 +1978,7 @@ public class MainActivity extends Activity {
                     SURFACE_2,
                     BORDER,
                     CARD_RADIUS,
-                    GradientDrawable.Orientation.TL_BR
+                    themeGradientOrientation()
             ));
             heroLabel.setText("NEXT CLASS");
             heroLabel.setTextColor(ACCENT);
@@ -1922,8 +1988,7 @@ public class MainActivity extends Activity {
             setHeroLocation(next);
 
             if (isWeekend) {
-                long secondsUntil =
-                        secondsUntilNextWeekendClass(next);
+                long secondsUntil = secondsUntilNextWeekendClass(next);
                 heroCountdown.setText(formatHumanCountdown(secondsUntil));
                 heroCountdownLabel.setText("until Monday · " + getBatch());
             } else {
@@ -1939,7 +2004,7 @@ public class MainActivity extends Activity {
                     SURFACE_2,
                     BORDER,
                     CARD_RADIUS,
-                    GradientDrawable.Orientation.TL_BR
+                    themeGradientOrientation()
             ));
             heroLabel.setText("DAY COMPLETE");
             heroLabel.setTextColor(ACCENT);
@@ -1953,9 +2018,7 @@ public class MainActivity extends Activity {
         }
 
         homeDayLabel.setText(
-                isWeekend
-                        ? "MONDAY PREVIEW"
-                        : "TODAY  •  " + formatTodayDate()
+                isWeekend ? "MONDAY PREVIEW" : "TODAY  •  " + formatTodayDate()
         );
 
         int academicBlocks = 0;
@@ -1967,23 +2030,41 @@ public class MainActivity extends Activity {
                 academicBlocks++;
             }
         }
+
         homeSummary.setText(
                 academicBlocks + " sessions  •  " + breakBlocks + " breaks  •  " + getBatch()
         );
-
         profileBadge.setText(getBatch() + "  •  Roll " + getRollNumber());
 
-        homeSchedule.removeAllViews();
+        StringBuilder signatureBuilder = new StringBuilder();
+        signatureBuilder.append(getRollNumber()).append('|').append(day).append('|');
+        if (currentClass != null) signatureBuilder.append("C:").append(currentClass.id);
+        if (currentBreak != null) signatureBuilder.append("B:").append(currentBreak.id);
         for (TimetableData.ClassItem item : entries) {
-            boolean isCurrent = currentClass != null && currentClass.id.equals(item.id);
-            boolean isDone = !isWeekend
-                    && item.isAcademic()
-                    && toSeconds(item.end) <= now;
+            signatureBuilder.append(';').append(item.id).append(':').append(item.isBreak());
+            if (!isWeekend && item.isAcademic()) {
+                signatureBuilder.append(':').append(toSeconds(item.end) <= now);
+            }
+        }
+        String scheduleSignature = signatureBuilder.toString();
 
-            if (item.isBreak()) {
-                homeSchedule.addView(breakRow(item));
-            } else {
-                homeSchedule.addView(classRow(item, isCurrent, false, isDone));
+        if (!scheduleSignature.equals(lastHomeScheduleSignature)) {
+            lastHomeScheduleSignature = scheduleSignature;
+            homeSchedule.removeAllViews();
+
+            int index = 0;
+            for (TimetableData.ClassItem item : entries) {
+                boolean isCurrent = currentClass != null && currentClass.id.equals(item.id);
+                boolean isDone = !isWeekend
+                        && item.isAcademic()
+                        && toSeconds(item.end) <= now;
+
+                View row = item.isBreak()
+                        ? breakRow(item)
+                        : classRow(item, isCurrent, false, isDone);
+
+                homeSchedule.addView(row);
+                animateListItem(row, index++);
             }
         }
     }
@@ -1993,8 +2074,6 @@ public class MainActivity extends Activity {
 
         List<TimetableData.ClassItem> entries =
                 TimetableData.forRollAndDay(getRollNumber(), weekSelectedDay);
-
-        weekSchedule.removeAllViews();
 
         String today = todayName();
         boolean viewingToday = weekSelectedDay.equals(today) && !today.isEmpty();
@@ -2013,29 +2092,44 @@ public class MainActivity extends Activity {
             }
         }
 
+        StringBuilder signatureBuilder = new StringBuilder();
+        signatureBuilder.append(getRollNumber()).append('|').append(weekSelectedDay).append('|');
+        if (current != null) signatureBuilder.append("C:").append(current.id);
+        for (TimetableData.ClassItem item : entries) {
+            signatureBuilder.append(';').append(item.id).append(':').append(item.isBreak());
+            if (viewingToday && item.isAcademic()) {
+                signatureBuilder.append(':').append(toSeconds(item.end) <= now);
+            }
+        }
+        String scheduleSignature = signatureBuilder.toString();
+
+        if (scheduleSignature.equals(lastWeekScheduleSignature)) return;
+        lastWeekScheduleSignature = scheduleSignature;
+
+        weekSchedule.removeAllViews();
+
         if (entries.isEmpty()) {
-            TextView empty = text(
-                    "No classes scheduled.",
-                    13,
-                    MUTED
-            );
+            TextView empty = text("No classes scheduled.", 13, MUTED);
             empty.setGravity(Gravity.CENTER);
             empty.setPadding(0, dp(30), 0, dp(30));
             weekSchedule.addView(empty);
+            animateListItem(empty, 0);
             return;
         }
 
+        int index = 0;
         for (TimetableData.ClassItem item : entries) {
             boolean isCurrent = current != null && current.id.equals(item.id);
             boolean isDone = viewingToday
                     && item.isAcademic()
                     && toSeconds(item.end) <= now;
 
-            weekSchedule.addView(
-                    item.isBreak()
-                            ? breakRow(item)
-                            : classRow(item, isCurrent, false, isDone)
-            );
+            View row = item.isBreak()
+                    ? breakRow(item)
+                    : classRow(item, isCurrent, false, isDone);
+
+            weekSchedule.addView(row);
+            animateListItem(row, index++);
         }
     }
 
@@ -2082,6 +2176,7 @@ public class MainActivity extends Activity {
         ));
         chip.setClickable(true);
         chip.setFocusable(true);
+        installPressAnimation(chip);
         return chip;
     }
 
@@ -2567,6 +2662,7 @@ public class MainActivity extends Activity {
         arrow.setGravity(Gravity.CENTER);
         button.addView(arrow, new LinearLayout.LayoutParams(dp(22), dp(32)));
 
+        installPressAnimation(button);
         return button;
     }
 
@@ -2595,6 +2691,7 @@ public class MainActivity extends Activity {
         ));
         button.setClickable(true);
         button.setFocusable(true);
+        installPressAnimation(button);
         return button;
     }
 
@@ -2832,6 +2929,217 @@ public class MainActivity extends Activity {
     private int BUTTON_RADIUS() { return BUTTON_RADIUS; }
     private int PILL_RADIUS() { return 999; }
     private int CONTROL_HEIGHT_DP() { return CONTROL_HEIGHT; }
+
+    private int screenIndex(String screen) {
+        if ("home".equals(screen)) return 0;
+        if ("week".equals(screen)) return 1;
+        if ("expenses".equals(screen)) return 2;
+        return 3;
+    }
+
+    private int themeHeadingSize() {
+        switch (themeIndex) {
+            case 1: return 30;
+            case 2: return 28;
+            case 3: return 30;
+            case 4: return 31;
+            default: return 29;
+        }
+    }
+
+    private int themeContentPadding() {
+        switch (themeIndex) {
+            case 1: return 18;
+            case 2: return 22;
+            case 3: return 19;
+            case 4: return 21;
+            default: return 20;
+        }
+    }
+
+    private int themeTopPadding() {
+        switch (themeIndex) {
+            case 1: return 20;
+            case 2: return 24;
+            case 3: return 17;
+            case 4: return 22;
+            default: return 18;
+        }
+    }
+
+    private GradientDrawable.Orientation themeGradientOrientation() {
+        switch (themeIndex) {
+            case 1: return GradientDrawable.Orientation.LEFT_RIGHT;
+            case 2: return GradientDrawable.Orientation.TOP_BOTTOM;
+            case 3: return GradientDrawable.Orientation.TL_BR;
+            case 4: return GradientDrawable.Orientation.BL_TR;
+            default: return GradientDrawable.Orientation.TR_BL;
+        }
+    }
+
+    private void animateScreenTransition(View view, boolean forward) {
+        if (view == null) return;
+
+        view.setAlpha(0f);
+        view.setScaleX(0.985f);
+        view.setScaleY(0.985f);
+        view.setTranslationX(forward ? dp(36) : -dp(36));
+        view.setTranslationY(dp(4));
+
+        view.animate()
+                .alpha(1f)
+                .scaleX(1f)
+                .scaleY(1f)
+                .translationX(0)
+                .translationY(0)
+                .setDuration(420)
+                .setInterpolator(new OvershootInterpolator(0.75f))
+                .start();
+    }
+
+    private void animateThemeRefresh() {
+        if (root == null) return;
+        root.setAlpha(0.90f);
+        root.setScaleX(0.985f);
+        root.setScaleY(0.985f);
+        root.animate()
+                .alpha(1f)
+                .scaleX(1f)
+                .scaleY(1f)
+                .setDuration(420)
+                .setInterpolator(new DecelerateInterpolator())
+                .start();
+    }
+
+    private void animateListItem(View view, int index) {
+        if (view == null) return;
+        view.setAlpha(0f);
+        view.setTranslationY(dp(12));
+        view.setScaleX(0.985f);
+        view.setScaleY(0.985f);
+        view.animate()
+                .alpha(1f)
+                .translationY(0)
+                .scaleX(1f)
+                .scaleY(1f)
+                .setStartDelay(Math.min(320, index * 55L))
+                .setDuration(360)
+                .setInterpolator(new DecelerateInterpolator())
+                .start();
+    }
+
+    private void installPressAnimation(View view) {
+        if (view == null) return;
+        view.setClickable(true);
+        view.setFocusable(true);
+        view.setOnTouchListener((v, event) -> {
+            switch (event.getActionMasked()) {
+                case android.view.MotionEvent.ACTION_DOWN:
+                    v.animate().cancel();
+                    v.animate()
+                            .scaleX(0.965f)
+                            .scaleY(0.965f)
+                            .translationY(dp(1))
+                            .alpha(0.92f)
+                            .setDuration(90)
+                            .setInterpolator(new DecelerateInterpolator())
+                            .start();
+                    break;
+                case android.view.MotionEvent.ACTION_UP:
+                case android.view.MotionEvent.ACTION_CANCEL:
+                    v.animate().cancel();
+                    v.animate()
+                            .scaleX(1f)
+                            .scaleY(1f)
+                            .translationY(0)
+                            .alpha(1f)
+                            .setDuration(240)
+                            .setInterpolator(new OvershootInterpolator(1.15f))
+                            .start();
+                    break;
+            }
+            return false;
+        });
+    }
+
+    private static final class SpendingChartView extends View {
+        private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final RectF bounds = new RectF();
+        private java.util.Map<String, Long> totals = new java.util.HashMap<>();
+        private long total;
+
+        SpendingChartView(android.content.Context context) {
+            super(context);
+            paint.setStrokeCap(Paint.Cap.ROUND);
+            setLayerType(View.LAYER_TYPE_SOFTWARE, null);
+        }
+
+        void setData(java.util.Map<String, Long> totals, long total) {
+            this.totals = totals == null
+                    ? new java.util.HashMap<>()
+                    : new java.util.HashMap<>(totals);
+            this.total = total;
+            invalidate();
+        }
+
+        @Override
+        protected void onDraw(Canvas canvas) {
+            super.onDraw(canvas);
+
+            float cx = getWidth() / 2f;
+            float cy = getHeight() / 2f;
+            float radius = Math.min(getWidth(), getHeight()) * 0.39f;
+            bounds.set(cx - radius, cy - radius, cx + radius, cy + radius);
+
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeWidth(dpValue(10));
+            paint.setColor(Color.argb(55, 255, 255, 255));
+            canvas.drawArc(bounds, 0, 360, false, paint);
+
+            if (total > 0) {
+                float startAngle = -90f;
+                for (int i = 0; i < ExpenseStore.CATEGORIES.length; i++) {
+                    String category = ExpenseStore.CATEGORIES[i];
+                    long amount = totals.containsKey(category) ? totals.get(category) : 0L;
+                    if (amount <= 0) continue;
+
+                    float sweep = 360f * ((float) amount / (float) total);
+                    paint.setColor(chartColor(i));
+                    canvas.drawArc(bounds, startAngle, Math.max(4f, sweep - 3f), false, paint);
+                    startAngle += sweep;
+                }
+            }
+
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(TEXT);
+            paint.setTextAlign(Paint.Align.CENTER);
+            paint.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
+            paint.setTextSize(dpValue(16));
+            canvas.drawText(total > 0 ? compactRupees(total) : "₹0", cx, cy + dpValue(5), paint);
+
+            paint.setColor(MUTED);
+            paint.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+            paint.setTextSize(dpValue(8));
+            canvas.drawText("TOTAL", cx, cy + dpValue(19), paint);
+        }
+
+        private int chartColor(int index) {
+            if (index % 2 == 0) return ACCENT;
+            if (index % 3 == 0) return ACCENT_2;
+            return blend(ACCENT, ACCENT_2, 0.48f);
+        }
+
+        private String compactRupees(long paise) {
+            double rupees = paise / 100d;
+            if (rupees >= 100000d) return "₹" + String.format(Locale.ENGLISH, "%.1fL", rupees / 100000d);
+            if (rupees >= 1000d) return "₹" + String.format(Locale.ENGLISH, "%.1fK", rupees / 1000d);
+            return formatRupees(paise);
+        }
+
+        private float dpValue(float dp) {
+            return dp * getResources().getDisplayMetrics().density;
+        }
+    }
 
     private int dp(int value) {
         return Math.round(value * getResources().getDisplayMetrics().density);
