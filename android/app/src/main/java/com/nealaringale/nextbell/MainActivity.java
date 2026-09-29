@@ -1783,6 +1783,8 @@ public class MainActivity extends Activity {
                         fingerprint
                 ));
 
+                ExpenseDailyAlertReceiver.maybeNotifyNow(this);
+
                 expenseMonth = selectedDate[0].withDayOfMonth(1);
                 hideKeyboard();
                 dialog.dismiss();
