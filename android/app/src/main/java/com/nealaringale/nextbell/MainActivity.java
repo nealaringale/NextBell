@@ -4,6 +4,7 @@ import android.Manifest;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.DatePickerDialog;
+import android.app.Dialog;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
@@ -13,6 +14,7 @@ import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.RectF;
 import android.graphics.Typeface;
+import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.StateListDrawable;
 import android.os.Build;
@@ -25,6 +27,10 @@ import android.view.View;
 import android.view.animation.DecelerateInterpolator;
 import android.view.animation.OvershootInterpolator;
 import android.view.Window;
+import android.view.WindowManager;
+import android.view.inputmethod.InputMethodManager;
+import android.content.Context;
+import android.widget.DatePicker;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.HorizontalScrollView;
@@ -1199,138 +1205,325 @@ public class MainActivity extends Activity {
     }
 
     private void showExpenseActions(ExpenseStore.Expense expense) {
-        new AlertDialog.Builder(this)
-                .setTitle(expense.category + "  •  " + formatRupees(expense.amountPaise))
-                .setItems(
-                        new String[]{"Edit expense", "Delete expense"},
-                        (dialog, which) -> {
-                            if (which == 0) {
-                                showExpenseEditor(expense);
-                            } else {
-                                new AlertDialog.Builder(this)
-                                        .setTitle("Delete expense?")
-                                        .setMessage(
-                                                formatRupees(expense.amountPaise)
-                                                        + " • " + expense.category
-                                        )
-                                        .setNegativeButton("Cancel", null)
-                                        .setPositiveButton("Delete", (d, w) -> {
-                                            ExpenseStore.delete(preferences, expense.id);
-                                            refreshExpensesScreen();
-                                        })
-                                        .show();
-                            }
-                        }
-                )
-                .show();
+        LinearLayout sheet = dialogSheet();
+
+        ImageView icon = dialogIcon(R.drawable.ic_wallet, ACCENT);
+        sheet.addView(icon, dialogMarginParams(48, 0, 0, 14));
+
+        TextView title = text(formatRupees(expense.amountPaise), 26, TEXT);
+        title.setTypeface(Typeface.DEFAULT_BOLD);
+        sheet.addView(title);
+
+        TextView meta = text(
+                expense.category + "  •  " + formatLongDate(expense.date)
+                        + (expense.paymentMode.isEmpty() ? "" : "  •  " + expense.paymentMode),
+                10,
+                MUTED
+        );
+        meta.setPadding(0, dp(4), 0, 18);
+        sheet.addView(meta);
+
+        LinearLayout actions = new LinearLayout(this);
+        actions.setOrientation(LinearLayout.HORIZONTAL);
+
+        TextView edit = dialogAction("EDIT EXPENSE", false);
+        TextView delete = dialogAction("DELETE", false);
+        actions.addView(edit, new LinearLayout.LayoutParams(0, dp(48), 1f));
+        LinearLayout.LayoutParams deleteParams = new LinearLayout.LayoutParams(0, dp(48), 1f);
+        deleteParams.setMargins(dp(9), 0, 0, 0);
+        actions.addView(delete, deleteParams);
+        sheet.addView(actions);
+
+        TextView cancel = dialogTextAction("CANCEL");
+        LinearLayout.LayoutParams cancelParams = new LinearLayout.LayoutParams(-1, dp(42));
+        cancelParams.setMargins(0, dp(8), 0, 0);
+        sheet.addView(cancel, cancelParams);
+
+        Dialog dialog = showBottomSheet(sheet);
+        edit.setOnClickListener(v -> {
+            tap(v);
+            dialog.dismiss();
+            showExpenseEditor(expense);
+        });
+        delete.setOnClickListener(v -> {
+            tap(v);
+            dialog.dismiss();
+            showDeleteExpenseConfirmation(expense);
+        });
+        cancel.setOnClickListener(v -> dialog.dismiss());
+    }
+
+    private void showDeleteExpenseConfirmation(ExpenseStore.Expense expense) {
+        LinearLayout sheet = dialogSheet();
+
+        ImageView icon = dialogIcon(R.drawable.ic_wallet, ACCENT_2);
+        sheet.addView(icon, dialogMarginParams(48, 0, 0, 14));
+
+        TextView title = text("Delete expense?", 23, TEXT);
+        title.setTypeface(Typeface.DEFAULT_BOLD);
+        sheet.addView(title);
+
+        TextView message = text(
+                formatRupees(expense.amountPaise) + "  •  " + expense.category
+                        + "\\n" + formatLongDate(expense.date),
+                10,
+                MUTED
+        );
+        message.setPadding(0, dp(6), 0, dp(19));
+        sheet.addView(message);
+
+        LinearLayout actions = new LinearLayout(this);
+        actions.setOrientation(LinearLayout.HORIZONTAL);
+
+        TextView cancel = dialogAction("KEEP IT", false);
+        TextView confirm = dialogAction("DELETE", true);
+        actions.addView(cancel, new LinearLayout.LayoutParams(0, dp(48), 1f));
+        LinearLayout.LayoutParams confirmParams = new LinearLayout.LayoutParams(0, dp(48), 1f);
+        confirmParams.setMargins(dp(9), 0, 0, 0);
+        actions.addView(confirm, confirmParams);
+        sheet.addView(actions);
+
+        Dialog dialog = showBottomSheet(sheet);
+        cancel.setOnClickListener(v -> dialog.dismiss());
+        confirm.setOnClickListener(v -> {
+            tap(v);
+            ExpenseStore.delete(preferences, expense.id);
+            dialog.dismiss();
+            refreshExpensesScreen();
+        });
     }
 
     private void showExpenseEditor(ExpenseStore.Expense existing) {
-        LinearLayout box = new LinearLayout(this);
-        box.setOrientation(LinearLayout.VERTICAL);
-        box.setPadding(dp(2), 0, dp(2), 0);
+        final String[] selectedCategory = {
+                existing == null ? "Food & Drinks" : existing.category
+        };
+        final String[] selectedPayment = {
+                existing == null ? "UPI" : existing.paymentMode
+        };
+        final LocalDate[] selectedDate = {
+                existing == null ? LocalDate.now(zone) : existing.date
+        };
+
+        LinearLayout sheet = dialogSheet();
+
+        LinearLayout heading = new LinearLayout(this);
+        heading.setGravity(Gravity.CENTER_VERTICAL);
+        ImageView icon = dialogIcon(R.drawable.ic_wallet, ACCENT);
+        heading.addView(icon, new LinearLayout.LayoutParams(dp(44), dp(44)));
+
+        LinearLayout headingCopy = new LinearLayout(this);
+        headingCopy.setOrientation(LinearLayout.VERTICAL);
+        headingCopy.setPadding(dp(11), 0, 0, 0);
+
+        TextView title = text(
+                existing == null ? "Add expense" : "Edit expense",
+                23,
+                TEXT
+        );
+        title.setTypeface(Typeface.DEFAULT_BOLD);
+        headingCopy.addView(title);
+
+        TextView subtitle = text(
+                "Log it in seconds. Everything stays on this phone.",
+                9,
+                MUTED
+        );
+        subtitle.setPadding(0, dp(3), 0, 0);
+        headingCopy.addView(subtitle);
+
+        heading.addView(headingCopy, new LinearLayout.LayoutParams(0, -2, 1f));
+        sheet.addView(heading);
 
         EditText amount = field("0.00", true);
         amount.setInputType(
                 InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL
         );
-        amount.setHint("0.00");
-        if (existing != null) {
-            amount.setText(amountRupeesInput(existing.amountPaise));
+        amount.setTextSize(30);
+        amount.setGravity(Gravity.CENTER);
+        amount.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
+        amount.setHintTextColor(blend(MUTED, BG, 0.08f));
+        amount.setPadding(dp(15), 0, dp(15), 0);
+        amount.setBackground(gradientRound(
+                SURFACE_2,
+                blend(SURFACE_2, ACCENT_BG, 0.35f),
+                Color.TRANSPARENT,
+                SMALL_RADIUS,
+                themeGradientOrientation()
+        ));
+        if (existing != null) amount.setText(amountRupeesInput(existing.amountPaise));
+        LinearLayout.LayoutParams amountParams = new LinearLayout.LayoutParams(-1, dp(72));
+        amountParams.setMargins(0, dp(16), 0, dp(15));
+        sheet.addView(amount, amountParams);
+
+        TextView catLabel = dialogSectionLabel("CATEGORY");
+        sheet.addView(catLabel);
+
+        LinearLayout catGrid = new LinearLayout(this);
+        catGrid.setOrientation(LinearLayout.VERTICAL);
+        List<TextView> categoryChips = new java.util.ArrayList<>();
+
+        for (int start = 0; start < ExpenseStore.CATEGORIES.length; start += 3) {
+            LinearLayout line = new LinearLayout(this);
+            line.setOrientation(LinearLayout.HORIZONTAL);
+            for (int j = start; j < Math.min(start + 3, ExpenseStore.CATEGORIES.length); j++) {
+                int index = j;
+                String label = ExpenseStore.CATEGORIES[j];
+                TextView chip = dialogChoiceChip(label, label.equals(selectedCategory[0]));
+                categoryChips.add(chip);
+                LinearLayout.LayoutParams chipParams = new LinearLayout.LayoutParams(0, dp(44), 1f);
+                if (j % 3 != 0) chipParams.setMargins(dp(7), 0, 0, 0);
+                line.addView(chip, chipParams);
+                chip.setOnClickListener(v -> {
+                    selectedCategory[0] = ExpenseStore.CATEGORIES[index];
+                    for (TextView cchip : categoryChips) {
+                        String value = cchip.getText().toString();
+                        cchip.setBackground(choiceBackground(
+                                value.equals(selectedCategory[0])
+                        ));
+                        cchip.setTextColor(
+                                value.equals(selectedCategory[0]) ? ACCENT : TEXT
+                        );
+                    }
+                    tap(v);
+                });
+            }
+            while (line.getChildCount() < 3) {
+                View empty = new View(this);
+                LinearLayout.LayoutParams emptyParams = new LinearLayout.LayoutParams(0, dp(44), 1f);
+                if (line.getChildCount() > 0) emptyParams.setMargins(dp(7), 0, 0, 0);
+                line.addView(empty, emptyParams);
+            }
+            catGrid.addView(line);
+            if (start + 3 < ExpenseStore.CATEGORIES.length) {
+                catGrid.addView(spacer(1, dp(7)));
+            }
         }
-        box.addView(amount, fieldParams());
+        sheet.addView(catGrid, new LinearLayout.LayoutParams(-1, dp(146)));
 
-        TextView category = choiceField(
-                "Category",
-                existing == null ? "Food" : existing.category
+        LinearLayout dateRow = new LinearLayout(this);
+        dateRow.setGravity(Gravity.CENTER_VERTICAL);
+
+        TextView date = dialogAction(
+                "DATE  •  " + (selectedDate[0].equals(LocalDate.now(zone))
+                        ? "TODAY" : formatLongDate(selectedDate[0])),
+                false
         );
-        LinearLayout.LayoutParams choiceParams = fieldLikeParams();
-        choiceParams.setMargins(0, dp(9), 0, 0);
-        box.addView(category, choiceParams);
+        dateRow.addView(date, new LinearLayout.LayoutParams(0, dp(44), 1f));
 
-        TextView payment = choiceField(
-                "Payment",
-                existing == null ? "UPI" : existing.paymentMode
-        );
-        LinearLayout.LayoutParams paymentParams = fieldLikeParams();
-        paymentParams.setMargins(0, dp(9), 0, 0);
-        box.addView(payment, paymentParams);
+        TextView dateChange = dialogTextAction("CHANGE");
+        LinearLayout.LayoutParams dateChangeParams = new LinearLayout.LayoutParams(dp(74), dp(44));
+        dateChangeParams.setMargins(dp(8), 0, 0, 0);
+        dateRow.addView(dateChange, dateChangeParams);
+        LinearLayout.LayoutParams dateRowParams = new LinearLayout.LayoutParams(-1, dp(44));
+        dateRowParams.setMargins(0, dp(15), 0, 0);
+        sheet.addView(dateRow, dateRowParams);
 
-        LocalDate[] selectedDate = {
-                existing == null ? LocalDate.now(zone) : existing.date
-        };
-        TextView date = choiceField("Date", formatLongDate(selectedDate[0]));
-        LinearLayout.LayoutParams dateParams = fieldLikeParams();
-        dateParams.setMargins(0, dp(9), 0, 0);
-        box.addView(date, dateParams);
+        date.setOnClickListener(v -> showExpenseDatePicker(selectedDate, date));
+        dateChange.setOnClickListener(v -> showExpenseDatePicker(selectedDate, date));
 
-        EditText note = field("e.g. Lunch at college", false);
+        TextView paymentLabel = dialogSectionLabel("PAID WITH");
+        LinearLayout.LayoutParams paymentLabelParams = new LinearLayout.LayoutParams(-1, -2);
+        paymentLabelParams.setMargins(0, dp(15), 0, dp(7));
+        sheet.addView(paymentLabel, paymentLabelParams);
+
+        HorizontalScrollView paymentScroll = new HorizontalScrollView(this);
+        paymentScroll.setHorizontalScrollBarEnabled(false);
+        LinearLayout paymentRow = new LinearLayout(this);
+        paymentScroll.addView(paymentRow);
+
+        List<TextView> paymentChips = new java.util.ArrayList<>();
+        for (int i = 0; i < ExpenseStore.PAYMENT_MODES.length; i++) {
+            int index = i;
+            String mode = ExpenseStore.PAYMENT_MODES[i];
+            TextView chip = dialogChoiceChip(mode, mode.equals(selectedPayment[0]));
+            paymentChips.add(chip);
+            LinearLayout.LayoutParams chipParams = new LinearLayout.LayoutParams(dp(92), dp(38));
+            if (i > 0) chipParams.setMargins(dp(7), 0, 0, 0);
+            paymentRow.addView(chip, chipParams);
+            chip.setOnClickListener(v -> {
+                selectedPayment[0] = ExpenseStore.PAYMENT_MODES[index];
+                for (TextView pchip : paymentChips) {
+                    boolean active = pchip.getText().toString().equals(selectedPayment[0]);
+                    pchip.setBackground(choiceBackground(active));
+                    pchip.setTextColor(active ? ACCENT : TEXT);
+                }
+                tap(v);
+            });
+        }
+        LinearLayout.LayoutParams paymentScrollParams = new LinearLayout.LayoutParams(-1, dp(38));
+        sheet.addView(paymentScroll, paymentScrollParams);
+
+        EditText note = field("Optional note — e.g. lunch at college", false);
+        note.setSingleLine(true);
         if (existing != null) note.setText(existing.note);
-        LinearLayout.LayoutParams noteParams = fieldParams();
-        noteParams.setMargins(0, dp(9), 0, 0);
-        box.addView(note, noteParams);
+        LinearLayout.LayoutParams noteParams = new LinearLayout.LayoutParams(-1, dp(48));
+        noteParams.setMargins(0, dp(14), 0, 0);
+        sheet.addView(note, noteParams);
 
-        category.setOnClickListener(v ->
-                showExpenseChoice("Category", ExpenseStore.CATEGORIES, category)
+        LinearLayout actions = new LinearLayout(this);
+        actions.setGravity(Gravity.CENTER_VERTICAL);
+
+        TextView cancel = dialogTextAction("CANCEL");
+        TextView save = dialogAction(
+                existing == null ? "SAVE EXPENSE" : "SAVE CHANGES",
+                true
         );
-        payment.setOnClickListener(v ->
-                showExpenseChoice("Payment", ExpenseStore.PAYMENT_MODES, payment)
-        );
-        date.setOnClickListener(v -> {
-            DatePickerDialog picker = new DatePickerDialog(
-                    this,
-                    (view, year, month, day) -> {
-                        selectedDate[0] = LocalDate.of(year, month + 1, day);
-                        date.setText(formatLongDate(selectedDate[0]));
-                    },
-                    selectedDate[0].getYear(),
-                    selectedDate[0].getMonthValue() - 1,
-                    selectedDate[0].getDayOfMonth()
-            );
-            picker.show();
+        actions.addView(cancel, new LinearLayout.LayoutParams(0, dp(48), 1f));
+        LinearLayout.LayoutParams saveParams = new LinearLayout.LayoutParams(0, dp(48), 1.45f);
+        saveParams.setMargins(dp(8), 0, 0, 0);
+        actions.addView(save, saveParams);
+        LinearLayout.LayoutParams actionsParams = new LinearLayout.LayoutParams(-1, dp(48));
+        actionsParams.setMargins(0, dp(17), 0, 0);
+        sheet.addView(actions, actionsParams);
+
+        Dialog dialog = showBottomSheet(sheet);
+        dialog.setOnShowListener(x -> {
+            amount.requestFocus();
+            amount.postDelayed(() -> {
+                InputMethodManager imm = (InputMethodManager)
+                        getSystemService(Context.INPUT_METHOD_SERVICE);
+                if (imm != null) {
+                    imm.showSoftInput(amount, InputMethodManager.SHOW_IMPLICIT);
+                }
+            }, 220);
         });
 
-        AlertDialog dialog = new AlertDialog.Builder(this)
-                .setTitle(existing == null ? "Add expense" : "Edit expense")
-                .setView(box)
-                .setNegativeButton("Cancel", null)
-                .setPositiveButton(existing == null ? "Add" : "Save", null)
-                .create();
+        cancel.setOnClickListener(v -> {
+            ((InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE))
+                    .hideSoftInputFromWindow(amount.getWindowToken(), 0);
+            dialog.dismiss();
+        });
 
-        dialog.setOnShowListener(d -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
-                .setOnClickListener(v -> {
-                    try {
-                        long paise = ExpenseStore.parseAmountToPaise(
-                                amount.getText().toString()
-                        );
-                        if (paise <= 0) {
-                            amount.setError("Enter an amount greater than ₹0");
-                            return;
-                        }
+        save.setOnClickListener(v -> {
+            try {
+                long paise = ExpenseStore.parseAmountToPaise(
+                        amount.getText().toString()
+                );
+                if (paise <= 0) {
+                    amount.setError("Enter an amount greater than ₹0");
+                    shake(v);
+                    return;
+                }
 
-                        long id = existing == null
-                                ? System.currentTimeMillis()
-                                : existing.id;
+                long id = existing == null ? System.currentTimeMillis() : existing.id;
+                ExpenseStore.upsert(preferences, new ExpenseStore.Expense(
+                        id,
+                        paise,
+                        selectedDate[0],
+                        selectedCategory[0],
+                        note.getText().toString().trim(),
+                        selectedPayment[0]
+                ));
 
-                        ExpenseStore.Expense updated = new ExpenseStore.Expense(
-                                id,
-                                paise,
-                                selectedDate[0],
-                                category.getText().toString(),
-                                note.getText().toString().trim(),
-                                payment.getText().toString()
-                        );
-
-                        ExpenseStore.upsert(preferences, updated);
-                        expenseMonth = selectedDate[0].withDayOfMonth(1);
-                        dialog.dismiss();
-                        refreshExpensesScreen();
-                    } catch (Exception ignored) {
-                        amount.setError("Enter a valid amount, e.g. 120.50");
-                    }
-                }));
-
-        dialog.show();
+                expenseMonth = selectedDate[0].withDayOfMonth(1);
+                hideKeyboard();
+                dialog.dismiss();
+                refreshExpensesScreen();
+            } catch (Exception ignored) {
+                amount.setError("Enter a valid amount, e.g. 120.50");
+                shake(v);
+            }
+        });
     }
 
     private void showExpenseChoice(
@@ -1338,22 +1531,39 @@ public class MainActivity extends Activity {
             String[] options,
             TextView target
     ) {
-        String current = target.getText().toString();
-        int selected = 0;
-        for (int i = 0; i < options.length; i++) {
-            if (options[i].equals(current)) {
-                selected = i;
-                break;
-            }
-        }
+        final String[] selected = { target.getText().toString() };
+        LinearLayout sheet = dialogSheet();
 
-        new AlertDialog.Builder(this)
-                .setTitle(title)
-                .setSingleChoiceItems(options, selected, (dialog, which) -> {
-                    target.setText(options[which]);
-                    dialog.dismiss();
-                })
-                .show();
+        TextView heading = text(title, 23, TEXT);
+        heading.setTypeface(Typeface.DEFAULT_BOLD);
+        sheet.addView(heading);
+
+        LinearLayout choices = new LinearLayout(this);
+        choices.setOrientation(LinearLayout.VERTICAL);
+        for (String option : options) {
+            TextView row = dialogChoiceChip(option, option.equals(selected[0]));
+            LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(-1, dp(46));
+            rowParams.setMargins(0, dp(7), 0, 0);
+            choices.addView(row, rowParams);
+            row.setOnClickListener(v -> {
+                target.setText(option);
+                tap(v);
+                ((Dialog) v.getTag()).dismiss();
+            });
+            row.setTag(null);
+        }
+        sheet.addView(choices);
+
+        TextView cancel = dialogTextAction("CANCEL");
+        LinearLayout.LayoutParams cancelParams = new LinearLayout.LayoutParams(-1, dp(42));
+        cancelParams.setMargins(0, dp(9), 0, 0);
+        sheet.addView(cancel, cancelParams);
+
+        Dialog dialog = showBottomSheet(sheet);
+        for (int i = 0; i < choices.getChildCount(); i++) {
+            choices.getChildAt(i).setTag(dialog);
+        }
+        cancel.setOnClickListener(v -> dialog.dismiss());
     }
 
     private TextView choiceField(String label, String value) {
@@ -1378,33 +1588,326 @@ public class MainActivity extends Activity {
     }
 
     private void showBudgetEditor() {
-        EditText input = field("0.00", true);
+        LinearLayout sheet = dialogSheet();
+
+        ImageView icon = dialogIcon(R.drawable.ic_wallet, ACCENT);
+        sheet.addView(icon, dialogMarginParams(48, 0, 0, 14));
+
+        TextView title = text("Monthly budget", 23, TEXT);
+        title.setTypeface(Typeface.DEFAULT_BOLD);
+        sheet.addView(title);
+
+        TextView subtitle = text(
+                "How much do you want to allow yourself for " +
+                        expenseMonth.format(DateTimeFormatter.ofPattern("MMMM yyyy", Locale.ENGLISH)) + "?",
+                10,
+                MUTED
+        );
+        subtitle.setPadding(0, dp(5), 0, dp(15));
+        sheet.addView(subtitle);
+
+        EditText input = field("0", true);
         input.setInputType(
                 InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL
         );
+        input.setTextSize(29);
+        input.setGravity(Gravity.CENTER);
+        input.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
         long current = ExpenseStore.budgetPaise(preferences, expenseMonth);
         if (current > 0) input.setText(amountRupeesInput(current));
+        LinearLayout.LayoutParams inputParams = new LinearLayout.LayoutParams(-1, dp(68));
+        sheet.addView(input, inputParams);
 
-        new AlertDialog.Builder(this)
-                .setTitle("Monthly budget")
-                .setMessage("Set a spending limit for " +
-                        expenseMonth.format(DateTimeFormatter.ofPattern("MMMM yyyy", Locale.ENGLISH)) + ".")
-                .setView(input)
-                .setNegativeButton("Cancel", null)
-                .setNeutralButton("Clear", (dialog, which) -> {
-                    ExpenseStore.setBudgetPaise(preferences, expenseMonth, 0L);
-                    refreshExpensesScreen();
-                })
-                .setPositiveButton("Save", (dialog, which) -> {
-                    try {
-                        long paise = ExpenseStore.parseAmountToPaise(input.getText().toString());
-                        ExpenseStore.setBudgetPaise(preferences, expenseMonth, paise);
-                        refreshExpensesScreen();
-                    } catch (Exception ignored) {
-                        input.setError("Enter a valid budget.");
-                    }
-                })
-                .show();
+        TextView presetLabel = dialogSectionLabel("QUICK LIMIT");
+        LinearLayout.LayoutParams presetLabelParams = new LinearLayout.LayoutParams(-1, -2);
+        presetLabelParams.setMargins(0, dp(16), 0, dp(7));
+        sheet.addView(presetLabel, presetLabelParams);
+
+        HorizontalScrollView presetsScroll = new HorizontalScrollView(this);
+        presetsScroll.setHorizontalScrollBarEnabled(false);
+        LinearLayout presets = new LinearLayout(this);
+        presetsScroll.addView(presets);
+        int[] values = {3000, 5000, 8000, 10000, 15000, 20000};
+        for (int value : values) {
+            TextView chip = dialogChoiceChip("₹" + value, false);
+            LinearLayout.LayoutParams chipParams = new LinearLayout.LayoutParams(dp(82), dp(38));
+            if (presets.getChildCount() > 0) chipParams.setMargins(dp(7), 0, 0, 0);
+            presets.addView(chip, chipParams);
+            chip.setOnClickListener(v -> {
+                input.setText(String.valueOf(value));
+                input.setSelection(input.length());
+                tap(v);
+            });
+        }
+        sheet.addView(presetsScroll, new LinearLayout.LayoutParams(-1, dp(38)));
+
+        LinearLayout actions = new LinearLayout(this);
+        actions.setGravity(Gravity.CENTER_VERTICAL);
+        TextView clear = dialogTextAction("CLEAR");
+        TextView cancel = dialogTextAction("CANCEL");
+        TextView save = dialogAction("SAVE BUDGET", true);
+        actions.addView(clear, new LinearLayout.LayoutParams(0, dp(48), 0.85f));
+        actions.addView(cancel, new LinearLayout.LayoutParams(0, dp(48), 0.85f));
+        LinearLayout.LayoutParams saveParams = new LinearLayout.LayoutParams(0, dp(48), 1.25f);
+        saveParams.setMargins(dp(7), 0, 0, 0);
+        actions.addView(save, saveParams);
+        LinearLayout.LayoutParams actionsParams = new LinearLayout.LayoutParams(-1, dp(48));
+        actionsParams.setMargins(0, dp(18), 0, 0);
+        sheet.addView(actions, actionsParams);
+
+        Dialog dialog = showBottomSheet(sheet);
+        dialog.setOnShowListener(x -> input.requestFocus());
+
+        clear.setOnClickListener(v -> {
+            ExpenseStore.setBudgetPaise(preferences, expenseMonth, 0L);
+            hideKeyboard();
+            dialog.dismiss();
+            refreshExpensesScreen();
+        });
+        cancel.setOnClickListener(v -> {
+            hideKeyboard();
+            dialog.dismiss();
+        });
+        save.setOnClickListener(v -> {
+            try {
+                long paise = ExpenseStore.parseAmountToPaise(input.getText().toString());
+                ExpenseStore.setBudgetPaise(preferences, expenseMonth, paise);
+                hideKeyboard();
+                dialog.dismiss();
+                refreshExpensesScreen();
+            } catch (Exception ignored) {
+                input.setError("Enter a valid budget.");
+                shake(v);
+            }
+        });
+    }
+
+    private LinearLayout dialogSheet() {
+        LinearLayout sheet = new LinearLayout(this);
+        sheet.setOrientation(LinearLayout.VERTICAL);
+        sheet.setPadding(dp(20), dp(18), dp(20), dp(16));
+        sheet.setBackground(gradientRound(
+                SURFACE,
+                SURFACE_2,
+                BORDER,
+                CARD_RADIUS,
+                GradientDrawable.Orientation.TL_BR
+        ));
+        sheet.setElevation(dp(CARD_ELEVATION + 8));
+        return sheet;
+    }
+
+    private Dialog showBottomSheet(View sheet) {
+        final Dialog dialog = new Dialog(this);
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        dialog.setContentView(sheet);
+        dialog.setCanceledOnTouchOutside(true);
+
+        Window window = dialog.getWindow();
+        if (window != null) {
+            window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+            WindowManager.LayoutParams attrs = window.getAttributes();
+            attrs.width = WindowManager.LayoutParams.MATCH_PARENT;
+            attrs.height = WindowManager.LayoutParams.WRAP_CONTENT;
+            attrs.gravity = Gravity.BOTTOM;
+            attrs.dimAmount = 0.52f;
+            window.setAttributes(attrs);
+            window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+            window.setSoftInputMode(
+                    WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE |
+                            WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE
+            );
+        }
+
+        sheet.setAlpha(0f);
+        sheet.setTranslationY(dp(90));
+        sheet.setScaleX(0.985f);
+        sheet.setScaleY(0.985f);
+
+        dialog.setOnShowListener(d -> sheet.animate()
+                .alpha(1f)
+                .translationY(0)
+                .scaleX(1f)
+                .scaleY(1f)
+                .setDuration(340)
+                .setInterpolator(new OvershootInterpolator(0.75f))
+                .start());
+
+        dialog.setOnDismissListener(d -> sheet.animate()
+                .alpha(0f)
+                .translationY(dp(55))
+                .setDuration(170)
+                .start());
+
+        dialog.show();
+        return dialog;
+    }
+
+    private ImageView dialogIcon(int resId, int tint) {
+        ImageView icon = new ImageView(this);
+        icon.setImageResource(resId);
+        icon.setColorFilter(tint);
+        icon.setPadding(dp(10), dp(10), dp(10), dp(10));
+        icon.setBackground(round(ACCENT_BG, Color.TRANSPARENT, 999));
+        return icon;
+    }
+
+    private LinearLayout.LayoutParams dialogMarginParams(
+            int size, int left, int top, int bottom
+    ) {
+        LinearLayout.LayoutParams params =
+                new LinearLayout.LayoutParams(dp(size), dp(size));
+        params.setMargins(dp(left), dp(top), dp(left), dp(bottom));
+        return params;
+    }
+
+    private TextView dialogSectionLabel(String value) {
+        TextView label = sectionLabel(value);
+        label.setTextColor(MUTED);
+        return label;
+    }
+
+    private TextView dialogAction(String value, boolean primary) {
+        TextView button = actionButton(value, primary);
+        button.setTextSize(10);
+        return button;
+    }
+
+    private TextView dialogTextAction(String value) {
+        TextView button = text(value, 10, ACCENT);
+        button.setGravity(Gravity.CENTER);
+        button.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
+        button.setLetterSpacing(0.06f);
+        button.setBackground(ripple(
+                Color.TRANSPARENT,
+                blend(ACCENT_BG, BG, 0.22f),
+                Color.TRANSPARENT,
+                SMALL_RADIUS
+        ));
+        installPressAnimation(button);
+        return button;
+    }
+
+    private TextView dialogChoiceChip(String value, boolean selected) {
+        TextView chip = text(value, 9, selected ? ACCENT : TEXT);
+        chip.setGravity(Gravity.CENTER);
+        chip.setTypeface(Typeface.create(
+                "sans-serif-medium",
+                Typeface.BOLD
+        ));
+        chip.setSingleLine(true);
+        chip.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        chip.setPadding(dp(7), dp(4), dp(7), dp(4));
+        chip.setBackground(choiceBackground(selected));
+        chip.setClickable(true);
+        chip.setFocusable(true);
+        installPressAnimation(chip);
+        return chip;
+    }
+
+    private GradientDrawable choiceBackground(boolean selected) {
+        return round(
+                selected ? ACCENT_BG : SURFACE_2,
+                selected ? blend(ACCENT, BG, 0.48f) : Color.TRANSPARENT,
+                selected ? BUTTON_RADIUS : SMALL_RADIUS
+        );
+    }
+
+    private void showExpenseDatePicker(final LocalDate[] selectedDate, final TextView target) {
+        Dialog dialog = new Dialog(this);
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+
+        LinearLayout sheet = dialogSheet();
+
+        TextView title = text("Choose date", 22, TEXT);
+        title.setTypeface(Typeface.DEFAULT_BOLD);
+        sheet.addView(title);
+
+        DatePicker picker = new DatePicker(this);
+        picker.init(
+                selectedDate[0].getYear(),
+                selectedDate[0].getMonthValue() - 1,
+                selectedDate[0].getDayOfMonth(),
+                null
+        );
+        sheet.addView(picker, new LinearLayout.LayoutParams(-1, dp(300)));
+
+        LinearLayout actions = new LinearLayout(this);
+        actions.setGravity(Gravity.CENTER_VERTICAL);
+        TextView cancel = dialogTextAction("CANCEL");
+        TextView done = dialogAction("USE DATE", true);
+        actions.addView(cancel, new LinearLayout.LayoutParams(0, dp(48), 1f));
+        LinearLayout.LayoutParams doneParams = new LinearLayout.LayoutParams(0, dp(48), 1.2f);
+        doneParams.setMargins(dp(8), 0, 0, 0);
+        actions.addView(done, doneParams);
+        sheet.addView(actions, new LinearLayout.LayoutParams(-1, dp(48)));
+
+        Window window = dialog.getWindow();
+        if (window != null) {
+            window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+            WindowManager.LayoutParams attrs = window.getAttributes();
+            attrs.width = WindowManager.LayoutParams.MATCH_PARENT;
+            attrs.height = WindowManager.LayoutParams.WRAP_CONTENT;
+            attrs.gravity = Gravity.BOTTOM;
+            attrs.dimAmount = 0.52f;
+            window.setAttributes(attrs);
+            window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+        }
+
+        sheet.setAlpha(0f);
+        sheet.setTranslationY(dp(60));
+        dialog.setOnShowListener(d -> sheet.animate()
+                .alpha(1f).translationY(0)
+                .setDuration(280)
+                .setInterpolator(new DecelerateInterpolator())
+                .start());
+
+        cancel.setOnClickListener(v -> dialog.dismiss());
+        done.setOnClickListener(v -> {
+            selectedDate[0] = LocalDate.of(
+                    picker.getYear(),
+                    picker.getMonth() + 1,
+                    picker.getDayOfMonth()
+            );
+            target.setText(
+                    "DATE  •  " + (selectedDate[0].equals(LocalDate.now(zone))
+                            ? "TODAY" : formatLongDate(selectedDate[0]))
+            );
+            dialog.dismiss();
+        });
+
+        dialog.show();
+    }
+
+    private void shake(View view) {
+        if (view == null) return;
+        view.animate().cancel();
+        view.animate()
+                .translationX(dp(8))
+                .setDuration(55)
+                .withEndAction(() -> view.animate()
+                        .translationX(-dp(8))
+                        .setDuration(55)
+                        .withEndAction(() -> view.animate()
+                                .translationX(dp(4))
+                                .setDuration(45)
+                                .withEndAction(() -> view.animate()
+                                        .translationX(0)
+                                        .setDuration(55)
+                                        .start())
+                                .start())
+                        .start())
+                .start();
+    }
+
+    private void hideKeyboard() {
+        View current = getCurrentFocus();
+        if (current != null) {
+            InputMethodManager imm = (InputMethodManager)
+                    getSystemService(Context.INPUT_METHOD_SERVICE);
+            if (imm != null) imm.hideSoftInputFromWindow(current.getWindowToken(), 0);
+            current.clearFocus();
+        }
     }
 
     private String dateLabel(LocalDate date) {
