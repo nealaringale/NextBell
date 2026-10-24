@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { announcements, profile, timetable } from './data.js';
+import SuperNeHome from './SuperNeHome.jsx';
+import './super-ne.css';
 
 const days = Object.keys(timetable);
 const typeIcons = { Lecture: 'L', Practical: 'P', Tutorial: 'T' };
@@ -38,7 +40,7 @@ function getNowMinutes() {
 
 function App() {
   const today = getTodayName();
-  const [page, setPage] = useState('Today');
+  const [page, setPage] = useState('Home');
   const [selectedDay, setSelectedDay] = useState(days.includes(today) ? today : 'Monday');
   const [now, setNow] = useState(getNowMinutes());
   const [dark, setDark] = useState(true);
@@ -86,13 +88,14 @@ function App() {
         <div className="brand">
           <div className="brand-mark">⌁</div>
           <div>
-            <div className="brand-name">NextBell</div>
-            <div className="brand-sub">college, one glance away</div>
+            <div className="brand-name">Super Ne</div>
+            <div className="brand-sub">your day, connected</div>
           </div>
         </div>
 
         <nav className="nav-list">
           {[
+            ['Home', '⌂'],
             ['Today', '◷'],
             ['Week', '▦'],
             ['Announcements', '◉']
@@ -133,6 +136,8 @@ function App() {
             <span /> {profile.division} Division · {profile.batch}
           </div>
         </header>
+
+        {page === 'Home' && <SuperNeHome onOpenTimetable={() => setPage('Today')} />}
 
         {page === 'Today' && (
           <>
@@ -281,8 +286,8 @@ function App() {
         )}
 
         <footer>
-          <span>NextBell v0.1 · MVP</span>
-          <span>Built for your class 🤝</span>
+          <span>Super Ne · unified web MVP</span>
+          <span>College · Focus · Wellbeing</span>
         </footer>
       </main>
     </div>
