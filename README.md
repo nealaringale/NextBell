@@ -1,64 +1,36 @@
-# NextBell 🔔
+# Super Ne
 
-**NextBell is a native Android timetable app for college students.**
+Super Ne is the unified web experience for college planning, study productivity and personal wellbeing. This repository uses the existing NextBell React + Vite web app as its base and keeps the original NextBell timetable views available.
 
-The current MVP is built as an Android application and uses the student's division, batch, and roll number to show the most relevant class schedule.
+## Current web experience
 
-## Android MVP
+- **College:** the existing NextBell Today, Week and Announcements screens.
+- **Daily dashboard:** a unified overview with priorities, water tracking, and a focus timer.
+- **Tasks:** add, complete and delete daily tasks. Tasks are stored in browser local storage.
+- **Water tracker:** quick-add up to eight glasses per browser-local counter.
+- **Focus timer:** 25-minute focus timer with pause/resume.
+- **Theme:** existing dark/light theme toggle.
 
-- Native Android app
-- Today view with current/next class
-- Live minutes remaining
-- Weekly day switching
-- Batch-aware practical/tutorial labels
-- Class room and teacher details
-- Day statistics and free-period count
-- Dark UI designed for quick glances
-
-## Build the APK with GitHub Actions
-
-Every push to `main` triggers:
-
-```text
-GitHub Push
-    ↓
-GitHub Actions
-    ↓
-Android SDK + Java 17
-    ↓
-Gradle assembleDebug
-    ↓
-NextBell-debug-apk
-```
-
-Open the **Actions** tab, select **Build NextBell Android**, and download the `NextBell-debug-apk` artifact from a successful run.
-
-## Local Android build
-
-You need Android Studio/SDK and Gradle 8.9+.
+## Run locally
 
 ```bash
-cd android
-gradle assembleDebug
+npm install
+npm run dev
 ```
 
-The APK is generated at:
+Build for production:
 
-`android/app/build/outputs/apk/debug/app-debug.apk`
+```bash
+npm run build
+```
 
-## Timetable data
+## Source projects and migration notes
 
-The demo timetable is currently stored in:
+- [NextBell](https://github.com/nealaringale/NextBell) — source of the timetable web experience and Android implementation.
+- [Super-me-](https://github.com/nealaringale/Super-me-) — source Android app with study/project roadmaps, Pomodoro options, flashcards, notes, fasting, weight, water and food diary features.
 
-`android/app/src/main/java/com/nealaringale/nextbell/TimetableData.java`
+The original Super Me project is native Android Java/Gradle, not a web application. The web dashboard implements a first shared layer (tasks, focus timer, and water counter). Porting the remaining native modules—flashcards, notes, fasting history, food diary, data import/export and reminders—requires dedicated web implementations and regression tests. Both original repositories remain unchanged.
 
-Replace the sample classes with the real NMIET schedule as you collect it.
+## Data and privacy
 
-## Roadmap
-
-1. Replace demo timetable with the real NMIET timetable.
-2. Add a first-run profile setup screen.
-3. Store profile + attendance locally.
-4. Add notifications for upcoming classes.
-5. Add Supabase for shared class updates and admin edits.
-6. Produce a signed release APK/AAB for wider distribution.
+The web dashboard stores tasks and water count in browser local storage. It does not currently provide cross-device sync, authentication, cloud backup, or medical guidance.
