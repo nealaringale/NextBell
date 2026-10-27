@@ -17,4 +17,4 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "NextBell"
-include(":app")
+include(":app", ":admin")
