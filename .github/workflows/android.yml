@@ -1,8 +1,8 @@
-name: Build NextBell Android
+name: Build NextBell and Admin Android Apps
 
 on:
   push:
-    branches: ["main"]
+    branches: ["main", "feature/announcements"]
   pull_request:
     branches: ["main"]
   workflow_dispatch:
@@ -11,7 +11,7 @@ permissions:
   contents: read
 
 jobs:
-  build-apk:
+  build-apks:
     runs-on: ubuntu-latest
 
     steps:
@@ -34,13 +34,20 @@ jobs:
         with:
           gradle-version: "8.9"
 
-      - name: Build debug APK
+      - name: Build both debug APKs
         working-directory: android
         run: gradle --no-daemon assembleDebug
 
-      - name: Upload APK
+      - name: Upload NextBell student APK
         uses: actions/upload-artifact@v4
         with:
-          name: NextBell-debug-apk
+          name: NextBell-student-debug-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+
+      - name: Upload NextBell Admin APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: NextBell-admin-debug-apk
+          path: android/admin/build/outputs/apk/debug/admin-debug.apk
           if-no-files-found: error
