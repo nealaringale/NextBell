@@ -47,8 +47,9 @@ jobs:
           set -euo pipefail
           APK="android/app/build/outputs/apk/debug/app-debug.apk"
           test -s "$APK"
+          cp "$APK" NextBell.apk
           gh release delete student-latest --yes --cleanup-tag >/dev/null 2>&1 || true
-          gh release create student-latest "$APK#NextBell.apk" \
+          gh release create student-latest "NextBell.apk" \
             --title "NextBell Student — Latest Test Build" \
             --notes "NextBell Android student app, version 0.4.1. This is a debug/testing APK for the campus pilot, not a Play Store release. Install on Android only." \
             --prerelease \
