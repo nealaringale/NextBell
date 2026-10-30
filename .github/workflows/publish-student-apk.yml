@@ -1,0 +1,55 @@
+name: Publish NextBell Student APK
+
+on:
+  push:
+    branches: ["feature/announcements"]
+    paths:
+      - "android/app/**"
+      - "android/build.gradle"
+      - "android/settings.gradle"
+      - ".github/workflows/publish-student-apk.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          packages: 'platforms;android-35 build-tools;35.0.0'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+
+      - name: Build student APK
+        working-directory: android
+        run: gradle --no-daemon :app:assembleDebug
+
+      - name: Publish stable download release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          APK="android/app/build/outputs/apk/debug/app-debug.apk"
+          test -s "$APK"
+          gh release delete student-latest --yes --cleanup-tag >/dev/null 2>&1 || true
+          gh release create student-latest "$APK#NextBell.apk" \
+            --title "NextBell Student — Latest Test Build" \
+            --notes "NextBell Android student app, version 0.4.1. This is a debug/testing APK for the campus pilot, not a Play Store release. Install on Android only." \
+            --prerelease \
+            --target "$GITHUB_SHA"
