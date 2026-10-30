@@ -43,14 +43,32 @@ jobs:
       - name: Publish stable download release
         env:
           GH_TOKEN: ${{ github.token }}
+          GITHUB_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
           APK="android/app/build/outputs/apk/debug/app-debug.apk"
           test -s "$APK"
           cp "$APK" NextBell.apk
           gh release delete student-latest --yes --cleanup-tag >/dev/null 2>&1 || true
-          gh release create student-latest "NextBell.apk" \
-            --title "NextBell Student — Latest Test Build" \
-            --notes "NextBell Android student app, version 0.4.1. This is a debug/testing APK for the campus pilot, not a Play Store release. Install on Android only." \
-            --prerelease \
-            --target "$GITHUB_SHA"
+
+          RELEASE_JSON=$(curl --fail-with-body --silent --show-error \
+            -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            https://api.github.com/repos/nealaringale/NextBell/releases \
+            -d "$(jq -n --arg tag "student-latest" --arg target "$GITHUB_SHA" \
+              --arg name "NextBell Student — Latest Test Build" \
+              --arg body "NextBell Android student app, version 0.4.1. This is a debug/testing APK for the campus pilot, not a Play Store release. Install on Android only." \
+              '{tag_name:$tag,target_commitish:$target,name:$name,body:$body,draft:false,prerelease:true}')")
+          RELEASE_ID=$(printf '%s' "$RELEASE_JSON" | jq -r '.id')
+          test "$RELEASE_ID" != "null"
+
+          curl --fail-with-body --silent --show-error \
+            -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            -H "Content-Type: application/vnd.android.package-archive" \
+            --data-binary @NextBell.apk \
+            "https://uploads.github.com/repos/nealaringale/NextBell/releases/$RELEASE_ID/assets?name=NextBell.apk"
