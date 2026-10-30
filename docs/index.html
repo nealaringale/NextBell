@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#080e1c">
+  <meta name="description" content="Download NextBell for Android. Your college day, under control.">
+  <link rel="canonical" href="https://nealaringale.github.io/NextBell/">
+  <title>NextBell — Download for Android</title>
+  <style>
+    :root{color-scheme:dark;--bg:#080e1c;--panel:#101b30;--panel2:#14243e;--text:#f5f7ff;--muted:#a8b4cb;--mint:#55efd0;--purple:#b5a2ff;--orange:#ff806d;--line:#293956}
+    *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:radial-gradient(ellipse at 80% 8%,#18314a 0,transparent 35%),radial-gradient(ellipse at 10% 60%,#102a34 0,transparent 28%),var(--bg);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;line-height:1.5}
+    a{color:inherit;text-decoration:none}.wrap{width:min(1120px,calc(100% - 40px));margin:auto}
+    header{height:82px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(168,180,203,.12)}
+    .brand{display:flex;gap:12px;align-items:center;font-weight:850;letter-spacing:.03em;font-size:20px}.brand-mark{width:38px;height:38px;border-radius:12px;background:linear-gradient(145deg,#55efd0,#38bba9);display:grid;place-items:center;color:#08201f;box-shadow:0 8px 24px #55efd02b}
+    .brand-mark svg{width:23px;height:23px}.top-tag{font-size:11px;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);border:1px solid var(--line);border-radius:99px;padding:8px 12px}
+    .hero{padding:76px 0 60px;display:grid;grid-template-columns:1.08fr .92fr;gap:56px;align-items:center;min-height:610px}
+    .eyebrow{display:inline-flex;align-items:center;gap:9px;color:var(--mint);font-size:11px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;border:1px solid #2b695f;background:#102b2d;border-radius:99px;padding:8px 13px}
+    .dot{width:7px;height:7px;border-radius:50%;background:var(--mint);box-shadow:0 0 12px var(--mint)}
+    h1{font-size:clamp(46px,6vw,76px);letter-spacing:-.055em;line-height:1.01;margin:24px 0 18px;font-weight:850;max-width:690px}
+    h1 span{color:var(--mint)}.lead{font-size:18px;color:var(--muted);max-width:560px;margin:0 0 28px}
+    .actions{display:flex;gap:13px;align-items:center;flex-wrap:wrap}.btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;padding:15px 20px;border-radius:14px;font-weight:850;font-size:14px;transition:transform .18s,filter .18s}.btn:hover{transform:translateY(-2px);filter:brightness(1.08)}.btn-primary{background:var(--mint);color:#061d1b;box-shadow:0 12px 32px #55efd02a}.btn-secondary{border:1px solid var(--line);color:var(--text);background:#0c1628}
+    .meta{display:flex;gap:20px;flex-wrap:wrap;margin-top:22px;color:var(--muted);font-size:12px}.meta b{color:#e8efff}
+    .phone-stage{position:relative;display:grid;place-items:center;min-height:460px}.glow{position:absolute;width:360px;height:360px;border-radius:50%;background:#2bd4b421;filter:blur(42px)}.phone{position:relative;width:286px;min-height:430px;padding:15px;border:1px solid #536785;border-radius:34px;background:linear-gradient(160deg,#172740,#0d1728 70%);box-shadow:0 34px 90px #0008, inset 0 1px 0 #ffffff22;transform:rotate(2deg)}
+    .notch{width:76px;height:6px;border-radius:10px;background:#34435c;margin:1px auto 18px}.phone-kicker{font-size:10px;color:var(--muted);letter-spacing:.1em}.phone-greeting{font-size:19px;font-weight:800;margin:5px 0 14px}.next-card{padding:15px;border-radius:17px;background:linear-gradient(135deg,#16423f,#133337);border:1px solid #2e7770}.next-label{font-size:9px;color:#8ff8e1;letter-spacing:.16em;font-weight:800}.next-subject{font-size:17px;font-weight:800;margin:8px 0 2px}.next-time{font-size:11px;color:#b7d9d2}.phone-section{font-size:11px;font-weight:800;margin:19px 0 8px}.schedule-row{display:flex;gap:11px;padding:9px 2px;border-bottom:1px solid #283752;font-size:11px}.schedule-time{color:var(--mint);width:44px;font-weight:800}.schedule-name{font-weight:700}.schedule-room{display:block;font-size:9px;color:var(--muted);margin-top:2px}.phone-tabs{display:flex;justify-content:space-between;color:#9ba9c1;font-size:8px;margin-top:17px}
+    .float-chip{position:absolute;right:0;bottom:42px;background:#172641;border:1px solid #3b526c;border-radius:14px;padding:12px 15px;color:#eaf3ff;font-size:11px;box-shadow:0 12px 30px #0005}.float-chip strong{color:var(--mint);display:block;font-size:13px}
+    .section{padding:64px 0;border-top:1px solid rgba(168,180,203,.12)}.section-head{max-width:640px;margin-bottom:28px}.kicker{color:var(--mint);font-size:11px;font-weight:800;letter-spacing:.16em;text-transform:uppercase}.section h2{font-size:clamp(30px,4vw,44px);line-height:1.08;letter-spacing:-.04em;margin:10px 0}.section p{color:var(--muted)}
+    .features{display:grid;grid-template-columns:repeat(3,1fr);gap:15px}.feature{background:linear-gradient(145deg,#14223a,#0e192b);border:1px solid var(--line);border-radius:20px;padding:22px;min-height:174px}.feature-icon{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;background:#163b3b;color:var(--mint);font-size:18px;margin-bottom:15px}.feature:nth-child(2) .feature-icon{background:#292447;color:var(--purple)}.feature:nth-child(3) .feature-icon{background:#482c30;color:var(--orange)}.feature h3{margin:0 0 7px;font-size:17px}.feature p{font-size:13px;margin:0}
+    .install{display:grid;grid-template-columns:1fr .85fr;gap:34px;align-items:center}.steps{display:grid;gap:12px}.step{display:flex;gap:14px;align-items:flex-start;padding:15px 0;border-bottom:1px solid var(--line)}.step-no{flex:none;width:30px;height:30px;border-radius:10px;background:#183d3a;color:var(--mint);display:grid;place-items:center;font-size:12px;font-weight:900}.step h3{margin:0 0 3px;font-size:14px}.step p{margin:0;font-size:13px}.notice{border:1px solid #66513e;background:#241e1b;border-radius:18px;padding:20px;color:#f4d9b5}.notice strong{display:block;color:#ffc58e;margin-bottom:6px}.notice p{color:#d5bfa7;font-size:13px;margin:0}
+    .download-panel{display:flex;align-items:center;justify-content:space-between;gap:25px;padding:30px;border-radius:24px;border:1px solid #28665f;background:linear-gradient(120deg,#103b3a,#11283a 70%,#1b2944)}.download-panel h2{font-size:clamp(25px,3vw,37px);margin:0 0 7px}.download-panel p{margin:0;color:#b9d7d3;font-size:13px}
+    footer{padding:26px 0 38px;display:flex;align-items:center;justify-content:space-between;border-top:1px solid rgba(168,180,203,.12);color:var(--muted);font-size:11px}
+    @media(max-width:800px){.hero{grid-template-columns:1fr;gap:15px;padding-top:55px}.phone-stage{min-height:450px}.features{grid-template-columns:1fr}.install{grid-template-columns:1fr}.download-panel{align-items:flex-start;flex-direction:column}.top-tag{display:none}}
+    @media(max-width:430px){.wrap{width:min(100% - 28px,1120px)}.hero{padding-top:42px}.phone{width:270px}.float-chip{right:-4px}.actions .btn{width:100%}.meta{gap:10px 16px}}
+  </style>
+</head>
+<body>
+  <header class="wrap">
+    <a class="brand" href="#top" aria-label="NextBell home">
+      <span class="brand-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/></svg></span>
+      NEXTBELL
+    </a>
+    <span class="top-tag">Student-first · Android</span>
+  </header>
+
+  <main id="top">
+    <section class="hero wrap">
+      <div>
+        <span class="eyebrow"><i class="dot"></i> Android · Student test build</span>
+        <h1>Your college day,<br><span>under control.</span></h1>
+        <p class="lead">Your classes, your next step, and the money you spend along the way — brought into one calmer daily flow.</p>
+        <div class="actions">
+          <a class="btn btn-primary" href="https://github.com/nealaringale/NextBell/releases/download/student-latest/NextBell.apk" download>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5M12 15V3"/></svg>
+            Download for Android
+          </a>
+          <a class="btn btn-secondary" href="#install">How to install</a>
+        </div>
+        <div class="meta"><span><b>Version</b> 0.4.1</span><span><b>Platform</b> Android 8.0+</span><span><b>File</b> APK</span></div>
+      </div>
+      <div class="phone-stage" aria-label="Illustrative app preview">
+        <div class="glow"></div>
+        <div class="phone">
+          <div class="notch"></div>
+          <div class="phone-kicker">MONDAY · YOUR DAY</div>
+          <div class="phone-greeting">Good morning.</div>
+          <div class="next-card"><div class="next-label">UP NEXT</div><div class="next-subject">Engineering Physics</div><div class="next-time">10:00 AM · Room 204</div></div>
+          <div class="phone-section">TODAY'S SCHEDULE</div>
+          <div class="schedule-row"><span class="schedule-time">09:00</span><span><span class="schedule-name">Linear Algebra</span><span class="schedule-room">Room 203</span></span></div>
+          <div class="schedule-row"><span class="schedule-time">10:00</span><span><span class="schedule-name">Physics</span><span class="schedule-room">Room 204</span></span></div>
+          <div class="schedule-row"><span class="schedule-time">11:00</span><span><span class="schedule-name">Electrical Eng.</span><span class="schedule-room">Room 105</span></span></div>
+          <div class="schedule-row"><span class="schedule-time">12:00</span><span><span class="schedule-name">Lunch break</span></span></div>
+          <div class="phone-tabs"><span>⌂ HOME</span><span>▦ WEEK</span><span>₹ MONEY</span><span>⚙ MORE</span></div>
+        </div>
+        <div class="float-chip"><strong>One daily view.</strong>Less hunting. More clarity.</div>
+      </div>
+      <p style="grid-column:1/-1;text-align:center;font-size:10px;color:#7888a3;margin:-7px 0 0">Illustrative product preview — not an in-app screenshot.</p>
+    </section>
+
+    <section class="section">
+      <div class="wrap">
+        <div class="section-head"><div class="kicker">Made for the everyday</div><h2>Small things. One less place to search.</h2><p>NextBell brings the practical parts of a student day closer together, without trying to become an everything-app.</p></div>
+        <div class="features">
+          <article class="feature"><div class="feature-icon">◷</div><h3>Know what comes next</h3><p>Check today's timetable, move through the week, and keep class and batch context close.</p></article>
+          <article class="feature"><div class="feature-icon">₹</div><h3>Make spending visible</h3><p>Record expenses manually, review categories, and see daily and monthly limits.</p></article>
+          <article class="feature"><div class="feature-icon">↗</div><h3>Build useful habits</h3><p>Review trends, recurring expenses, split calculations, and optional reminders.</p></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="install">
+      <div class="wrap install">
+        <div>
+          <div class="kicker">Get started</div><h2>Install in a few steps.</h2>
+          <div class="steps">
+            <div class="step"><span class="step-no">1</span><div><h3>Download the APK</h3><p>Tap Download for Android and wait for the file to finish downloading.</p></div></div>
+            <div class="step"><span class="step-no">2</span><div><h3>Allow this install source</h3><p>Open the downloaded file. Android may ask you to allow your browser or file manager to install apps.</p></div></div>
+            <div class="step"><span class="step-no">3</span><div><h3>Install and open NextBell</h3><p>Tap Install, then open NextBell from your app screen.</p></div></div>
+          </div>
+        </div>
+        <aside class="notice"><strong>Important: this is a test build</strong><p>NextBell is shared here as a directly installed Android debug/testing APK, not through the Play Store. Android may show a security warning for apps installed from outside the Play Store. Only install it if you are comfortable testing this build.</p></aside>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="wrap">
+        <div class="download-panel">
+          <div><h2>Ready to try NextBell?</h2><p>Download the Android test build and share honest feedback with the team.</p></div>
+          <a class="btn btn-primary" href="https://github.com/nealaringale/NextBell/releases/download/student-latest/NextBell.apk" download>Download APK · v0.4.1</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="wrap"><span>© NextBell · Neal and team</span><span>Your college day, under control.</span></footer>
+</body>
+</html>
