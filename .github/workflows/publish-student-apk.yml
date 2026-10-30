@@ -1,4 +1,4 @@
-name: Publish NextBell Student APK
+name: Publish NextBell Student APK and Download Site
 
 on:
   push:
@@ -7,14 +7,24 @@ on:
       - "android/app/**"
       - "android/build.gradle"
       - "android/settings.gradle"
+      - "docs/**"
       - ".github/workflows/publish-student-apk.yml"
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: nextbell-download-site
+  cancel-in-progress: false
 
 jobs:
-  build-and-publish:
+  build-and-deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -40,20 +50,22 @@ jobs:
         working-directory: android
         run: gradle --no-daemon :app:assembleDebug
 
-      - name: Publish APK into GitHub Pages files
+      - name: Add APK to download site
         run: |
           set -euo pipefail
           APK="android/app/build/outputs/apk/debug/app-debug.apk"
-          DEST="docs/downloads/NextBell.apk"
           test -s "$APK"
           mkdir -p docs/downloads
-          cp "$APK" "$DEST"
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add "$DEST"
-          if git diff --cached --quiet; then
-            echo "APK did not change; nothing to commit."
-          else
-            git commit -m "Publish latest NextBell student APK"
-            git push origin "HEAD:${GITHUB_REF_NAME}"
-          fi
+          cp "$APK" docs/downloads/NextBell.apk
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload website and APK
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./docs
+
+      - name: Deploy website
+        id: deployment
+        uses: actions/deploy-pages@v4
