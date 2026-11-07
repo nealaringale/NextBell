@@ -36,7 +36,7 @@ The student APK can use a persistent keystore when these four repository Actions
 With Node.js installed, run:
 
 ```sh
-npm ci
+npm install
 npm run build
 ```
 
