@@ -10,6 +10,9 @@ import android.provider.Telephony;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 /** Locally parses only transaction-like SMS and saves derived ledger fields, never message text. */
 public final class SmsTransactionService {
@@ -51,18 +54,26 @@ public final class SmsTransactionService {
         if (parsed == null || parsed.fingerprint.isEmpty()
                 || ExpenseStore.hasFingerprint(preferences, parsed.fingerprint)) return false;
 
+        ExpenseStore.upsert(preferences, toExpense(preferences, parsed,
+                ExpenseStore.nextId(preferences)));
+        return true;
+    }
+
+    private static ExpenseStore.Expense toExpense(
+            SharedPreferences preferences,
+            SmsTransactionParser.ParsedTransaction parsed,
+            long id
+    ) {
         String category = parsed.category;
         if (SmsTransactionParser.DEBIT.equals(parsed.direction)) {
             String learned = ExpenseStore.learnedMerchantCategory(preferences, parsed.merchant);
             if (!learned.isEmpty()) category = learned;
         }
-        ExpenseStore.upsert(preferences, new ExpenseStore.Expense(
-                ExpenseStore.nextId(preferences), parsed.amountPaise, parsed.date,
-                category, "", parsed.paymentMode, parsed.merchant, "SMS",
-                parsed.confidence, parsed.fingerprint, parsed.direction,
-                parsed.availableBalancePaise
-        ));
-        return true;
+        return new ExpenseStore.Expense(
+                id, parsed.amountPaise, parsed.date, category, "", parsed.paymentMode,
+                parsed.merchant, "SMS", parsed.confidence, parsed.fingerprint,
+                parsed.direction, parsed.availableBalancePaise
+        );
     }
 
     /** Explicit user action: scan at most the last 30 days of inbox messages on this device. */
@@ -71,6 +82,12 @@ public final class SmsTransactionService {
         long since = System.currentTimeMillis() - HISTORY_DAYS * 24L * 60L * 60L * 1000L;
         int imported = 0;
         int inspected = 0;
+        List<ExpenseStore.Expense> expenses = ExpenseStore.load(preferences);
+        Set<String> fingerprints = new HashSet<>();
+        for (ExpenseStore.Expense expense : expenses) {
+            if (!expense.fingerprint.isEmpty()) fingerprints.add(expense.fingerprint);
+        }
+        long nextId = ExpenseStore.nextId(preferences);
         try (Cursor cursor = context.getContentResolver().query(
                 Telephony.Sms.Inbox.CONTENT_URI,
                 new String[]{Telephony.Sms.ADDRESS, Telephony.Sms.BODY, Telephony.Sms.DATE},
@@ -88,11 +105,16 @@ public final class SmsTransactionService {
                 String body = cursor.getString(bodyIndex);
                 long timestamp = cursor.getLong(dateIndex);
                 LocalDate receivedDate = Instant.ofEpochMilli(timestamp).atZone(INDIA).toLocalDate();
-                if (processMessage(preferences, sender, body, receivedDate)) imported++;
+                SmsTransactionParser.ParsedTransaction parsed =
+                        SmsTransactionParser.parse(sender, body, receivedDate);
+                if (parsed == null || parsed.fingerprint.isEmpty()
+                        || !fingerprints.add(parsed.fingerprint)) continue;
+                expenses.add(toExpense(preferences, parsed, nextId++));
+                imported++;
             }
         } catch (SecurityException | IllegalArgumentException ignored) {
-            return imported;
         }
+        if (imported > 0) ExpenseStore.save(preferences, expenses);
         return imported;
     }
 }
