@@ -137,7 +137,7 @@ public class LiveStatusReceiver extends BroadcastReceiver {
                     .setCategory(android.app.Notification.CATEGORY_STATUS);
         }
 
-        builder.setSmallIcon(android.R.drawable.ic_popup_reminder)
+        builder.setSmallIcon(R.drawable.ic_nextbell_notification)
                 .setContentIntent(contentIntent)
                 .setOngoing(true)
                 .setAutoCancel(false)

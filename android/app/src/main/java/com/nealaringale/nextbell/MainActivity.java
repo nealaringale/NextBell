@@ -5,8 +5,11 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.DatePickerDialog;
 import android.app.Dialog;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.ActivityNotFoundException;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.graphics.Canvas;
@@ -21,6 +24,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.provider.Settings;
 import android.text.InputType;
 import android.view.Gravity;
 import android.view.View;
@@ -29,6 +33,8 @@ import android.view.animation.OvershootInterpolator;
 import android.view.Window;
 import android.view.WindowManager;
 import android.view.inputmethod.InputMethodManager;
+import android.view.WindowInsets;
+import android.graphics.Insets;
 import android.content.Context;
 import android.widget.DatePicker;
 import android.widget.EditText;
@@ -49,6 +55,7 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 import java.text.NumberFormat;
 import java.util.Locale;
 
@@ -57,8 +64,11 @@ public class MainActivity extends Activity {
     private static final String KEY_NAME = "name";
     private static final String KEY_ROLL_NUMBER = "roll_number";
     private static final String KEY_NOTIFICATION_PROMPTED = "notification_prompted";
+    private static final String KEY_NOTIFICATION_PERMISSION_REQUESTED = "notification_permission_requested";
     private static final String KEY_THEME = "theme";
     private static final String KEY_REDUCED_MOTION = "reduced_motion";
+    private static final int REQUEST_EXPORT_BACKUP = 8101;
+    private static final int REQUEST_IMPORT_BACKUP = 8102;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final DateTimeFormatter timeFormatter =
@@ -121,6 +131,7 @@ public class MainActivity extends Activity {
     private boolean reducedMotion;
     private String selectedScreen = "home";
     private Runnable refreshRunnable;
+    private boolean openedNotificationSettings;
     private android.animation.ObjectAnimator heroPulseAnimator;
     private String lastHeroState = "";
 
@@ -189,6 +200,10 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        if (preferences != null && openedNotificationSettings && isNotificationGranted()) {
+            openedNotificationSettings = false;
+            NotificationScheduler.scheduleUpcoming(this);
+        }
         if (preferences != null && "settings".equals(selectedScreen)) {
             buildSettingsScreen();
             updateBottomNav();
@@ -298,11 +313,20 @@ public class MainActivity extends Activity {
         Window window = getWindow();
         window.setStatusBarColor(BG);
         window.setNavigationBarColor(BG);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            window.setDecorFitsSystemWindows(false);
+        }
+        window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            int systemUi = themeIndex == 5
-                    ? View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
-                    | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
+            int systemUi = Build.VERSION.SDK_INT < Build.VERSION_CODES.R
+                    ? View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                    | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                    | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
                     : 0;
+            if (themeIndex == 5) {
+                systemUi |= View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
+                        | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
+            }
             window.getDecorView().setSystemUiVisibility(systemUi);
         }
     }
@@ -332,6 +356,7 @@ public class MainActivity extends Activity {
     private void buildShell() {
         root = new FrameLayout(this);
         root.setBackgroundColor(BG);
+        applySystemBarInsets(root);
 
         contentHost = new FrameLayout(this);
         FrameLayout.LayoutParams contentParams = new FrameLayout.LayoutParams(-1, -1);
@@ -344,6 +369,42 @@ public class MainActivity extends Activity {
         root.addView(bottomNav, navParams);
 
         setContentView(root);
+        root.requestApplyInsets();
+    }
+
+    private void applySystemBarInsets(View view) {
+        int baseLeft = view.getPaddingLeft();
+        int baseTop = view.getPaddingTop();
+        int baseRight = view.getPaddingRight();
+        int baseBottom = view.getPaddingBottom();
+        view.setOnApplyWindowInsetsListener((target, insets) -> {
+            int left;
+            int top;
+            int right;
+            int bottom;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                Insets bars = insets.getInsets(
+                        WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout()
+                );
+                Insets ime = insets.getInsets(WindowInsets.Type.ime());
+                left = bars.left;
+                top = bars.top;
+                right = bars.right;
+                bottom = Math.max(bars.bottom, ime.bottom);
+            } else {
+                left = insets.getSystemWindowInsetLeft();
+                top = insets.getSystemWindowInsetTop();
+                right = insets.getSystemWindowInsetRight();
+                bottom = insets.getSystemWindowInsetBottom();
+            }
+            target.setPadding(
+                    baseLeft + left,
+                    baseTop + top,
+                    baseRight + right,
+                    baseBottom + bottom
+            );
+            return insets;
+        });
     }
 
     private LinearLayout buildBottomNav() {
@@ -417,6 +478,8 @@ public class MainActivity extends Activity {
             }
             boolean selected = id.equals(selectedScreen);
             LinearLayout item = (LinearLayout) child;
+            item.setSelected(selected);
+            item.setContentDescription(labelForScreen(id) + (selected ? ", selected" : ""));
             ImageView icon = (ImageView) item.getChildAt(0);
             TextView caption = (TextView) item.getChildAt(1);
 
@@ -428,12 +491,26 @@ public class MainActivity extends Activity {
                     selected ? ACCENT : Color.TRANSPARENT,
                     Math.max(10, SMALL_RADIUS)
             ));
-            item.animate()
-                    .scaleX(selected ? 1.03f : 1f)
-                    .scaleY(selected ? 1.03f : 1f)
-                    .setDuration(170)
-                    .setInterpolator(new DecelerateInterpolator())
-                    .start();
+            if (reducedMotion) {
+                item.setScaleX(1f);
+                item.setScaleY(1f);
+            } else {
+                item.animate()
+                        .scaleX(selected ? 1.03f : 1f)
+                        .scaleY(selected ? 1.03f : 1f)
+                        .setDuration(170)
+                        .setInterpolator(new DecelerateInterpolator())
+                        .start();
+            }
+        }
+    }
+
+    private String labelForScreen(String id) {
+        switch (id) {
+            case "week": return "Week";
+            case "expenses": return "Money";
+            case "settings": return "Settings";
+            default: return "Home";
         }
     }
 
@@ -469,6 +546,11 @@ public class MainActivity extends Activity {
     }
 
     private void showSetupScreen() {
+        ScrollView scroll = new ScrollView(this);
+        scroll.setFillViewport(true);
+        scroll.setVerticalScrollBarEnabled(false);
+        scroll.setBackgroundColor(BG);
+
         LinearLayout page = new LinearLayout(this);
         page.setOrientation(LinearLayout.VERTICAL);
         page.setGravity(Gravity.CENTER);
@@ -570,16 +652,22 @@ public class MainActivity extends Activity {
         privacy.setPadding(0, dp(14), 0, 0);
         page.addView(privacy);
 
-        setContentView(page);
-        animatePageIn(page);
-        logo.animate().rotationBy(360f)
-                .setDuration(700)
-                .setStartDelay(120)
-                .setInterpolator(new DecelerateInterpolator())
-                .start();
+        scroll.addView(page, new ScrollView.LayoutParams(-1, -2));
+        applySystemBarInsets(scroll);
+        setContentView(scroll);
+        scroll.requestApplyInsets();
+        animatePageIn(scroll);
+        if (!reducedMotion) {
+            logo.animate().rotationBy(360f)
+                    .setDuration(700)
+                    .setStartDelay(120)
+                    .setInterpolator(new DecelerateInterpolator())
+                    .start();
+        }
     }
 
     private void buildHomeScreen() {
+        lastHeroState = "";
         LinearLayout page = scrollPage();
 
         LinearLayout top = new LinearLayout(this);
@@ -2523,26 +2611,34 @@ public class MainActivity extends Activity {
             );
         }
 
-        sheet.setAlpha(0f);
-        sheet.setTranslationY(dp(90));
-        sheet.setScaleX(0.985f);
-        sheet.setScaleY(0.985f);
-
-        dialog.setOnDismissListener(d -> sheet.animate()
-                .alpha(0f)
-                .translationY(dp(55))
-                .setDuration(170)
-                .start());
+        if (reducedMotion) {
+            sheet.setAlpha(1f);
+            sheet.setTranslationY(0f);
+            sheet.setScaleX(1f);
+            sheet.setScaleY(1f);
+        } else {
+            sheet.setAlpha(0f);
+            sheet.setTranslationY(dp(90));
+            sheet.setScaleX(0.985f);
+            sheet.setScaleY(0.985f);
+            dialog.setOnDismissListener(d -> sheet.animate()
+                    .alpha(0f)
+                    .translationY(dp(55))
+                    .setDuration(170)
+                    .start());
+        }
 
         dialog.show();
-        sheet.animate()
-                .alpha(1f)
-                .translationY(0)
-                .scaleX(1f)
-                .scaleY(1f)
-                .setDuration(340)
-                .setInterpolator(new OvershootInterpolator(0.75f))
-                .start();
+        if (!reducedMotion) {
+            sheet.animate()
+                    .alpha(1f)
+                    .translationY(0)
+                    .scaleX(1f)
+                    .scaleY(1f)
+                    .setDuration(340)
+                    .setInterpolator(new OvershootInterpolator(0.75f))
+                    .start();
+        }
         return dialog;
     }
 
@@ -2657,13 +2753,18 @@ public class MainActivity extends Activity {
             window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
         }
 
-        sheet.setAlpha(0f);
-        sheet.setTranslationY(dp(60));
-        dialog.setOnShowListener(d -> sheet.animate()
-                .alpha(1f).translationY(0)
-                .setDuration(280)
-                .setInterpolator(new DecelerateInterpolator())
-                .start());
+        if (reducedMotion) {
+            sheet.setAlpha(1f);
+            sheet.setTranslationY(0f);
+        } else {
+            sheet.setAlpha(0f);
+            sheet.setTranslationY(dp(60));
+            dialog.setOnShowListener(d -> sheet.animate()
+                    .alpha(1f).translationY(0)
+                    .setDuration(280)
+                    .setInterpolator(new DecelerateInterpolator())
+                    .start());
+        }
 
         cancel.setOnClickListener(v -> dialog.dismiss());
         done.setOnClickListener(v -> {
@@ -2683,7 +2784,7 @@ public class MainActivity extends Activity {
     }
 
     private void shake(View view) {
-        if (view == null) return;
+        if (view == null || reducedMotion) return;
         view.animate().cancel();
         view.animate()
                 .translationX(dp(8))
@@ -2853,6 +2954,14 @@ public class MainActivity extends Activity {
         motionSwitch.setOnCheckedChangeListener((button, checked) -> {
             reducedMotion = checked;
             preferences.edit().putBoolean(KEY_REDUCED_MOTION, checked).apply();
+            if (checked) {
+                stopHeroPulse();
+                if (homeHero != null) {
+                    homeHero.animate().cancel();
+                    homeHero.setAlpha(1f);
+                    homeHero.setTranslationY(0f);
+                }
+            }
             motionSwitch.setThumbTintList(android.content.res.ColorStateList.valueOf(
                     checked ? ACCENT : MUTED
             ));
@@ -2886,7 +2995,7 @@ public class MainActivity extends Activity {
 
         notificationCard.addView(notifText, new LinearLayout.LayoutParams(0, -2, 1f));
 
-        if (!isNotificationGranted() && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        if (!isNotificationGranted()) {
             TextView enable = actionButton("Enable", false);
             notificationCard.addView(enable, new LinearLayout.LayoutParams(dp(84), CONTROL_HEIGHT_DP()));
             enable.setOnClickListener(v -> {
@@ -2934,6 +3043,41 @@ public class MainActivity extends Activity {
         autoCard.addView(safeBadge, new LinearLayout.LayoutParams(-2, dp(32)));
 
         page.addView(autoCard, sectionParams(0, 22));
+
+        page.addView(sectionLabel("BACKUP & RESTORE"), sectionParams(0, 7));
+
+        LinearLayout backupCard = cardColumn();
+        TextView backupTitle = text("Your NextBell data", 15, TEXT);
+        backupTitle.setTypeface(Typeface.DEFAULT_BOLD);
+        backupCard.addView(backupTitle);
+
+        TextView backupDescription = text(
+                "Save your profile, themes and spending to a file you choose. Anyone with that file can read it.",
+                10,
+                MUTED
+        );
+        backupDescription.setPadding(0, dp(5), 0, dp(13));
+        backupCard.addView(backupDescription);
+
+        LinearLayout backupActions = new LinearLayout(this);
+        backupActions.setGravity(Gravity.CENTER_VERTICAL);
+        TextView exportBackup = actionButton("Export backup", true);
+        TextView importBackup = actionButton("Restore backup", false);
+        backupActions.addView(exportBackup, new LinearLayout.LayoutParams(0, dp(46), 1f));
+        LinearLayout.LayoutParams importParams = new LinearLayout.LayoutParams(0, dp(46), 1f);
+        importParams.setMargins(dp(9), 0, 0, 0);
+        backupActions.addView(importBackup, importParams);
+        backupCard.addView(backupActions);
+
+        exportBackup.setOnClickListener(v -> {
+            tap(v);
+            startBackupExport();
+        });
+        importBackup.setOnClickListener(v -> {
+            tap(v);
+            startBackupImport();
+        });
+        page.addView(backupCard, sectionParams(0, 22));
 
         page.addView(sectionLabel("ABOUT & FEEDBACK"), sectionParams(0, 7));
 
@@ -3354,13 +3498,6 @@ public class MainActivity extends Activity {
             boolean lunch = currentBreak.kind == TimetableData.Kind.LUNCH;
             int breakAccent = lunch ? ACCENT_2 : ACCENT;
 
-            homeHero.setBackground(glassGradient(
-                    SURFACE,
-                    blend(SURFACE_2, breakAccent, 0.22f),
-                    breakAccent,
-                    CARD_RADIUS,
-                    themeGradientOrientation()
-            ));
             heroLabel.setText(lunch ? "LUNCH BREAK" : "SHORT BREAK");
             heroLabel.setTextColor(breakAccent);
             heroSubject.setText(lunch ? "Take your lunch." : "Recharge for the next class.");
@@ -3376,15 +3513,12 @@ public class MainActivity extends Activity {
                     formatCountdown(Math.max(0, toSeconds(currentBreak.end) - now))
             );
             heroCountdownLabel.setText("until break ends");
-            animateHero("break:" + currentBreak.id);
+            animateHero(
+                    "break:" + currentBreak.id,
+                    blend(SURFACE_2, breakAccent, 0.22f),
+                    breakAccent
+            );
         } else if (currentClass != null) {
-            homeHero.setBackground(glassGradient(
-                    SURFACE,
-                    ACCENT_BG,
-                    ACCENT,
-                    CARD_RADIUS,
-                    themeGradientOrientation()
-            ));
             heroLabel.setText("HAPPENING NOW");
             heroLabel.setTextColor(ACCENT);
             heroSubject.setText(currentClass.subject);
@@ -3397,15 +3531,8 @@ public class MainActivity extends Activity {
                     formatCountdown(Math.max(0, toSeconds(currentClass.end) - now))
             );
             heroCountdownLabel.setText("until it ends");
-            animateHero("current:" + currentClass.id);
+            animateHero("current:" + currentClass.id, ACCENT_BG, ACCENT);
         } else if (next != null) {
-            homeHero.setBackground(glassGradient(
-                    SURFACE,
-                    SURFACE_2,
-                    BORDER,
-                    CARD_RADIUS,
-                    themeGradientOrientation()
-            ));
             heroLabel.setText("NEXT CLASS");
             heroLabel.setTextColor(ACCENT);
             heroSubject.setText(next.subject);
@@ -3423,15 +3550,8 @@ public class MainActivity extends Activity {
                 );
                 heroCountdownLabel.setText("until it starts");
             }
-            animateHero("next:" + next.id);
+            animateHero("next:" + next.id, SURFACE_2, BORDER);
         } else {
-            homeHero.setBackground(glassGradient(
-                    SURFACE,
-                    SURFACE_2,
-                    BORDER,
-                    CARD_RADIUS,
-                    themeGradientOrientation()
-            ));
             heroLabel.setText("DAY COMPLETE");
             heroLabel.setTextColor(ACCENT);
             heroTimeRange.setText("—");
@@ -3440,7 +3560,7 @@ public class MainActivity extends Activity {
             clearHeroLocation();
             heroCountdown.setText("✓");
             heroCountdownLabel.setText("nothing else scheduled");
-            animateHero("done");
+            animateHero("done", SURFACE_2, BORDER);
         }
 
         homeDayLabel.setText(
@@ -3854,6 +3974,11 @@ public class MainActivity extends Activity {
 
     private void animatePageIn(View view) {
         if (view == null) return;
+        if (reducedMotion) {
+            view.setAlpha(1f);
+            view.setTranslationY(0f);
+            return;
+        }
         view.setAlpha(0f);
         view.setTranslationY(dp(12));
         view.animate()
@@ -3865,7 +3990,7 @@ public class MainActivity extends Activity {
     }
 
     private void tap(View view) {
-        if (view == null) return;
+        if (view == null || reducedMotion) return;
         view.animate()
                 .scaleX(0.97f)
                 .scaleY(0.97f)
@@ -3879,18 +4004,34 @@ public class MainActivity extends Activity {
                 .start();
     }
 
-    private void animateHero(String state) {
+    private void animateHero(String state, int endColor, int borderColor) {
         if (state.equals(lastHeroState)) return;
         lastHeroState = state;
 
+        if (homeHero != null) {
+            homeHero.setBackground(glassGradient(
+                    SURFACE,
+                    endColor,
+                    borderColor,
+                    CARD_RADIUS,
+                    themeGradientOrientation()
+            ));
+        }
+
         boolean current = state.startsWith("current:");
-        if (current) {
+        if (current && !reducedMotion) {
             startHeroPulse();
         } else {
             stopHeroPulse();
         }
 
         if (homeHero != null) {
+            if (reducedMotion) {
+                homeHero.animate().cancel();
+                homeHero.setAlpha(1f);
+                homeHero.setTranslationY(0f);
+                return;
+            }
             homeHero.setAlpha(0.94f);
             homeHero.setTranslationY(dp(4));
             homeHero.animate()
@@ -3903,7 +4044,7 @@ public class MainActivity extends Activity {
     }
 
     private void startHeroPulse() {
-        if (heroPulseDot == null || heroPulseAnimator != null) return;
+        if (reducedMotion || heroPulseDot == null || heroPulseAnimator != null) return;
         heroPulseAnimator = android.animation.ObjectAnimator.ofFloat(
                 heroPulseDot,
                 "alpha",
@@ -3987,8 +4128,8 @@ public class MainActivity extends Activity {
         Intent intent = new Intent(Intent.ACTION_VIEW, uri);
         try {
             startActivity(intent);
-        } catch (Exception ignored) {
-            // The web URL remains the fallback when WhatsApp is unavailable.
+        } catch (ActivityNotFoundException ignored) {
+            Toast.makeText(this, "No browser or WhatsApp app is available.", Toast.LENGTH_LONG).show();
         }
     }
 
@@ -3997,8 +4138,8 @@ public class MainActivity extends Activity {
         intent.setData(Uri.parse("tel:7499517574"));
         try {
             startActivity(intent);
-        } catch (Exception ignored) {
-            // No dialer available; keep the screen unchanged.
+        } catch (ActivityNotFoundException ignored) {
+            Toast.makeText(this, "No dialer app is available.", Toast.LENGTH_LONG).show();
         }
     }
 
@@ -4011,8 +4152,8 @@ public class MainActivity extends Activity {
         Intent intent = new Intent(Intent.ACTION_SENDTO, uri);
         try {
             startActivity(intent);
-        } catch (Exception ignored) {
-            // No email client installed; keep the screen unchanged.
+        } catch (ActivityNotFoundException ignored) {
+            Toast.makeText(this, "No email app is available.", Toast.LENGTH_LONG).show();
         }
     }
 
@@ -4176,6 +4317,15 @@ public class MainActivity extends Activity {
     }
 
     private boolean isNotificationGranted() {
+        NotificationManager manager = (NotificationManager)
+                getSystemService(Context.NOTIFICATION_SERVICE);
+        if (manager == null || !manager.areNotificationsEnabled()) return false;
+        NotificationChannel channel = manager.getNotificationChannel(
+                NotificationScheduler.CHANNEL_ID
+        );
+        if (channel != null && channel.getImportance() == NotificationManager.IMPORTANCE_NONE) {
+            return false;
+        }
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return true;
         return checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
                 == PackageManager.PERMISSION_GRANTED;
@@ -4183,14 +4333,46 @@ public class MainActivity extends Activity {
 
     private void requestNotificationAccess() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
-            NotificationScheduler.scheduleUpcoming(this);
+            openNotificationSettings();
             return;
         }
+
+        boolean requestedBefore = preferences.getBoolean(
+                KEY_NOTIFICATION_PERMISSION_REQUESTED, false
+        );
+        if (requestedBefore && !shouldShowRequestPermissionRationale(
+                Manifest.permission.POST_NOTIFICATIONS
+        )) {
+            openNotificationSettings();
+            return;
+        }
+
+        preferences.edit()
+                .putBoolean(KEY_NOTIFICATION_PERMISSION_REQUESTED, true)
+                .apply();
 
         requestPermissions(
                 new String[]{Manifest.permission.POST_NOTIFICATIONS},
                 7001
         );
+    }
+
+    private void openNotificationSettings() {
+        openedNotificationSettings = true;
+        Intent settingsIntent = new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                .putExtra(Settings.EXTRA_APP_PACKAGE, getPackageName());
+        try {
+            startActivity(settingsIntent);
+        } catch (ActivityNotFoundException exception) {
+            Intent appSettings = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                    Uri.parse("package:" + getPackageName()));
+            try {
+                startActivity(appSettings);
+            } catch (ActivityNotFoundException ignored) {
+                Toast.makeText(this, "Open NextBell in system settings to enable reminders.",
+                        Toast.LENGTH_LONG).show();
+            }
+        }
     }
 
     private void requestNotificationPermissionIfNeeded() {
@@ -4239,6 +4421,93 @@ public class MainActivity extends Activity {
             return;
         }
 
+    }
+
+    private void startBackupExport() {
+        Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType(LocalDataBackup.MIME_TYPE);
+        intent.putExtra(
+                Intent.EXTRA_TITLE,
+                "NextBell-backup-" + LocalDate.now(zone) + ".json"
+        );
+        try {
+            startActivityForResult(intent, REQUEST_EXPORT_BACKUP);
+        } catch (ActivityNotFoundException exception) {
+            Toast.makeText(this, "No file app is available to save a backup.", Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void startBackupImport() {
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType(LocalDataBackup.MIME_TYPE);
+        try {
+            startActivityForResult(intent, REQUEST_IMPORT_BACKUP);
+        } catch (ActivityNotFoundException exception) {
+            Toast.makeText(this, "No file app is available to open a backup.", Toast.LENGTH_LONG).show();
+        }
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (resultCode != RESULT_OK || data == null || data.getData() == null) return;
+
+        Uri uri = data.getData();
+        if (requestCode == REQUEST_EXPORT_BACKUP) {
+            try (java.io.OutputStream output = getContentResolver().openOutputStream(uri)) {
+                if (output == null) throw new java.io.IOException("Could not open the backup file.");
+                LocalDataBackup.write(preferences, output);
+                Toast.makeText(this, "Backup saved.", Toast.LENGTH_LONG).show();
+            } catch (Exception exception) {
+                Toast.makeText(this, "Could not save that backup file.", Toast.LENGTH_LONG).show();
+            }
+            return;
+        }
+
+        if (requestCode == REQUEST_IMPORT_BACKUP) {
+            try (java.io.InputStream input = getContentResolver().openInputStream(uri)) {
+                if (input == null) throw new java.io.IOException("Could not open the backup file.");
+                Map<String, Object> backup = LocalDataBackup.read(input);
+                confirmBackupRestore(backup);
+            } catch (Exception exception) {
+                Toast.makeText(this, "That file is not a readable NextBell backup.", Toast.LENGTH_LONG).show();
+            }
+        }
+    }
+
+    private void confirmBackupRestore(Map<String, Object> backup) {
+        new AlertDialog.Builder(this)
+                .setTitle("Replace this phone’s NextBell data?")
+                .setMessage(
+                        "Restoring replaces the profile, theme, reminders and spending currently in NextBell. "
+                                + "The backup has been checked and your current data is not changed unless you continue."
+                )
+                .setNegativeButton("Cancel", null)
+                .setPositiveButton("Restore backup", (dialog, which) -> {
+                    try {
+                        LocalDataBackup.restore(preferences, backup);
+                        themeIndex = clampTheme(preferences.getInt(KEY_THEME, 0));
+                        reducedMotion = preferences.getBoolean(KEY_REDUCED_MOTION, false);
+                        selectedScreen = "home";
+                        lastScreenIndex = 0;
+                        lastHeroState = "";
+                        lastHomeScheduleSignature = "";
+                        lastWeekScheduleSignature = "";
+                        applyTheme();
+                        if (hasSavedProfile()) {
+                            weekSelectedDay = todayNameOrMonday();
+                            openApp();
+                        } else {
+                            showSetupScreen();
+                        }
+                        Toast.makeText(this, "Backup restored.", Toast.LENGTH_LONG).show();
+                    } catch (Exception exception) {
+                        Toast.makeText(this, "Could not restore that backup.", Toast.LENGTH_LONG).show();
+                    }
+                })
+                .show();
     }
 
     private String formatTodayDate() {

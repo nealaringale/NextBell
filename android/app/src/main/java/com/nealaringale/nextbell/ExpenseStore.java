@@ -79,13 +79,22 @@ public final class ExpenseStore {
         List<Expense> result = new ArrayList<>();
         String raw = prefs.getString(KEY_EXPENSES, "[]");
 
+        JSONArray array;
         try {
-            JSONArray array = new JSONArray(raw);
-            for (int i = 0; i < array.length(); i++) {
+            array = new JSONArray(raw);
+        } catch (Exception ignored) {
+            // A malformed store is shown as empty but remains untouched on disk.
+            return result;
+        }
+
+        for (int i = 0; i < array.length(); i++) {
+            try {
                 JSONObject item = array.getJSONObject(i);
+                long amountPaise = item.optLong("amountPaise", -1L);
+                if (amountPaise < 0L) continue;
                 result.add(new Expense(
                         item.optLong("id"),
-                        item.optLong("amountPaise"),
+                        amountPaise,
                         LocalDate.parse(item.optString("date")),
                         normalizeCategory(item.optString("category", "Other")),
                         item.optString("note", ""),
@@ -95,14 +104,18 @@ public final class ExpenseStore {
                         (float) item.optDouble("confidence", 1.0),
                         item.optString("fingerprint", "")
                 ));
+            } catch (Exception ignored) {
+                // Skip one damaged row without hiding the rest of the ledger.
             }
-        } catch (Exception ignored) {
-            // Corrupt data is treated as an empty local expense list.
         }
 
-        result.sort(Comparator.comparing((Expense e) -> e.date).reversed()
-                .thenComparingLong(e -> e.id).reversed());
+        sortNewestFirst(result);
         return result;
+    }
+
+    static void sortNewestFirst(List<Expense> expenses) {
+        expenses.sort(Comparator.comparing((Expense e) -> e.date).reversed()
+                .thenComparing(Comparator.comparingLong((Expense e) -> e.id).reversed()));
     }
 
     public static void save(SharedPreferences prefs, List<Expense> expenses) {
@@ -213,16 +226,16 @@ public final class ExpenseStore {
             }
         }
 
-        result.sort(Comparator.comparing((Expense e) -> e.date).reversed()
-                .thenComparingLong(e -> e.id).reversed());
+        sortNewestFirst(result);
         return result;
     }
 
     public static long totalPaise(List<Expense> expenses) {
         long total = 0L;
         for (Expense expense : expenses) {
-            if (Long.MAX_VALUE - total < expense.amountPaise) return Long.MAX_VALUE;
-            total += expense.amountPaise;
+            long amountPaise = Math.max(0L, expense.amountPaise);
+            if (Long.MAX_VALUE - total < amountPaise) return Long.MAX_VALUE;
+            total += amountPaise;
         }
         return total;
     }
@@ -233,7 +246,10 @@ public final class ExpenseStore {
 
         for (Expense expense : expenses) {
             long old = totals.containsKey(expense.category) ? totals.get(expense.category) : 0L;
-            long next = old + expense.amountPaise;
+            long amountPaise = Math.max(0L, expense.amountPaise);
+            long next = Long.MAX_VALUE - old < amountPaise
+                    ? Long.MAX_VALUE
+                    : old + amountPaise;
             totals.put(expense.category, next);
         }
         return totals;

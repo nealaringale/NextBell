@@ -34,9 +34,34 @@ jobs:
         with:
           gradle-version: "8.9"
 
-      - name: Build both debug APKs
+      - name: Prepare stable NextBell signing when configured
+        env:
+          NEXTBELL_KEYSTORE_BASE64: ${{ secrets.NEXTBELL_KEYSTORE_BASE64 }}
+          NEXTBELL_KEYSTORE_PASSWORD: ${{ secrets.NEXTBELL_KEYSTORE_PASSWORD }}
+          NEXTBELL_KEY_ALIAS: ${{ secrets.NEXTBELL_KEY_ALIAS }}
+          NEXTBELL_KEY_PASSWORD: ${{ secrets.NEXTBELL_KEY_PASSWORD }}
+        run: |
+          if [ -n "${NEXTBELL_KEYSTORE_BASE64:-}" ]; then
+            if [ -z "${NEXTBELL_KEYSTORE_PASSWORD:-}" ] || [ -z "${NEXTBELL_KEY_ALIAS:-}" ] || [ -z "${NEXTBELL_KEY_PASSWORD:-}" ]; then
+              echo "::error::NextBell signing is only partially configured. Check the four documented repository secrets."
+              exit 1
+            fi
+            keystore="$GITHUB_WORKSPACE/android/app/nextbell-upload.jks"
+            printf '%s' "$NEXTBELL_KEYSTORE_BASE64" | base64 --decode > "$keystore"
+            chmod 600 "$keystore"
+            echo "NEXTBELL_KEYSTORE_PATH=$keystore" >> "$GITHUB_ENV"
+            echo "Stable NextBell signing is configured."
+          else
+            echo "::notice::No stable NextBell signing key is configured; this CI build will use its temporary debug key."
+          fi
+
+      - name: Test and build both Android apps
         working-directory: android
-        run: gradle --no-daemon assembleDebug
+        env:
+          NEXTBELL_KEYSTORE_PASSWORD: ${{ secrets.NEXTBELL_KEYSTORE_PASSWORD }}
+          NEXTBELL_KEY_ALIAS: ${{ secrets.NEXTBELL_KEY_ALIAS }}
+          NEXTBELL_KEY_PASSWORD: ${{ secrets.NEXTBELL_KEY_PASSWORD }}
+        run: gradle --no-daemon :app:testDebugUnitTest :app:lintDebug assembleDebug
 
       - name: Upload NextBell student APK
         uses: actions/upload-artifact@v4

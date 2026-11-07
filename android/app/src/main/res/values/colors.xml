@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="background">#0B0D12</color>
+    <color name="icon_background">#0C1422</color>
+    <color name="background">#0C1422</color>
     <color name="surface">#12151C</color>
     <color name="surface_2">#171B23</color>
     <color name="border">#2A303A</color>

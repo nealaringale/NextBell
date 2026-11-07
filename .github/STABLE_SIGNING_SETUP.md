@@ -1,28 +1,16 @@
-# NextBell stable Android signing
+# Stable NextBell Android signing
 
-NextBell must use the same signing key for APK updates. The public repository must not contain the private keystore, so GitHub Actions reads it from repository Actions secrets.
+The CI workflows can sign the student APK with a stable keystore so one CI build can update an earlier one without removing the app.
 
-## One-time setup
+In the repository's **Settings → Secrets and variables → Actions**, configure all four secrets:
 
-1. Download the generated signing keystore attached to this chat: `nextbell-upload.jks`.
-2. In PowerShell, run:
+- `NEXTBELL_KEYSTORE_BASE64`: base64-encoded contents of the existing keystore.
+- `NEXTBELL_KEYSTORE_PASSWORD`: keystore password.
+- `NEXTBELL_KEY_ALIAS`: key alias.
+- `NEXTBELL_KEY_PASSWORD`: key password.
 
-```powershell
-$base64 = [Convert]::ToBase64String([IO.File]::ReadAllBytes("$HOME\Downloads\nextbell-upload.jks"))
-Set-Clipboard $base64
-```
+The workflow decodes the keystore into an ignored file inside the build checkout and removes it when the runner ends. The key and passwords are never written to the repository. Do not paste them into source files, issues, or logs.
 
-If the file is elsewhere, replace the path.
+If the keystore secret is absent, CI builds with GitHub's temporary debug key. Those APKs can be installed for testing, but later builds may not update them because Android checks the signing certificate. Preserve app data before uninstalling a differently signed build.
 
-3. Open the repository's **Settings → Secrets and variables → Actions** and add these repository secrets:
-
-- `NEXTBELL_KEYSTORE_BASE64` — paste the clipboard value.
-- `NEXTBELL_KEYSTORE_PASSWORD` — `NextBell2026!`
-- `NEXTBELL_KEY_ALIAS` — `nextbell`
-- `NEXTBELL_KEY_PASSWORD` — `NextBell2026!`
-
-4. Re-run the latest Android workflow.
-
-The current installed debug APKs were signed with an older/different debug key. Because Android requires the same signing key for an in-place update, the first APK built with this stable key requires one uninstall/reinstall. Every later APK from this pipeline will have the same signing identity and an automatically increasing versionCode, so Android can install it as an update.
-
-Do not commit the keystore or any secret value to the repository.
+This repository does not create, rotate, or replace signing credentials. Keep a protected backup of the existing keystore before changing its storage.
