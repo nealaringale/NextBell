@@ -30,7 +30,7 @@ public final class SmsTransactionParser {
     private static final Pattern REFUND = Pattern.compile(
             "(?i)refund|reversal|reversed|cashback|credited|credit to|received|deposit|paid back"
     );
-    private static final Pattern DEBIT = Pattern.compile(
+    private static final Pattern DEBIT_TERMS = Pattern.compile(
             "(?i)debited|deducted|withdrawn|withdrawal|spent|purchase|payment|paid|sent|transfer to"
     );
     private static final Pattern RAIL_SUCCESS = Pattern.compile(
@@ -95,7 +95,8 @@ public final class SmsTransactionParser {
                 ? bareAmountMatcher.group(1) : amountMatcher.group(1);
 
         boolean isCredit = REFUND.matcher(normalized).find();
-        boolean isDebit = DEBIT.matcher(normalized).find() || RAIL_SUCCESS.matcher(normalized).find();
+        boolean isDebit = DEBIT_TERMS.matcher(normalized).find()
+                || RAIL_SUCCESS.matcher(normalized).find();
         if (!isCredit && !isDebit) return null;
 
         long amountPaise;

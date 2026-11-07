@@ -1829,7 +1829,8 @@ public class MainActivity extends Activity {
         }
         if (expenseMonthlyIncome != null) {
             expenseMonthlyIncome.setText("RECEIVED THIS MONTH\n"
-                    + formatRupees(ExpenseStore.totalReceivedPaise(expenses)));
+                    + formatRupees(ExpenseStore.totalReceivedPaise(
+                            ExpenseStore.forMonth(preferences, expenseMonth))));
         }
 
         if (previousMonthTotal <= 0L) {
