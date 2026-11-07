@@ -37,6 +37,7 @@ import android.widget.HorizontalScrollView;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
+import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -57,6 +58,7 @@ public class MainActivity extends Activity {
     private static final String KEY_ROLL_NUMBER = "roll_number";
     private static final String KEY_NOTIFICATION_PROMPTED = "notification_prompted";
     private static final String KEY_THEME = "theme";
+    private static final String KEY_REDUCED_MOTION = "reduced_motion";
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final DateTimeFormatter timeFormatter =
@@ -116,34 +118,37 @@ public class MainActivity extends Activity {
     private int lastScreenIndex = 0;
 
     private int themeIndex;
+    private boolean reducedMotion;
     private String selectedScreen = "home";
     private Runnable refreshRunnable;
     private android.animation.ObjectAnimator heroPulseAnimator;
     private String lastHeroState = "";
 
     private static final String[] THEME_NAMES = {
-            "Midnight", "Ocean", "Sakura", "Forest", "Solar"
+            "Midnight", "Tide", "Petal", "Grove", "Amber", "Porcelain"
     };
 
     private static final String[] THEME_TAGS = {
-            "NEO GLASS", "FLOW", "EDITORIAL", "ORGANIC", "STUDIO"
+            "AFTER DARK", "COOL LIGHT", "SOFT ROSE", "BOTANICAL", "WARM LIGHT", "PAPER"
     };
 
     private static final String[] THEME_DESCRIPTIONS = {
-            "Dark glass, luminous edges, soft depth",
-            "Cool gradients, fluid controls, crisp focus",
-            "Soft editorial cards, refined contrast, calm motion",
-            "Natural surfaces, spacious rhythm, grounded controls",
-            "Warm studio contrast, sharper geometry, bold hierarchy"
+            "Ink surfaces, cool glass and a mint signal color",
+            "Deep blue glass with a clear, icy accent",
+            "Muted rose surfaces with warm, quiet contrast",
+            "Forest glass with a fresh botanical accent",
+            "Warm charcoal with a restrained amber highlight",
+            "A bright, paper-like surface with ink and indigo"
     };
 
     // BG, SURFACE, SURFACE_2, BORDER, TEXT, MUTED, ACCENT, ACCENT_BG, ACCENT_2
     private static final int[][] THEMES = {
-            {Color.rgb(7, 9, 13), Color.rgb(14, 18, 24), Color.rgb(21, 27, 37), Color.rgb(43, 51, 66), Color.rgb(246, 248, 252), Color.rgb(145, 155, 173), Color.rgb(139, 255, 176), Color.rgb(19, 57, 36), Color.rgb(99, 230, 255)},
-            {Color.rgb(5, 11, 20), Color.rgb(10, 19, 32), Color.rgb(17, 30, 48), Color.rgb(31, 53, 76), Color.rgb(241, 248, 255), Color.rgb(146, 169, 199), Color.rgb(84, 209, 255), Color.rgb(12, 52, 76), Color.rgb(124, 111, 255)},
-            {Color.rgb(19, 10, 18), Color.rgb(31, 17, 29), Color.rgb(45, 23, 42), Color.rgb(69, 38, 64), Color.rgb(255, 247, 252), Color.rgb(188, 158, 181), Color.rgb(255, 130, 194), Color.rgb(77, 29, 58), Color.rgb(255, 194, 102)},
-            {Color.rgb(6, 15, 12), Color.rgb(11, 25, 20), Color.rgb(19, 39, 31), Color.rgb(38, 64, 51), Color.rgb(240, 252, 245), Color.rgb(151, 184, 169), Color.rgb(103, 231, 170), Color.rgb(21, 69, 49), Color.rgb(120, 221, 255)},
-            {Color.rgb(18, 13, 7), Color.rgb(31, 22, 12), Color.rgb(45, 32, 16), Color.rgb(72, 53, 29), Color.rgb(255, 250, 238), Color.rgb(193, 175, 140), Color.rgb(255, 191, 77), Color.rgb(80, 52, 15), Color.rgb(255, 119, 86)}
+            {Color.rgb(8, 11, 17), Color.rgb(17, 22, 31), Color.rgb(26, 34, 46), Color.rgb(55, 68, 86), Color.rgb(245, 248, 252), Color.rgb(157, 170, 189), Color.rgb(139, 240, 190), Color.rgb(24, 66, 52), Color.rgb(112, 210, 230)},
+            {Color.rgb(8, 15, 28), Color.rgb(16, 27, 46), Color.rgb(25, 41, 66), Color.rgb(49, 70, 101), Color.rgb(242, 247, 255), Color.rgb(159, 177, 204), Color.rgb(126, 205, 255), Color.rgb(23, 59, 95), Color.rgb(169, 168, 255)},
+            {Color.rgb(24, 15, 23), Color.rgb(35, 23, 34), Color.rgb(50, 33, 47), Color.rgb(78, 54, 73), Color.rgb(252, 244, 249), Color.rgb(188, 160, 181), Color.rgb(242, 151, 194), Color.rgb(79, 43, 66), Color.rgb(248, 194, 135)},
+            {Color.rgb(10, 19, 16), Color.rgb(20, 32, 27), Color.rgb(30, 47, 39), Color.rgb(54, 77, 65), Color.rgb(242, 248, 243), Color.rgb(163, 184, 171), Color.rgb(142, 220, 174), Color.rgb(30, 70, 52), Color.rgb(175, 211, 193)},
+            {Color.rgb(22, 18, 13), Color.rgb(34, 28, 20), Color.rgb(49, 40, 28), Color.rgb(79, 64, 43), Color.rgb(250, 246, 237), Color.rgb(190, 176, 148), Color.rgb(238, 183, 91), Color.rgb(77, 57, 28), Color.rgb(232, 142, 105)},
+            {Color.rgb(242, 244, 248), Color.rgb(255, 255, 255), Color.rgb(233, 237, 244), Color.rgb(207, 215, 228), Color.rgb(29, 38, 54), Color.rgb(101, 113, 132), Color.rgb(77, 103, 204), Color.rgb(225, 232, 252), Color.rgb(36, 151, 143)}
     };
 
     private int BG;
@@ -169,6 +174,7 @@ public class MainActivity extends Activity {
 
         preferences = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
         themeIndex = clampTheme(preferences.getInt(KEY_THEME, 0));
+        reducedMotion = preferences.getBoolean(KEY_REDUCED_MOTION, false);
         applyTheme();
 
         if (!hasSavedProfile()) {
@@ -252,7 +258,7 @@ public class MainActivity extends Activity {
                 BUTTON_RADIUS = 18;
                 SMALL_RADIUS = 15;
                 NAV_RADIUS = 24;
-                CARD_ELEVATION = 7;
+                CARD_ELEVATION = 5;
                 CONTROL_HEIGHT = 48;
                 break;
             case 2: // Sakura — editorial, calmer and less rounded.
@@ -284,7 +290,7 @@ public class MainActivity extends Activity {
                 BUTTON_RADIUS = 15;
                 SMALL_RADIUS = 13;
                 NAV_RADIUS = 28;
-                CARD_ELEVATION = 9;
+                CARD_ELEVATION = 5;
                 CONTROL_HEIGHT = 48;
                 break;
         }
@@ -293,7 +299,11 @@ public class MainActivity extends Activity {
         window.setStatusBarColor(BG);
         window.setNavigationBarColor(BG);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            window.getDecorView().setSystemUiVisibility(0);
+            int systemUi = themeIndex == 5
+                    ? View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
+                    | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
+                    : 0;
+            window.getDecorView().setSystemUiVisibility(systemUi);
         }
     }
 
@@ -309,7 +319,10 @@ public class MainActivity extends Activity {
         refreshRunnable = new Runnable() {
             @Override
             public void run() {
-                refreshLiveUi();
+                if ("home".equals(selectedScreen)) {
+                    updateClock();
+                    refreshHome();
+                }
                 handler.postDelayed(this, 1_000);
             }
         };
@@ -338,14 +351,14 @@ public class MainActivity extends Activity {
         nav.setOrientation(LinearLayout.HORIZONTAL);
         nav.setGravity(Gravity.CENTER);
         nav.setPadding(dp(8), dp(7), dp(8), dp(7));
-        nav.setBackground(gradientRound(
+        nav.setBackground(glassGradient(
                 SURFACE_2,
                 blend(SURFACE_2, BG, 0.45f),
                 BORDER,
                 NAV_RADIUS,
                 GradientDrawable.Orientation.LEFT_RIGHT
         ));
-        nav.setElevation(dp(16));
+        nav.setElevation(dp(9));
 
         nav.addView(navItem("home", "Home", R.drawable.ic_home), navWeight());
         nav.addView(navItem("week", "Week", R.drawable.ic_calendar), navWeight());
@@ -648,7 +661,7 @@ public class MainActivity extends Activity {
         homeHero.setOrientation(LinearLayout.VERTICAL);
         homeHero.setPadding(dp(19), dp(18), dp(19), dp(18));
         homeHero.setElevation(dp(CARD_ELEVATION + 1));
-        homeHero.setBackground(gradientRound(SURFACE, SURFACE_2, BORDER, CARD_RADIUS,
+        homeHero.setBackground(glassGradient(SURFACE, SURFACE_2, BORDER, CARD_RADIUS,
                 GradientDrawable.Orientation.TL_BR));
 
         LinearLayout heroTop = new LinearLayout(this);
@@ -2809,6 +2822,47 @@ public class MainActivity extends Activity {
         themeScroller.addView(themeRow);
         page.addView(themeScroller, sectionParams(0, 22));
 
+        page.addView(sectionLabel("MOTION"), sectionParams(0, 7));
+
+        LinearLayout motionCard = settingRow(R.drawable.ic_settings, ACCENT_2);
+        LinearLayout motionText = new LinearLayout(this);
+        motionText.setOrientation(LinearLayout.VERTICAL);
+
+        TextView motionTitle = text("Reduce motion", 14, TEXT);
+        motionTitle.setTypeface(Typeface.DEFAULT_BOLD);
+        motionText.addView(motionTitle);
+
+        TextView motionDescription = text(
+                "Use quieter transitions and shorter list animations.",
+                10,
+                MUTED
+        );
+        motionDescription.setPadding(0, dp(4), 0, 0);
+        motionText.addView(motionDescription);
+        motionCard.addView(motionText, new LinearLayout.LayoutParams(0, -2, 1f));
+
+        Switch motionSwitch = new Switch(this);
+        motionSwitch.setChecked(reducedMotion);
+        motionSwitch.setContentDescription("Reduce motion");
+        motionSwitch.setThumbTintList(android.content.res.ColorStateList.valueOf(
+                reducedMotion ? ACCENT : MUTED
+        ));
+        motionSwitch.setTrackTintList(android.content.res.ColorStateList.valueOf(
+                reducedMotion ? ACCENT_BG : BORDER
+        ));
+        motionSwitch.setOnCheckedChangeListener((button, checked) -> {
+            reducedMotion = checked;
+            preferences.edit().putBoolean(KEY_REDUCED_MOTION, checked).apply();
+            motionSwitch.setThumbTintList(android.content.res.ColorStateList.valueOf(
+                    checked ? ACCENT : MUTED
+            ));
+            motionSwitch.setTrackTintList(android.content.res.ColorStateList.valueOf(
+                    checked ? ACCENT_BG : BORDER
+            ));
+        });
+        motionCard.addView(motionSwitch, new LinearLayout.LayoutParams(dp(54), dp(42)));
+        page.addView(motionCard, sectionParams(0, 18));
+
         page.addView(sectionLabel("NOTIFICATIONS"), sectionParams(0, 7));
 
         LinearLayout notificationCard = settingRow(R.drawable.ic_calendar, ACCENT);
@@ -2998,7 +3052,7 @@ public class MainActivity extends Activity {
         LinearLayout card = new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
         card.setPadding(dp(17), dp(17), dp(17), dp(17));
-        card.setBackground(gradientRound(
+        card.setBackground(glassGradient(
                 SURFACE,
                 SURFACE_2,
                 BORDER,
@@ -3015,12 +3069,12 @@ public class MainActivity extends Activity {
         card.setGravity(Gravity.CENTER_VERTICAL);
         card.setPadding(dp(13), dp(12), dp(13), dp(12));
         card.setBackground(ripple(
-                SURFACE,
-                blend(SURFACE, BG, 0.24f),
-                BORDER,
+                glassColor(SURFACE),
+                blend(glassColor(SURFACE), BG, 0.10f),
+                glassBorder(BORDER),
                 CARD_RADIUS
         ));
-        card.setElevation(dp(Math.max(1, CARD_ELEVATION - 2)));
+        card.setElevation(dp(Math.max(1, CARD_ELEVATION - 1)));
 
         ImageView icon = new ImageView(this);
         icon.setImageResource(iconRes);
@@ -3249,7 +3303,9 @@ public class MainActivity extends Activity {
     }
 
     private void refreshLiveUi() {
-        updateClock();
+        if ("home".equals(selectedScreen)) {
+            updateClock();
+        }
 
         if ("home".equals(selectedScreen)) {
             refreshHome();
@@ -3298,7 +3354,7 @@ public class MainActivity extends Activity {
             boolean lunch = currentBreak.kind == TimetableData.Kind.LUNCH;
             int breakAccent = lunch ? ACCENT_2 : ACCENT;
 
-            homeHero.setBackground(gradientRound(
+            homeHero.setBackground(glassGradient(
                     SURFACE,
                     blend(SURFACE_2, breakAccent, 0.22f),
                     breakAccent,
@@ -3322,7 +3378,7 @@ public class MainActivity extends Activity {
             heroCountdownLabel.setText("until break ends");
             animateHero("break:" + currentBreak.id);
         } else if (currentClass != null) {
-            homeHero.setBackground(gradientRound(
+            homeHero.setBackground(glassGradient(
                     SURFACE,
                     ACCENT_BG,
                     ACCENT,
@@ -3343,7 +3399,7 @@ public class MainActivity extends Activity {
             heroCountdownLabel.setText("until it ends");
             animateHero("current:" + currentClass.id);
         } else if (next != null) {
-            homeHero.setBackground(gradientRound(
+            homeHero.setBackground(glassGradient(
                     SURFACE,
                     SURFACE_2,
                     BORDER,
@@ -3369,7 +3425,7 @@ public class MainActivity extends Activity {
             }
             animateHero("next:" + next.id);
         } else {
-            homeHero.setBackground(gradientRound(
+            homeHero.setBackground(glassGradient(
                     SURFACE,
                     SURFACE_2,
                     BORDER,
@@ -4276,6 +4332,33 @@ public class MainActivity extends Activity {
         return d;
     }
 
+    private GradientDrawable glassGradient(
+            int start,
+            int end,
+            int stroke,
+            int radiusDp,
+            GradientDrawable.Orientation orientation
+    ) {
+        GradientDrawable d = new GradientDrawable(
+                orientation,
+                new int[]{glassColor(blend(start, TEXT, 0.025f)),
+                        glassColor(blend(end, TEXT, 0.045f))}
+        );
+        d.setCornerRadius(dp(radiusDp));
+        d.setStroke(dp(1), glassBorder(stroke));
+        return d;
+    }
+
+    private int glassColor(int color) {
+        return Color.argb(themeIndex == 5 ? 246 : 226,
+                Color.red(color), Color.green(color), Color.blue(color));
+    }
+
+    private int glassBorder(int color) {
+        return Color.argb(themeIndex == 5 ? 145 : 125,
+                Color.red(color), Color.green(color), Color.blue(color));
+    }
+
     private GradientDrawable round(int fill, int stroke, int radiusDp) {
         GradientDrawable d = new GradientDrawable();
         d.setColor(fill);
@@ -4353,11 +4436,20 @@ public class MainActivity extends Activity {
     private void animateScreenTransition(View view, boolean forward) {
         if (view == null) return;
 
+        if (reducedMotion) {
+            view.animate().cancel();
+            view.setAlpha(1f);
+            view.setScaleX(1f);
+            view.setScaleY(1f);
+            view.setTranslationX(0f);
+            view.setTranslationY(0f);
+            return;
+        }
         view.setAlpha(0f);
-        view.setScaleX(0.985f);
-        view.setScaleY(0.985f);
-        view.setTranslationX(forward ? dp(36) : -dp(36));
-        view.setTranslationY(dp(4));
+        view.setScaleX(1f);
+        view.setScaleY(1f);
+        view.setTranslationX(forward ? dp(14) : -dp(14));
+        view.setTranslationY(0);
 
         view.animate()
                 .alpha(1f)
@@ -4365,44 +4457,49 @@ public class MainActivity extends Activity {
                 .scaleY(1f)
                 .translationX(0)
                 .translationY(0)
-                .setDuration(420)
-                .setInterpolator(new OvershootInterpolator(0.75f))
+                .setDuration(190)
+                .setInterpolator(new DecelerateInterpolator(1.5f))
                 .start();
     }
 
     private void animateThemeRefresh() {
         if (root == null) return;
-        root.setAlpha(0.90f);
-        root.setScaleX(0.985f);
-        root.setScaleY(0.985f);
+        if (reducedMotion) return;
+        root.setAlpha(0.94f);
         root.animate()
                 .alpha(1f)
-                .scaleX(1f)
-                .scaleY(1f)
-                .setDuration(420)
+                .setDuration(150)
                 .setInterpolator(new DecelerateInterpolator())
                 .start();
     }
 
     private void animateListItem(View view, int index) {
         if (view == null) return;
+        if (reducedMotion) {
+            view.setAlpha(1f);
+            view.setTranslationY(0f);
+            view.setScaleX(1f);
+            view.setScaleY(1f);
+            return;
+        }
         view.setAlpha(0f);
-        view.setTranslationY(dp(12));
-        view.setScaleX(0.985f);
-        view.setScaleY(0.985f);
+        view.setTranslationY(dp(6));
+        view.setScaleX(1f);
+        view.setScaleY(1f);
         view.animate()
                 .alpha(1f)
                 .translationY(0)
                 .scaleX(1f)
                 .scaleY(1f)
-                .setStartDelay(Math.min(320, index * 55L))
-                .setDuration(360)
+                .setStartDelay(Math.min(120, index * 20L))
+                .setDuration(170)
                 .setInterpolator(new DecelerateInterpolator())
                 .start();
     }
 
     private void installPressAnimation(View view) {
         if (view == null) return;
+        if (reducedMotion) return;
         view.setClickable(true);
         view.setFocusable(true);
         view.setOnTouchListener((v, event) -> {
@@ -4410,11 +4507,10 @@ public class MainActivity extends Activity {
                 case android.view.MotionEvent.ACTION_DOWN:
                     v.animate().cancel();
                     v.animate()
-                            .scaleX(0.965f)
-                            .scaleY(0.965f)
-                            .translationY(dp(1))
-                            .alpha(0.92f)
-                            .setDuration(90)
+                            .scaleX(0.985f)
+                            .scaleY(0.985f)
+                            .alpha(0.96f)
+                            .setDuration(65)
                             .setInterpolator(new DecelerateInterpolator())
                             .start();
                     break;
@@ -4424,10 +4520,9 @@ public class MainActivity extends Activity {
                     v.animate()
                             .scaleX(1f)
                             .scaleY(1f)
-                            .translationY(0)
                             .alpha(1f)
-                            .setDuration(240)
-                            .setInterpolator(new OvershootInterpolator(1.15f))
+                            .setDuration(110)
+                            .setInterpolator(new DecelerateInterpolator())
                             .start();
                     break;
             }
