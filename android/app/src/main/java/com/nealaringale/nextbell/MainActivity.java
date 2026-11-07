@@ -589,7 +589,7 @@ public class MainActivity extends Activity {
         titleBlock.setOrientation(LinearLayout.VERTICAL);
         top.addView(titleBlock, new LinearLayout.LayoutParams(0, -2, 1f));
 
-        TextView eyebrow = sectionLabel("SMART TIMETABLE");
+        TextView eyebrow = sectionLabel("YOUR DAY");
         eyebrow.setTextColor(ACCENT);
         titleBlock.addView(eyebrow);
 
@@ -646,7 +646,7 @@ public class MainActivity extends Activity {
         });
         profileRow.addView(profileBadge);
 
-        TextView liveTag = text("●  LIVE • INDIA", 8, SUBTLE);
+        TextView liveTag = text("●  LOCAL TIME", 8, SUBTLE);
         liveTag.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
         liveTag.setLetterSpacing(0.08f);
         liveTag.setGravity(Gravity.CENTER);
@@ -754,7 +754,7 @@ public class MainActivity extends Activity {
         sectionHeader.addView(homeSummary);
         page.addView(sectionHeader);
 
-        TextView helper = text("Your day, in time order.", 10, MUTED);
+        TextView helper = text("Classes and breaks, in order.", 10, MUTED);
         helper.setPadding(0, dp(4), 0, dp(12));
         page.addView(helper);
 
@@ -906,7 +906,7 @@ public class MainActivity extends Activity {
         ));
 
         TextView autoStatusTitle = text(
-                "SAFE MODE  •  AUTO-TRACKING OFF",
+                "MANUAL SPENDING TRACKER",
                 9,
                 MUTED
         );
@@ -915,7 +915,7 @@ public class MainActivity extends Activity {
         autoStatus.addView(autoStatusTitle, new LinearLayout.LayoutParams(0, -2, 1f));
 
         TextView sync = text(
-                "MANUAL ENTRY • LOCAL ONLY",
+                "ON THIS PHONE",
                 8,
                 SUBTLE
         );
@@ -2753,7 +2753,7 @@ public class MainActivity extends Activity {
         page.addView(title);
 
         TextView subtitle = text(
-                "Your profile, visual system and reminders — all in one place.",
+                "Make your profile, colours and reminders your own.",
                 12,
                 MUTED
         );
@@ -2800,7 +2800,7 @@ public class MainActivity extends Activity {
         profileParams.setMargins(0, 0, 0, dp(21));
         page.addView(profileCard, profileParams);
 
-        page.addView(sectionLabel("APPEARANCE"), sectionParams(0, 6));
+        page.addView(sectionLabel("COLOURS & THEMES"), sectionParams(0, 6));
 
         TextView appearanceHint = text(
                 THEME_DESCRIPTIONS[themeIndex] + ".",
@@ -2911,12 +2911,12 @@ public class MainActivity extends Activity {
         LinearLayout autoText = new LinearLayout(this);
         autoText.setOrientation(LinearLayout.VERTICAL);
 
-        TextView autoTitle = text("Automatic payment tracking", 14, TEXT);
+        TextView autoTitle = text("Payment tracking", 14, TEXT);
         autoTitle.setTypeface(Typeface.DEFAULT_BOLD);
         autoText.addView(autoTitle);
 
         TextView autoDescription = text(
-                "Safe sideload build: NextBell does not read SMS or notifications. Add expenses manually in Money.",
+                "NextBell doesn’t read your messages. Add each expense in Money.",
                 10,
                 MUTED
         );
@@ -2924,7 +2924,7 @@ public class MainActivity extends Activity {
         autoDescription.setPadding(0, dp(4), 0, 0);
         autoText.addView(autoDescription);
 
-        TextView safeBadge = text("SAFE MODE", 8, ACCENT);
+        TextView safeBadge = text("MANUAL", 8, ACCENT);
         safeBadge.setGravity(Gravity.CENTER);
         safeBadge.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
         safeBadge.setPadding(dp(9), 0, dp(9), 0);
@@ -2995,7 +2995,7 @@ public class MainActivity extends Activity {
             openCall();
         });
 
-        TextView footer = text("No account • No cloud profile • Local-first", 8, SUBTLE);
+        TextView footer = text("Your profile and spending stay on this phone.", 8, SUBTLE);
         footer.setGravity(Gravity.CENTER);
         footer.setPadding(0, dp(10), 0, 0);
         aboutCard.addView(footer);
