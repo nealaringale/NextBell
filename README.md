@@ -7,7 +7,7 @@ NextBell is a native Android day planner for FE Division B students. A student's
 - **Android app:** Java, Android SDK 35, minimum Android 8.0 (API 26), target SDK 35. Screens are native views hosted in `MainActivity`; timetable, expense, notification, and backup logic live in separate Java classes.
 - **Timetable:** bundled official FE Division B timetable, W.E.F. 16 September 2026, Revision 00. Schedule data is available offline; batch filtering is based on the student's roll number.
 - **Profile and spending:** stored locally in the app's private `SharedPreferences`; there is no server, account system, or network permission. System cloud backup and device-to-device transfer are excluded. The user can export a readable JSON backup to a file they choose. Anyone who receives that file can read it.
-- **Money entry:** manual. The unused SMS parser is not connected, and the app does not read messages.
+- **Money entry:** manual. The app requests no SMS permissions and does not read messages.
 - **Admin companion:** a separate local draft tool. It does not publish timetable changes to student devices.
 - **Browser prototype:** `src/` is an older Vite demo with fixture data; it is not the Android app or the download website and should not be treated as the live timetable source.
 
