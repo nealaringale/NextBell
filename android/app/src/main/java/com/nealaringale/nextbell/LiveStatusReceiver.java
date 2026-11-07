@@ -27,6 +27,7 @@ public class LiveStatusReceiver extends BroadcastReceiver {
     }
 
     public static void updateNow(Context context) {
+        NextClassWidgetProvider.refreshAll(context);
         SharedPreferences prefs =
                 context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
 

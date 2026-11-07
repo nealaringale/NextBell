@@ -65,10 +65,12 @@ public class MainActivity extends Activity {
     private static final String KEY_ROLL_NUMBER = "roll_number";
     private static final String KEY_NOTIFICATION_PROMPTED = "notification_prompted";
     private static final String KEY_NOTIFICATION_PERMISSION_REQUESTED = "notification_permission_requested";
+    private static final String KEY_SMS_PERMISSION_REQUESTED = "sms_permission_requested";
     private static final String KEY_THEME = "theme";
     private static final String KEY_REDUCED_MOTION = "reduced_motion";
     private static final int REQUEST_EXPORT_BACKUP = 8101;
     private static final int REQUEST_IMPORT_BACKUP = 8102;
+    private static final int REQUEST_SMS_ACCESS = 8103;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final DateTimeFormatter timeFormatter =
@@ -118,7 +120,10 @@ public class MainActivity extends Activity {
     private TextView expenseWeeklySpend;
     private TextView expenseVsLastMonth;
     private TextView expenseStreak;
+    private TextView expenseMonthlyIncome;
     private TextView expenseDailyLimitStatus;
+    private TextView expenseWeeklyAllowanceStatus;
+    private TextView expenseDailySafeSpend;
     private TextView expenseDailyAlertStatus;
     private TextView expenseRecurringStatus;
     private LocalDate expenseMonth = LocalDate.now(zone).withDayOfMonth(1);
@@ -132,6 +137,7 @@ public class MainActivity extends Activity {
     private String selectedScreen = "home";
     private Runnable refreshRunnable;
     private boolean openedNotificationSettings;
+    private boolean scanSmsAfterPermission;
     private android.animation.ObjectAnimator heroPulseAnimator;
     private String lastHeroState = "";
 
@@ -206,6 +212,9 @@ public class MainActivity extends Activity {
         }
         if (preferences != null && "settings".equals(selectedScreen)) {
             buildSettingsScreen();
+            updateBottomNav();
+        } else if (preferences != null && "expenses".equals(selectedScreen)) {
+            buildExpensesScreen();
             updateBottomNav();
         }
 
@@ -335,6 +344,8 @@ public class MainActivity extends Activity {
         buildShell();
         navigate(selectedScreen);
         requestNotificationPermissionIfNeeded();
+        StudentPlannerScheduler.scheduleAll(this);
+        NextClassWidgetProvider.refreshAll(this);
 
         if (refreshRunnable != null) {
             handler.removeCallbacks(refreshRunnable);
@@ -424,6 +435,7 @@ public class MainActivity extends Activity {
         nav.addView(navItem("home", "Home", R.drawable.ic_home), navWeight());
         nav.addView(navItem("week", "Week", R.drawable.ic_calendar), navWeight());
         nav.addView(navItem("expenses", "Money", R.drawable.ic_wallet), navWeight());
+        nav.addView(navItem("study", "Study", R.drawable.ic_study), navWeight());
         nav.addView(navItem("settings", "Settings", R.drawable.ic_settings), navWeight());
         return nav;
     }
@@ -440,6 +452,7 @@ public class MainActivity extends Activity {
         item.setClickable(true);
         item.setFocusable(true);
         item.setContentDescription(label);
+        item.setTag(id);
 
         ImageView icon = new ImageView(this);
         icon.setImageResource(iconRes);
@@ -466,16 +479,7 @@ public class MainActivity extends Activity {
             View child = bottomNav.getChildAt(i);
             if (!(child instanceof LinearLayout)) continue;
 
-            String id;
-            if (i == 0) {
-                id = "home";
-            } else if (i == 1) {
-                id = "week";
-            } else if (i == 2) {
-                id = "expenses";
-            } else {
-                id = "settings";
-            }
+            String id = String.valueOf(child.getTag());
             boolean selected = id.equals(selectedScreen);
             LinearLayout item = (LinearLayout) child;
             item.setSelected(selected);
@@ -509,6 +513,7 @@ public class MainActivity extends Activity {
         switch (id) {
             case "week": return "Week";
             case "expenses": return "Money";
+            case "study": return "Study";
             case "settings": return "Settings";
             default: return "Home";
         }
@@ -533,6 +538,8 @@ public class MainActivity extends Activity {
             buildWeekScreen();
         } else if ("expenses".equals(screen)) {
             buildExpensesScreen();
+        } else if ("study".equals(screen)) {
+            buildStudyScreen();
         } else {
             buildSettingsScreen();
         }
@@ -916,6 +923,437 @@ public class MainActivity extends Activity {
         refreshWeekSchedule();
     }
 
+    private void buildStudyScreen() {
+        LinearLayout page = scrollPage();
+
+        TextView eyebrow = sectionLabel("STUDENT DESK");
+        eyebrow.setTextColor(ACCENT);
+        page.addView(eyebrow);
+
+        TextView title = text("Study & plans", themeHeadingSize(), TEXT);
+        title.setTypeface(Typeface.DEFAULT_BOLD);
+        title.setPadding(0, dp(5), 0, 0);
+        page.addView(title);
+
+        TextView subtitle = text(
+                "Keep attendance, deadlines and small next steps in one place.", 11, MUTED
+        );
+        subtitle.setPadding(0, dp(5), 0, dp(18));
+        page.addView(subtitle);
+
+        page.addView(sectionLabel("ATTENDANCE"), sectionParams(0, 8));
+        LinearLayout attendanceCard = cardColumn();
+        LinearLayout attendanceHeader = new LinearLayout(this);
+        attendanceHeader.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout attendanceCopy = new LinearLayout(this);
+        attendanceCopy.setOrientation(LinearLayout.VERTICAL);
+        TextView attendanceTitle = text("Your running record", 15, TEXT);
+        attendanceTitle.setTypeface(Typeface.DEFAULT_BOLD);
+        attendanceCopy.addView(attendanceTitle);
+        TextView attendanceHint = text(
+                "Mark each scheduled class. Bunk guidance uses only sessions you record.", 9, MUTED
+        );
+        attendanceHint.setPadding(0, dp(4), 0, 0);
+        attendanceCopy.addView(attendanceHint);
+        attendanceHeader.addView(attendanceCopy,
+                new LinearLayout.LayoutParams(0, -2, 1f));
+
+        int target = AttendanceStore.targetPercent(preferences);
+        TextView targetButton = actionButton(target + "% TARGET", false);
+        attendanceHeader.addView(targetButton,
+                new LinearLayout.LayoutParams(dp(102), dp(38)));
+        targetButton.setOnClickListener(v -> {
+            tap(v);
+            String[] values = {"65%", "70%", "75%", "80%", "85%", "90%"};
+            int selected = java.util.Arrays.asList(values).indexOf(target + "%");
+            new AlertDialog.Builder(this)
+                    .setTitle("Attendance target")
+                    .setSingleChoiceItems(values, selected, (dialog, which) -> {
+                        AttendanceStore.setTargetPercent(preferences,
+                                Integer.parseInt(values[which].replace("%", "")));
+                        dialog.dismiss();
+                        buildStudyScreen();
+                    })
+                    .setNegativeButton("Cancel", null)
+                    .show();
+        });
+        attendanceCard.addView(attendanceHeader);
+
+        LinearLayout attendanceActions = new LinearLayout(this);
+        attendanceActions.setGravity(Gravity.CENTER_VERTICAL);
+        TextView markDate = actionButton("MARK A CLASS", true);
+        TextView history = actionButton("CHOOSE DATE", false);
+        attendanceActions.addView(markDate,
+                new LinearLayout.LayoutParams(0, dp(44), 1f));
+        LinearLayout.LayoutParams historyParams =
+                new LinearLayout.LayoutParams(0, dp(44), 1f);
+        historyParams.setMargins(dp(8), 0, 0, 0);
+        attendanceActions.addView(history, historyParams);
+        markDate.setOnClickListener(v -> {
+            tap(v);
+            showAttendanceForDate(LocalDate.now(zone));
+        });
+        history.setOnClickListener(v -> {
+            tap(v);
+            LocalDate today = LocalDate.now(zone);
+            new DatePickerDialog(this, (picker, year, month, day) ->
+                    showAttendanceForDate(LocalDate.of(year, month + 1, day)),
+                    today.getYear(), today.getMonthValue() - 1, today.getDayOfMonth()).show();
+        });
+        attendanceCard.addView(attendanceActions,
+                sectionParams(0, 12));
+
+        List<AttendanceStore.Session> sessions = AttendanceStore.load(preferences);
+        java.util.Map<String, TimetableData.ClassItem> courses = new java.util.LinkedHashMap<>();
+        for (String day : TimetableData.DAYS) {
+            for (TimetableData.ClassItem item :
+                    TimetableData.forRollAndDay(getRollNumber(), day)) {
+                if (item.isAcademic() && !item.subject.trim().isEmpty()) {
+                    courses.putIfAbsent(item.subject, item);
+                }
+            }
+        }
+        if (courses.isEmpty()) {
+            attendanceCard.addView(text(
+                    "No course list is available for this roll number yet.", 10, MUTED
+            ));
+        } else {
+            for (String course : courses.keySet()) {
+                AttendanceStore.Stats stats = AttendanceStore.stats(sessions, course, target);
+                LinearLayout row = new LinearLayout(this);
+                row.setGravity(Gravity.CENTER_VERTICAL);
+                row.setPadding(0, dp(9), 0, dp(9));
+                LinearLayout copy = new LinearLayout(this);
+                copy.setOrientation(LinearLayout.VERTICAL);
+                TextView courseTitle = text(course, 11, TEXT);
+                courseTitle.setTypeface(Typeface.DEFAULT_BOLD);
+                courseTitle.setMaxLines(2);
+                copy.addView(courseTitle);
+                String status;
+                if (stats.held == 0) {
+                    status = "No sessions marked yet";
+                } else if (stats.classesToTarget() > 0) {
+                    status = stats.attended + " / " + stats.held + " attended · "
+                            + stats.classesToTarget() + " consecutive classes to reach " + target + "%";
+                } else {
+                    status = stats.attended + " / " + stats.held + " attended · "
+                            + stats.safeAbsences() + " safe absences at " + target + "%";
+                }
+                TextView courseMeta = text(status, 8, MUTED);
+                courseMeta.setPadding(0, dp(3), 0, 0);
+                copy.addView(courseMeta);
+                row.addView(copy, new LinearLayout.LayoutParams(0, -2, 1f));
+                TextView percentage = text(
+                        stats.held == 0 ? "—" : stats.percentage() + "%", 15,
+                        stats.held > 0 && stats.percentage() >= target ? ACCENT : ACCENT_2
+                );
+                percentage.setTypeface(Typeface.DEFAULT_BOLD);
+                row.addView(percentage);
+                attendanceCard.addView(row);
+                if (courses.size() > 1 && !course.equals(
+                        new java.util.ArrayList<>(courses.keySet()).get(courses.size() - 1))) {
+                    attendanceCard.addView(divider());
+                }
+            }
+        }
+        page.addView(attendanceCard, cardMargin());
+
+        page.addView(sectionLabel("ASSIGNMENTS & TASKS"), sectionParams(0, 8));
+        LinearLayout plannerCard = cardColumn();
+        TextView plannerHint = text(
+                "Deadlines stay on this phone. NextBell can remind you the day before.", 9, MUTED
+        );
+        plannerHint.setPadding(0, 0, 0, dp(12));
+        plannerCard.addView(plannerHint);
+
+        LinearLayout addRows = new LinearLayout(this);
+        addRows.setGravity(Gravity.CENTER_VERTICAL);
+        String[] kinds = {StudentPlannerStore.ASSIGNMENT, StudentPlannerStore.EXAM,
+                StudentPlannerStore.TASK};
+        String[] labels = {"+ ASSIGNMENT", "+ EXAM", "+ TASK"};
+        for (int i = 0; i < kinds.length; i++) {
+            final String kind = kinds[i];
+            TextView add = actionButton(labels[i], i == 0);
+            LinearLayout.LayoutParams addParams =
+                    new LinearLayout.LayoutParams(0, dp(42), 1f);
+            if (i > 0) addParams.setMargins(dp(6), 0, 0, 0);
+            addRows.addView(add, addParams);
+            add.setOnClickListener(v -> {
+                tap(v);
+                showStudentItemEditor(kind, null);
+            });
+        }
+        plannerCard.addView(addRows);
+
+        List<StudentPlannerStore.Item> plannerItems = StudentPlannerStore.load(preferences);
+        if (plannerItems.isEmpty()) {
+            TextView empty = text(
+                    "Nothing on the list. Add a deadline or one small next step.", 10, MUTED
+            );
+            empty.setPadding(0, dp(14), 0, dp(3));
+            plannerCard.addView(empty);
+        } else {
+            for (StudentPlannerStore.Item item : plannerItems) {
+                plannerCard.addView(studentPlannerRow(item));
+            }
+        }
+        page.addView(plannerCard, cardMargin());
+
+        LinearLayout infoCard = cardColumn();
+        TextView infoTitle = text("Class details", 13, TEXT);
+        infoTitle.setTypeface(Typeface.DEFAULT_BOLD);
+        infoCard.addView(infoTitle);
+        TextView info = text(
+                "Your timetable includes published classroom and faculty details. Check Week for the full schedule; NextBell does not invent campus map locations.",
+                9, MUTED
+        );
+        info.setPadding(0, dp(4), 0, 0);
+        infoCard.addView(info);
+        page.addView(infoCard, sectionParams(0, 18));
+        addBottomSpace(page);
+    }
+
+    private void showAttendanceForDate(LocalDate date) {
+        String day = date.getDayOfWeek().getDisplayName(
+                java.time.format.TextStyle.FULL, Locale.ENGLISH
+        );
+        List<TimetableData.ClassItem> classes = TimetableData.forRollAndDay(getRollNumber(), day);
+        classes = classes.stream().filter(TimetableData.ClassItem::isAcademic)
+                .collect(java.util.stream.Collectors.toList());
+        if (classes.isEmpty()) {
+            new AlertDialog.Builder(this)
+                    .setTitle("No scheduled classes")
+                    .setMessage("The published timetable has no classes for " + day + ". Choose a weekday with classes to record attendance.")
+                    .setPositiveButton("Choose date", (dialog, which) -> {
+                        new DatePickerDialog(this, (picker, year, month, dayOfMonth) ->
+                                showAttendanceForDate(LocalDate.of(year, month + 1, dayOfMonth)),
+                                date.getYear(), date.getMonthValue() - 1,
+                                date.getDayOfMonth()).show();
+                    })
+                    .setNegativeButton("Done", null)
+                    .show();
+            return;
+        }
+
+        LinearLayout sheet = dialogSheet();
+        TextView title = text("Attendance · " + formatLongDate(date), 20, TEXT);
+        title.setTypeface(Typeface.DEFAULT_BOLD);
+        sheet.addView(title);
+        TextView hint = text("Only mark a meeting once it has happened.", 9, MUTED);
+        hint.setPadding(0, dp(4), 0, dp(12));
+        sheet.addView(hint);
+
+        ScrollView scroll = new ScrollView(this);
+        LinearLayout list = new LinearLayout(this);
+        list.setOrientation(LinearLayout.VERTICAL);
+        List<AttendanceStore.Session> sessions = AttendanceStore.load(preferences);
+        for (TimetableData.ClassItem item : classes) {
+            LinearLayout row = cardColumn();
+            row.setPadding(dp(12), dp(12), dp(12), dp(12));
+            TextView subject = text(item.subject, 12, TEXT);
+            subject.setTypeface(Typeface.DEFAULT_BOLD);
+            row.addView(subject);
+            String details = formatTime(item.start) + " – " + formatTime(item.end);
+            if (!item.room.trim().isEmpty()) details += " · " + item.room;
+            if (!item.teacher.trim().isEmpty()) details += "\n" + item.teacher;
+            TextView detail = text(details, 8, MUTED);
+            detail.setPadding(0, dp(3), 0, dp(8));
+            row.addView(detail);
+
+            LinearLayout choices = new LinearLayout(this);
+            choices.setGravity(Gravity.CENTER_VERTICAL);
+            TextView present = actionButton("PRESENT", true);
+            TextView absent = actionButton("ABSENT", false);
+            TextView clear = actionButton("CLEAR", false);
+            TextView[] actions = {present, absent, clear};
+            for (TextView action : actions) {
+                LinearLayout.LayoutParams actionParams =
+                        new LinearLayout.LayoutParams(0, dp(36), 1f);
+                if (choices.getChildCount() > 0) actionParams.setMargins(dp(5), 0, 0, 0);
+                choices.addView(action, actionParams);
+            }
+            String status = AttendanceStore.statusFor(sessions, date, item);
+            present.setAlpha("PRESENT".equals(status) ? 1f : 0.72f);
+            absent.setAlpha("ABSENT".equals(status) ? 1f : 0.72f);
+            clear.setEnabled(!status.isEmpty());
+            present.setOnClickListener(v -> {
+                AttendanceStore.mark(preferences, date, item, "PRESENT");
+                buildStudyScreen();
+                present.setAlpha(1f);
+                absent.setAlpha(0.72f);
+                clear.setEnabled(true);
+            });
+            absent.setOnClickListener(v -> {
+                AttendanceStore.mark(preferences, date, item, "ABSENT");
+                buildStudyScreen();
+                present.setAlpha(0.72f);
+                absent.setAlpha(1f);
+                clear.setEnabled(true);
+            });
+            clear.setOnClickListener(v -> {
+                AttendanceStore.clear(preferences, date, item);
+                buildStudyScreen();
+                present.setAlpha(0.72f);
+                absent.setAlpha(0.72f);
+                clear.setEnabled(false);
+            });
+            row.addView(choices);
+            LinearLayout.LayoutParams rowParams =
+                    new LinearLayout.LayoutParams(-1, -2);
+            rowParams.setMargins(0, 0, 0, dp(8));
+            list.addView(row, rowParams);
+        }
+        scroll.addView(list);
+        sheet.addView(scroll, new LinearLayout.LayoutParams(-1, dp(390)));
+        TextView done = dialogAction("DONE", true);
+        LinearLayout.LayoutParams doneParams = new LinearLayout.LayoutParams(-1, dp(44));
+        doneParams.setMargins(0, dp(10), 0, 0);
+        sheet.addView(done, doneParams);
+        Dialog dialog = showBottomSheet(sheet);
+        done.setOnClickListener(v -> dialog.dismiss());
+    }
+
+    private View divider() {
+        View view = new View(this);
+        view.setBackgroundColor(BORDER);
+        view.setAlpha(0.55f);
+        view.setLayoutParams(new LinearLayout.LayoutParams(-1, dp(1)));
+        return view;
+    }
+
+    private View studentPlannerRow(StudentPlannerStore.Item item) {
+        LinearLayout row = new LinearLayout(this);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(0, dp(11), 0, dp(11));
+        LinearLayout copy = new LinearLayout(this);
+        copy.setOrientation(LinearLayout.VERTICAL);
+        TextView title = text(item.title, 11, item.completed ? MUTED : TEXT);
+        title.setTypeface(Typeface.DEFAULT_BOLD);
+        title.setMaxLines(2);
+        copy.addView(title);
+        String meta = item.type + (item.course.isEmpty() ? "" : " · " + item.course);
+        if (item.dueDate != null) meta += " · " + formatLongDate(item.dueDate);
+        TextView details = text(meta, 8, MUTED);
+        details.setPadding(0, dp(3), 0, 0);
+        copy.addView(details);
+        if (!item.details.isEmpty()) {
+            TextView note = text(item.details, 8, MUTED);
+            note.setMaxLines(2);
+            note.setPadding(0, dp(2), 0, 0);
+            copy.addView(note);
+        }
+        row.addView(copy, new LinearLayout.LayoutParams(0, -2, 1f));
+        TextView done = actionButton(item.completed ? "UNDO" : "DONE", !item.completed);
+        row.addView(done, new LinearLayout.LayoutParams(dp(66), dp(36)));
+        row.setOnClickListener(v -> showStudentItemActions(item));
+        done.setOnClickListener(v -> {
+            StudentPlannerStore.Item updated = new StudentPlannerStore.Item(
+                    item.id, item.type, item.title, item.course, item.details,
+                    item.dueDate, !item.completed
+            );
+            StudentPlannerStore.upsert(preferences, updated);
+            if (updated.completed) StudentPlannerScheduler.cancel(this, updated.id);
+            else StudentPlannerScheduler.schedule(this, updated);
+            buildStudyScreen();
+        });
+        return row;
+    }
+
+    private void showStudentItemActions(StudentPlannerStore.Item item) {
+        String[] actions = {item.completed ? "Mark as open" : "Mark complete", "Edit", "Delete"};
+        new AlertDialog.Builder(this)
+                .setTitle(item.title)
+                .setItems(actions, (dialog, which) -> {
+                    if (which == 0) {
+                        StudentPlannerStore.Item updated = new StudentPlannerStore.Item(
+                                item.id, item.type, item.title, item.course, item.details,
+                                item.dueDate, !item.completed
+                        );
+                        StudentPlannerStore.upsert(preferences, updated);
+                        if (updated.completed) StudentPlannerScheduler.cancel(this, updated.id);
+                        else StudentPlannerScheduler.schedule(this, updated);
+                        buildStudyScreen();
+                    } else if (which == 1) {
+                        showStudentItemEditor(item.type, item);
+                    } else {
+                        new AlertDialog.Builder(this)
+                                .setTitle("Delete this item?")
+                                .setMessage("This removes it from your local study list.")
+                                .setNegativeButton("Keep", null)
+                                .setPositiveButton("Delete", (confirm, ignored) -> {
+                                    StudentPlannerStore.delete(preferences, item.id);
+                                    StudentPlannerScheduler.cancel(this, item.id);
+                                    buildStudyScreen();
+                                }).show();
+                    }
+                }).show();
+    }
+
+    private void showStudentItemEditor(String type, StudentPlannerStore.Item existing) {
+        EditText itemTitle = field("e.g. Complete lab report", false);
+        itemTitle.setSingleLine(true);
+        EditText course = field("Course or class (optional)", false);
+        course.setSingleLine(true);
+        EditText details = field("What needs to be done? (optional)", false);
+        details.setMinLines(2);
+        details.setGravity(Gravity.TOP | Gravity.START);
+        LocalDate initialDate = LocalDate.now(zone);
+        final LocalDate[] dueDate = {existing == null ? null : existing.dueDate};
+        TextView dateButton = actionButton("NO DUE DATE", false);
+        if (existing != null) {
+            itemTitle.setText(existing.title);
+            course.setText(existing.course);
+            details.setText(existing.details);
+        }
+        updatePlannerDateButton(dateButton, dueDate[0]);
+        dateButton.setOnClickListener(v -> {
+            LocalDate seed = dueDate[0] == null ? initialDate : dueDate[0];
+            new DatePickerDialog(this, (picker, year, month, day) -> {
+                dueDate[0] = LocalDate.of(year, month + 1, day);
+                updatePlannerDateButton(dateButton, dueDate[0]);
+            }, seed.getYear(), seed.getMonthValue() - 1, seed.getDayOfMonth()).show();
+        });
+
+        LinearLayout form = new LinearLayout(this);
+        form.setOrientation(LinearLayout.VERTICAL);
+        form.setPadding(dp(4), dp(6), dp(4), dp(2));
+        form.addView(itemTitle, sectionParams(0, 8));
+        form.addView(course, sectionParams(0, 8));
+        form.addView(dateButton, sectionParams(0, 8));
+        form.addView(details, sectionParams(0, 2));
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle(existing == null ? "New " + type.toLowerCase(Locale.ENGLISH) : "Edit " + type.toLowerCase(Locale.ENGLISH))
+                .setView(form)
+                .setNegativeButton("Cancel", null)
+                .setPositiveButton(existing == null ? "Add" : "Save", null)
+                .create();
+        dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+                .setOnClickListener(v -> {
+                    String cleanTitle = itemTitle.getText().toString().trim();
+                    if (cleanTitle.isEmpty()) {
+                        itemTitle.setError("Add a short title first");
+                        return;
+                    }
+                    long id = existing == null
+                            ? StudentPlannerStore.nextId(preferences) : existing.id;
+                    StudentPlannerStore.Item updated = new StudentPlannerStore.Item(
+                            id, type, cleanTitle, course.getText().toString(),
+                            details.getText().toString(), dueDate[0],
+                            existing != null && existing.completed
+                    );
+                    StudentPlannerStore.upsert(preferences, updated);
+                    StudentPlannerScheduler.schedule(this, updated);
+                    dialog.dismiss();
+                    buildStudyScreen();
+                }));
+        dialog.show();
+    }
+
+    private void updatePlannerDateButton(TextView button, LocalDate date) {
+        button.setText(date == null ? "NO DUE DATE  ·  TAP TO SET" : "DUE  ·  " + formatLongDate(date));
+    }
+
     private void buildExpensesScreen() {
         expenseMonth = expenseMonth.withDayOfMonth(1);
 
@@ -932,7 +1370,7 @@ public class MainActivity extends Activity {
         eyebrow.setTextColor(ACCENT);
         headerText.addView(eyebrow);
 
-        TextView title = text("Expenses", themeHeadingSize(), TEXT);
+        TextView title = text("Money", themeHeadingSize(), TEXT);
         title.setTypeface(Typeface.DEFAULT_BOLD);
         title.setPadding(0, dp(5), 0, 0);
         headerText.addView(title);
@@ -994,7 +1432,7 @@ public class MainActivity extends Activity {
         ));
 
         TextView autoStatusTitle = text(
-                "MANUAL SPENDING TRACKER",
+                "AUTOMATIC BANK ALERTS",
                 9,
                 MUTED
         );
@@ -1003,11 +1441,22 @@ public class MainActivity extends Activity {
         autoStatus.addView(autoStatusTitle, new LinearLayout.LayoutParams(0, -2, 1f));
 
         TextView sync = text(
-                "ON THIS PHONE",
+                SmsTransactionService.isEnabled(preferences)
+                        && SmsTransactionService.hasReceivePermission(this)
+                        ? "AUTO ON" : (SmsTransactionService.isEnabled(preferences)
+                        ? "PAUSED" : "OFF · LOCAL"),
                 8,
                 SUBTLE
         );
         autoStatus.addView(sync);
+        autoStatus.setClickable(true);
+        autoStatus.setFocusable(true);
+        autoStatus.setBackground(ripple(SURFACE_2, blend(SURFACE_2, BG, 0.20f),
+                BORDER, SMALL_RADIUS));
+        autoStatus.setOnClickListener(v -> {
+            tap(v);
+            showSmsTrackingManager();
+        });
 
         page.addView(autoStatus, sectionParams(0, 14));
 
@@ -1017,7 +1466,7 @@ public class MainActivity extends Activity {
         toolsCard.addView(toolsTitle);
 
         TextView toolsHint = text(
-                "Set a daily limit, choose your alert threshold, or manage recurring bills.",
+                "Set daily and weekly student budgets, alerts, or recurring bills.",
                 9,
                 MUTED
         );
@@ -1036,6 +1485,20 @@ public class MainActivity extends Activity {
             showDailyLimitEditor();
         });
         toolsCard.addView(limitRow);
+
+        LinearLayout allowanceRow = new LinearLayout(this);
+        allowanceRow.setGravity(Gravity.CENTER_VERTICAL);
+        expenseWeeklyAllowanceStatus = text("Weekly allowance  •  Not set", 10, TEXT);
+        expenseWeeklyAllowanceStatus.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
+        allowanceRow.addView(expenseWeeklyAllowanceStatus,
+                new LinearLayout.LayoutParams(0, dp(42), 1f));
+        TextView allowanceButton = actionButton("SET WEEK", false);
+        allowanceRow.addView(allowanceButton, new LinearLayout.LayoutParams(dp(94), dp(42)));
+        allowanceButton.setOnClickListener(v -> {
+            tap(v);
+            showWeeklyAllowanceEditor();
+        });
+        toolsCard.addView(allowanceRow);
 
         LinearLayout alertRow = new LinearLayout(this);
         alertRow.setGravity(Gravity.CENTER_VERTICAL);
@@ -1121,6 +1584,11 @@ public class MainActivity extends Activity {
         expenseBudgetMeta.setPadding(0, dp(3), 0, 0);
         summary.addView(expenseBudgetMeta);
 
+        expenseDailySafeSpend = text("Suggested max today  •  Set a budget to get an estimate.",
+                9, ACCENT_2);
+        expenseDailySafeSpend.setPadding(0, dp(8), 0, 0);
+        summary.addView(expenseDailySafeSpend);
+
         page.addView(summary, cardMargin());
 
         page.addView(sectionLabel("INSIGHTS"), sectionParams(0, 8));
@@ -1149,9 +1617,9 @@ public class MainActivity extends Activity {
         LinearLayout row2 = new LinearLayout(this);
         row2.setGravity(Gravity.CENTER_VERTICAL);
         expenseStreak = metricText("STREAK", "—", TEXT);
-        TextView categoryTrendHint = metricText("CATEGORY TRENDS", "Shown below", ACCENT_2);
+        expenseMonthlyIncome = metricText("RECEIVED THIS MONTH", "₹0", ACCENT_2);
         row2.addView(expenseStreak, new LinearLayout.LayoutParams(0, dp(58), 1f));
-        row2.addView(categoryTrendHint, new LinearLayout.LayoutParams(0, dp(58), 1f));
+        row2.addView(expenseMonthlyIncome, new LinearLayout.LayoutParams(0, dp(58), 1f));
         insightsCard.addView(row2);
 
         page.addView(insightsCard, sectionParams(0, 20));
@@ -1253,6 +1721,31 @@ public class MainActivity extends Activity {
             expenseBudgetMeta.setText("Set one to track your remaining allowance.");
         }
 
+        if (expenseDailySafeSpend != null) {
+            LocalDate today = LocalDate.now(zone);
+            if (!expenseMonth.equals(today.withDayOfMonth(1))) {
+                expenseDailySafeSpend.setText("Suggested max today  •  Available in the current month view.");
+            } else {
+                long dailyLimit = ExpenseStore.dailyLimitPaise(preferences);
+                long suggested = Long.MAX_VALUE;
+                boolean hasEstimate = false;
+                if (budget > 0L) {
+                    long remaining = Math.max(0L, budget - total);
+                    int daysLeft = Math.max(1, today.lengthOfMonth() - today.getDayOfMonth() + 1);
+                    suggested = remaining / daysLeft;
+                    hasEstimate = true;
+                }
+                if (dailyLimit > 0L) {
+                    suggested = hasEstimate ? Math.min(suggested, dailyLimit) : dailyLimit;
+                    hasEstimate = true;
+                }
+                expenseDailySafeSpend.setText(hasEstimate
+                        ? "Suggested max today  •  " + formatRupees(suggested)
+                                + "  ·  Based on your limits"
+                        : "Suggested max today  •  Set a daily or monthly limit to get an estimate.");
+            }
+        }
+
         refreshMoneyInsights();
 
         // The breakdown card is immediately before the transactions header.
@@ -1327,6 +1820,17 @@ public class MainActivity extends Activity {
         );
 
         expenseWeeklySpend.setText("THIS WEEK\n" + formatRupees(weekTotal));
+        long weeklyAllowance = ExpenseStore.weeklyAllowancePaise(preferences);
+        if (expenseWeeklyAllowanceStatus != null) {
+            expenseWeeklyAllowanceStatus.setText(weeklyAllowance > 0L
+                    ? "Weekly allowance  •  " + formatRupees(Math.max(0L, weeklyAllowance - weekTotal))
+                            + " left"
+                    : "Weekly allowance  •  Not set");
+        }
+        if (expenseMonthlyIncome != null) {
+            expenseMonthlyIncome.setText("RECEIVED THIS MONTH\n"
+                    + formatRupees(ExpenseStore.totalReceivedPaise(expenses)));
+        }
 
         if (previousMonthTotal <= 0L) {
             expenseVsLastMonth.setText("VS LAST MONTH\nNew");
@@ -1354,8 +1858,10 @@ public class MainActivity extends Activity {
 
         expenseDailyLimitStatus.setText(
                 limit > 0L
-                        ? "Daily limit  •  " + formatRupees(limit)
-                        : "Daily limit  •  Not set"
+                        ? "Today  •  " + formatRupees(ExpenseStore.totalForDate(preferences, today))
+                                + " / " + formatRupees(limit)
+                        : "Spent today  •  " + formatRupees(
+                                ExpenseStore.totalForDate(preferences, today))
         );
 
         boolean alerts = ExpenseStore.dailyAlertsEnabled(preferences);
@@ -1372,8 +1878,11 @@ public class MainActivity extends Activity {
             if (rule.active) activeCount++;
         }
         int dueCount = RecurringExpenseStore.dueCount(preferences, today);
+        int detectedCount = RecurringExpenseStore.detectMonthlyCandidates(
+                ExpenseStore.load(preferences)).size();
         expenseRecurringStatus.setText(
                 "Recurring  •  " + activeCount + " " + (activeCount == 1 ? "bill" : "bills")
+                        + (detectedCount > 0 ? "  ·  " + detectedCount + " pattern" : "")
                         + (dueCount > 0 ? "  •  " + dueCount + " due" : "")
         );
     }
@@ -1509,7 +2018,8 @@ public class MainActivity extends Activity {
         categoryMark.setGravity(Gravity.CENTER);
         categoryMark.setTypeface(Typeface.DEFAULT_BOLD);
         categoryMark.setBackground(round(
-                expense.category.equals("Food") ? ACCENT : ACCENT_2,
+                expense.category.startsWith("Food") || expense.category.equals("Tea & Coffee")
+                        ? ACCENT : ACCENT_2,
                 Color.TRANSPARENT,
                 999
         ));
@@ -1532,6 +2042,9 @@ public class MainActivity extends Activity {
         if (!expense.paymentMode.isEmpty()) detail += "  •  " + expense.paymentMode;
         if ("SMS".equals(expense.source) || "NOTIFICATION".equals(expense.source)) detail += "  •  AUTO";
         else if (!expense.note.trim().isEmpty()) detail += "  •  " + expense.note.trim();
+        if (expense.availableBalancePaise >= 0L) {
+            detail += "  •  Balance " + formatRupees(expense.availableBalancePaise);
+        }
 
         TextView note = text(detail, 8, MUTED);
         note.setMaxLines(1);
@@ -1541,7 +2054,9 @@ public class MainActivity extends Activity {
 
         row.addView(copy, new LinearLayout.LayoutParams(0, -2, 1f));
 
-        TextView amount = text(formatRupees(expense.amountPaise), 12, TEXT);
+        boolean incoming = SmsTransactionParser.CREDIT.equals(expense.direction);
+        TextView amount = text((incoming ? "+" : "") + formatRupees(expense.amountPaise),
+                12, incoming ? ACCENT : TEXT);
         amount.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
         amount.setGravity(Gravity.END);
         row.addView(amount);
@@ -1555,7 +2070,9 @@ public class MainActivity extends Activity {
         ImageView icon = dialogIcon(R.drawable.ic_wallet, ACCENT);
         sheet.addView(icon, dialogMarginParams(48, 0, 0, 14));
 
-        TextView title = text(formatRupees(expense.amountPaise), 26, TEXT);
+        boolean incoming = SmsTransactionParser.CREDIT.equals(expense.direction);
+        TextView title = text((incoming ? "+" : "") + formatRupees(expense.amountPaise),
+                26, incoming ? ACCENT : TEXT);
         title.setTypeface(Typeface.DEFAULT_BOLD);
         sheet.addView(title);
 
@@ -1567,6 +2084,14 @@ public class MainActivity extends Activity {
         );
         meta.setPadding(0, dp(4), 0, 18);
         sheet.addView(meta);
+        if (expense.availableBalancePaise >= 0L) {
+            TextView balance = text(
+                    "Available balance at alert · " + formatRupees(expense.availableBalancePaise),
+                    9, MUTED
+            );
+            balance.setPadding(0, 0, 0, dp(12));
+            sheet.addView(balance);
+        }
 
         LinearLayout actions = new LinearLayout(this);
         actions.setOrientation(LinearLayout.HORIZONTAL);
@@ -1609,7 +2134,8 @@ public class MainActivity extends Activity {
         sheet.addView(title);
 
         TextView message = text(
-                formatRupees(expense.amountPaise) + "  •  " + expense.category
+                (SmsTransactionParser.CREDIT.equals(expense.direction) ? "+" : "")
+                        + formatRupees(expense.amountPaise) + "  •  " + expense.category
                         + "\\n" + formatLongDate(expense.date),
                 10,
                 MUTED
@@ -1704,7 +2230,9 @@ public class MainActivity extends Activity {
         TextView splitStatus = dialogAction("SPLIT EXPENSE", false);
         LinearLayout.LayoutParams splitStatusParams = new LinearLayout.LayoutParams(-1, dp(42));
         splitStatusParams.setMargins(0, 0, 0, dp(14));
-        sheet.addView(splitStatus, splitStatusParams);
+        if (existing == null || !SmsTransactionParser.CREDIT.equals(existing.direction)) {
+            sheet.addView(splitStatus, splitStatusParams);
+        }
         splitStatus.setOnClickListener(v -> {
             tap(v);
             showSplitExpenseDialog(amount, splitStatus, splitSummary);
@@ -1713,47 +2241,33 @@ public class MainActivity extends Activity {
         TextView catLabel = dialogSectionLabel("CATEGORY");
         sheet.addView(catLabel);
 
+        HorizontalScrollView categoryScroll = new HorizontalScrollView(this);
+        categoryScroll.setHorizontalScrollBarEnabled(false);
+        categoryScroll.setOverScrollMode(View.OVER_SCROLL_NEVER);
         LinearLayout catGrid = new LinearLayout(this);
-        catGrid.setOrientation(LinearLayout.VERTICAL);
+        catGrid.setOrientation(LinearLayout.HORIZONTAL);
         List<TextView> categoryChips = new java.util.ArrayList<>();
 
-        for (int start = 0; start < ExpenseStore.CATEGORIES.length; start += 3) {
-            LinearLayout line = new LinearLayout(this);
-            line.setOrientation(LinearLayout.HORIZONTAL);
-            for (int j = start; j < Math.min(start + 3, ExpenseStore.CATEGORIES.length); j++) {
-                int index = j;
-                String label = ExpenseStore.CATEGORIES[j];
-                TextView chip = dialogChoiceChip(label, label.equals(selectedCategory[0]));
-                categoryChips.add(chip);
-                LinearLayout.LayoutParams chipParams = new LinearLayout.LayoutParams(0, dp(44), 1f);
-                if (j % 3 != 0) chipParams.setMargins(dp(7), 0, 0, 0);
-                line.addView(chip, chipParams);
-                chip.setOnClickListener(v -> {
-                    selectedCategory[0] = ExpenseStore.CATEGORIES[index];
-                    for (TextView cchip : categoryChips) {
-                        String value = cchip.getText().toString();
-                        cchip.setBackground(choiceBackground(
-                                value.equals(selectedCategory[0])
-                        ));
-                        cchip.setTextColor(
-                                value.equals(selectedCategory[0]) ? ACCENT : TEXT
-                        );
-                    }
-                    tap(v);
-                });
-            }
-            while (line.getChildCount() < 3) {
-                View empty = new View(this);
-                LinearLayout.LayoutParams emptyParams = new LinearLayout.LayoutParams(0, dp(44), 1f);
-                if (line.getChildCount() > 0) emptyParams.setMargins(dp(7), 0, 0, 0);
-                line.addView(empty, emptyParams);
-            }
-            catGrid.addView(line);
-            if (start + 3 < ExpenseStore.CATEGORIES.length) {
-                catGrid.addView(spacer(1, dp(7)));
-            }
+        for (int j = 0; j < ExpenseStore.CATEGORIES.length; j++) {
+            int index = j;
+            String label = ExpenseStore.CATEGORIES[j];
+            TextView chip = dialogChoiceChip(label, label.equals(selectedCategory[0]));
+            categoryChips.add(chip);
+            LinearLayout.LayoutParams chipParams = new LinearLayout.LayoutParams(dp(142), dp(40));
+            if (j > 0) chipParams.setMargins(dp(7), 0, 0, 0);
+            catGrid.addView(chip, chipParams);
+            chip.setOnClickListener(v -> {
+                selectedCategory[0] = ExpenseStore.CATEGORIES[index];
+                for (TextView cchip : categoryChips) {
+                    String value = cchip.getText().toString();
+                    cchip.setBackground(choiceBackground(value.equals(selectedCategory[0])));
+                    cchip.setTextColor(value.equals(selectedCategory[0]) ? ACCENT : TEXT);
+                }
+                tap(v);
+            });
         }
-        sheet.addView(catGrid, new LinearLayout.LayoutParams(-1, dp(146)));
+        categoryScroll.addView(catGrid);
+        sheet.addView(categoryScroll, new LinearLayout.LayoutParams(-1, dp(40)));
 
         LinearLayout dateRow = new LinearLayout(this);
         dateRow.setGravity(Gravity.CENTER_VERTICAL);
@@ -1864,11 +2378,10 @@ public class MainActivity extends Activity {
                 float confidence = existing == null ? 1.0f : existing.confidence;
                 String fingerprint = existing == null ? "" : existing.fingerprint;
 
-                ExpenseStore.learnMerchantCategory(
-                        preferences,
-                        merchant,
-                        selectedCategory[0]
-                );
+                if (!SmsTransactionParser.CREDIT.equals(existing == null
+                        ? SmsTransactionParser.DEBIT : existing.direction)) {
+                    ExpenseStore.learnMerchantCategory(preferences, merchant, selectedCategory[0]);
+                }
 
                 ExpenseStore.upsert(preferences, new ExpenseStore.Expense(
                         id,
@@ -1880,7 +2393,9 @@ public class MainActivity extends Activity {
                         merchant,
                         source,
                         confidence,
-                        fingerprint
+                        fingerprint,
+                        existing == null ? SmsTransactionParser.DEBIT : existing.direction,
+                        existing == null ? -1L : existing.availableBalancePaise
                 ));
 
                 ExpenseDailyAlertReceiver.maybeNotifyNow(this);
@@ -2061,6 +2576,63 @@ public class MainActivity extends Activity {
         });
     }
 
+    private void showWeeklyAllowanceEditor() {
+        LinearLayout sheet = dialogSheet();
+        ImageView icon = dialogIcon(R.drawable.ic_wallet, ACCENT_2);
+        sheet.addView(icon, dialogMarginParams(48, 0, 0, 14));
+        TextView title = text("Weekly allowance", 22, TEXT);
+        title.setTypeface(Typeface.DEFAULT_BOLD);
+        sheet.addView(title);
+        TextView subtitle = text(
+                "Track a pocket-money target from Monday through Sunday. This is a guide, not an account balance.",
+                9, MUTED
+        );
+        subtitle.setPadding(0, dp(5), 0, dp(14));
+        sheet.addView(subtitle);
+
+        EditText input = field("e.g. 2,500", true);
+        input.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        input.setTextSize(27);
+        input.setGravity(Gravity.CENTER);
+        long current = ExpenseStore.weeklyAllowancePaise(preferences);
+        if (current > 0L) input.setText(amountRupeesInput(current));
+        sheet.addView(input, new LinearLayout.LayoutParams(-1, dp(64)));
+
+        LinearLayout actions = new LinearLayout(this);
+        actions.setGravity(Gravity.CENTER_VERTICAL);
+        TextView clear = dialogTextAction("CLEAR");
+        TextView cancel = dialogTextAction("CANCEL");
+        TextView save = dialogAction("SAVE ALLOWANCE", true);
+        actions.addView(clear, new LinearLayout.LayoutParams(0, dp(46), 0.85f));
+        actions.addView(cancel, new LinearLayout.LayoutParams(0, dp(46), 0.85f));
+        LinearLayout.LayoutParams saveParams = new LinearLayout.LayoutParams(0, dp(46), 1.3f);
+        saveParams.setMargins(dp(7), 0, 0, 0);
+        actions.addView(save, saveParams);
+        LinearLayout.LayoutParams actionsParams = new LinearLayout.LayoutParams(-1, dp(46));
+        actionsParams.setMargins(0, dp(14), 0, 0);
+        sheet.addView(actions, actionsParams);
+
+        Dialog dialog = showBottomSheet(sheet);
+        clear.setOnClickListener(v -> {
+            ExpenseStore.setWeeklyAllowancePaise(preferences, 0L);
+            dialog.dismiss();
+            refreshExpensesScreen();
+        });
+        cancel.setOnClickListener(v -> dialog.dismiss());
+        save.setOnClickListener(v -> {
+            try {
+                ExpenseStore.setWeeklyAllowancePaise(preferences,
+                        ExpenseStore.parseAmountToPaise(input.getText().toString()));
+                hideKeyboard();
+                dialog.dismiss();
+                refreshExpensesScreen();
+            } catch (Exception ignored) {
+                input.setError("Enter a valid weekly amount.");
+                shake(v);
+            }
+        });
+    }
+
     private void showRecurringManager() {
         LinearLayout sheet = dialogSheet();
 
@@ -2106,8 +2678,10 @@ public class MainActivity extends Activity {
         LinearLayout list = new LinearLayout(this);
         list.setOrientation(LinearLayout.VERTICAL);
         List<RecurringExpenseStore.Rule> rules = RecurringExpenseStore.load(preferences);
+        List<RecurringExpenseStore.Candidate> candidates =
+                RecurringExpenseStore.detectMonthlyCandidates(ExpenseStore.load(preferences));
 
-        if (rules.isEmpty()) {
+        if (rules.isEmpty() && candidates.isEmpty()) {
             TextView empty = text(
                     "No recurring expenses yet. Start with rent or a regular bill above.",
                     9,
@@ -2154,6 +2728,46 @@ public class MainActivity extends Activity {
             }
         }
 
+        if (!candidates.isEmpty()) {
+            TextView detectedTitle = text("Possible monthly repeats", 12, TEXT);
+            detectedTitle.setTypeface(Typeface.DEFAULT_BOLD);
+            detectedTitle.setPadding(0, dp(13), 0, dp(2));
+            list.addView(detectedTitle);
+            TextView detectedHint = text(
+                    "Patterns are suggestions. Review an item before turning it into a recurring bill.",
+                    8, MUTED
+            );
+            detectedHint.setPadding(0, 0, 0, dp(6));
+            list.addView(detectedHint);
+            for (RecurringExpenseStore.Candidate candidate : candidates) {
+                LinearLayout row = new LinearLayout(this);
+                row.setGravity(Gravity.CENTER_VERTICAL);
+                row.setPadding(0, dp(7), 0, dp(7));
+                LinearLayout copy = new LinearLayout(this);
+                copy.setOrientation(LinearLayout.VERTICAL);
+                TextView name = text(candidate.merchant, 10, TEXT);
+                name.setTypeface(Typeface.DEFAULT_BOLD);
+                copy.addView(name);
+                TextView meta = text(
+                        formatRupees(candidate.suggestedAmountPaise) + "  ·  "
+                                + candidate.occurrences + " monthly payments",
+                        8, MUTED
+                );
+                copy.addView(meta);
+                row.addView(copy, new LinearLayout.LayoutParams(0, -2, 1f));
+                TextView addCandidate = dialogTextAction("REVIEW");
+                row.addView(addCandidate, new LinearLayout.LayoutParams(dp(70), dp(38)));
+                addCandidate.setOnClickListener(v -> {
+                    tap(v);
+                    if (managerDialog[0] != null) managerDialog[0].dismiss();
+                    showRecurringEditor(null, candidate.merchant, candidate.category,
+                            Math.min(28, candidate.latestDate.getDayOfMonth()),
+                            candidate.suggestedAmountPaise);
+                });
+                list.addView(row);
+            }
+        }
+
         sheet.addView(list);
 
         TextView add = dialogAction("+ ADD RECURRING", true);
@@ -2181,6 +2795,16 @@ public class MainActivity extends Activity {
             String presetTitle,
             String presetCategory,
             int presetDay
+    ) {
+        showRecurringEditor(existing, presetTitle, presetCategory, presetDay, 0L);
+    }
+
+    private void showRecurringEditor(
+            RecurringExpenseStore.Rule existing,
+            String presetTitle,
+            String presetCategory,
+            int presetDay,
+            long presetAmountPaise
     ) {
         LinearLayout sheet = dialogSheet();
 
@@ -2213,6 +2837,7 @@ public class MainActivity extends Activity {
                 InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL
         );
         if (existing != null) amount.setText(amountRupeesInput(existing.amountPaise));
+        else if (presetAmountPaise > 0L) amount.setText(amountRupeesInput(presetAmountPaise));
         LinearLayout.LayoutParams amountParams = new LinearLayout.LayoutParams(-1, dp(50));
         amountParams.setMargins(0, dp(9), 0, 0);
         sheet.addView(amount, amountParams);
@@ -3025,15 +3650,22 @@ public class MainActivity extends Activity {
         autoText.addView(autoTitle);
 
         TextView autoDescription = text(
-                "NextBell doesn’t read your messages. Add each expense in Money.",
+                SmsTransactionService.isEnabled(preferences)
+                        && SmsTransactionService.hasReceivePermission(this)
+                        ? "Only transaction alerts are parsed on this device. Message text is never saved."
+                        : "Optional local bank-alert detection. You can keep using manual entry.",
                 10,
                 MUTED
         );
-        autoDescription.setMaxLines(2);
+        autoDescription.setMaxLines(3);
         autoDescription.setPadding(0, dp(4), 0, 0);
         autoText.addView(autoDescription);
 
-        TextView safeBadge = text("MANUAL", 8, ACCENT);
+        TextView safeBadge = text(
+                SmsTransactionService.isEnabled(preferences)
+                        && SmsTransactionService.hasReceivePermission(this) ? "AUTO ON" : "SET UP",
+                8, ACCENT
+        );
         safeBadge.setGravity(Gravity.CENTER);
         safeBadge.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
         safeBadge.setPadding(dp(9), 0, dp(9), 0);
@@ -3041,6 +3673,12 @@ public class MainActivity extends Activity {
 
         autoCard.addView(autoText, new LinearLayout.LayoutParams(0, -2, 1f));
         autoCard.addView(safeBadge, new LinearLayout.LayoutParams(-2, dp(32)));
+        autoCard.setClickable(true);
+        autoCard.setFocusable(true);
+        autoCard.setOnClickListener(v -> {
+            tap(v);
+            showSmsTrackingManager();
+        });
 
         page.addView(autoCard, sectionParams(0, 22));
 
@@ -3052,7 +3690,7 @@ public class MainActivity extends Activity {
         backupCard.addView(backupTitle);
 
         TextView backupDescription = text(
-                "Save your profile, themes and spending to a file you choose. Anyone with that file can read it.",
+                "Save your profile, study records, themes and money data to a file you choose. Anyone with that file can read it.",
                 10,
                 MUTED
         );
@@ -4375,6 +5013,128 @@ public class MainActivity extends Activity {
         }
     }
 
+    private void showSmsTrackingManager() {
+        boolean active = SmsTransactionService.isEnabled(preferences)
+                && SmsTransactionService.hasReceivePermission(this);
+        String disclosure = "Optional bank-alert tracking. NextBell parses messages only on this phone, "
+                + "keeps only transaction details (amount, date, merchant, category, type and available balance), "
+                + "and never saves or uploads message text or unrelated messages. New alerts are watched only "
+                + "while enabled. Scanning older messages is a separate choice limited to the last 30 days. "
+                + "Turning this off keeps transactions already added to Money. SMS access is sensitive and "
+                + "Google Play distribution requires its permission review.";
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(this)
+                .setTitle(active ? "Bank alerts are on" : "Automatic bank alerts")
+                .setMessage(disclosure)
+                .setNegativeButton(active ? "Turn off" : "Cancel", (dialog, which) -> {
+                    if (active) {
+                        SmsTransactionService.setEnabled(preferences, false);
+                        refreshMoneyAndSettings();
+                        Toast.makeText(this, "Automatic bank alerts are off. Existing transactions remain.",
+                                Toast.LENGTH_LONG).show();
+                    }
+                })
+                .setPositiveButton(active ? "Scan last 30 days" : "Enable new alerts",
+                        (dialog, which) -> requestSmsAccess(active))
+                .setNeutralButton(active ? "Done" : "Enable + scan 30 days", (dialog, which) -> {
+                    if (!active) requestSmsAccess(true);
+                });
+        builder.show();
+    }
+
+    private void requestSmsAccess(boolean scanRecent) {
+        scanSmsAfterPermission = scanRecent;
+        java.util.ArrayList<String> missing = new java.util.ArrayList<>();
+        if (!SmsTransactionService.hasReceivePermission(this)) {
+            missing.add(Manifest.permission.RECEIVE_SMS);
+        }
+        if (scanRecent && !SmsTransactionService.hasReadPermission(this)) {
+            missing.add(Manifest.permission.READ_SMS);
+        }
+
+        if (missing.isEmpty()) {
+            SmsTransactionService.setEnabled(preferences, true);
+            if (scanRecent) importRecentBankAlerts();
+            else refreshMoneyAndSettings();
+            return;
+        }
+
+        boolean requestedBefore = preferences.getBoolean(KEY_SMS_PERMISSION_REQUESTED, false);
+        boolean blocked = false;
+        for (String permission : missing) {
+            if (requestedBefore && !shouldShowRequestPermissionRationale(permission)) {
+                blocked = true;
+            }
+        }
+        if (blocked) {
+            scanSmsAfterPermission = false;
+            new AlertDialog.Builder(this)
+                    .setTitle("Allow bank-alert access")
+                    .setMessage("Android has this permission switched off. Open NextBell's app settings to enable only the SMS access you want.")
+                    .setNegativeButton("Cancel", null)
+                    .setPositiveButton("Open settings", (dialog, which) -> openSmsPermissionSettings())
+                    .show();
+            return;
+        }
+
+        preferences.edit().putBoolean(KEY_SMS_PERMISSION_REQUESTED, true).apply();
+        requestPermissions(missing.toArray(new String[0]), REQUEST_SMS_ACCESS);
+    }
+
+    private void openSmsPermissionSettings() {
+        Intent settingsIntent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                Uri.parse("package:" + getPackageName()));
+        try {
+            startActivity(settingsIntent);
+        } catch (ActivityNotFoundException ignored) {
+            Toast.makeText(this, "Open NextBell's app settings to manage SMS access.",
+                    Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void importRecentBankAlerts() {
+        if (!SmsTransactionService.hasReadPermission(this)) {
+            Toast.makeText(this, "Inbox access is needed only to scan recent bank alerts.",
+                    Toast.LENGTH_LONG).show();
+            refreshMoneyAndSettings();
+            return;
+        }
+        SmsTransactionService.setEnabled(preferences, true);
+        android.widget.ProgressBar progress = new android.widget.ProgressBar(this);
+        LinearLayout container = new LinearLayout(this);
+        container.setGravity(Gravity.CENTER_VERTICAL);
+        container.setPadding(dp(20), dp(16), dp(20), dp(16));
+        container.addView(progress, new LinearLayout.LayoutParams(dp(30), dp(30)));
+        TextView message = text("Checking recent messages on this phone…", 11, TEXT);
+        message.setPadding(dp(14), 0, 0, 0);
+        container.addView(message);
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle("Importing bank alerts")
+                .setView(container)
+                .setCancelable(false)
+                .create();
+        dialog.show();
+        Thread worker = new Thread(() -> {
+            int imported = SmsTransactionService.importRecentInbox(this, preferences);
+            runOnUiThread(() -> {
+                dialog.dismiss();
+                ExpenseDailyAlertReceiver.maybeNotifyNow(this);
+                refreshMoneyAndSettings();
+                Toast.makeText(this, imported == 0
+                                ? "No new bank transactions found in the last 30 days."
+                                : imported + (imported == 1 ? " transaction added." : " transactions added."),
+                        Toast.LENGTH_LONG).show();
+            });
+        }, "nextbell-bank-alert-import");
+        worker.start();
+    }
+
+    private void refreshMoneyAndSettings() {
+        if ("expenses".equals(selectedScreen)) buildExpensesScreen();
+        else if ("settings".equals(selectedScreen)) buildSettingsScreen();
+        updateBottomNav();
+    }
+
     private void requestNotificationPermissionIfNeeded() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
             NotificationScheduler.scheduleUpcoming(this);
@@ -4417,6 +5177,35 @@ public class MainActivity extends Activity {
             if ("settings".equals(selectedScreen)) {
                 buildSettingsScreen();
                 updateBottomNav();
+            }
+            return;
+        }
+
+        if (requestCode == REQUEST_SMS_ACCESS) {
+            boolean receiveGranted = SmsTransactionService.hasReceivePermission(this);
+            boolean readGranted = SmsTransactionService.hasReadPermission(this);
+            if (receiveGranted) {
+                SmsTransactionService.setEnabled(preferences, true);
+                if (scanSmsAfterPermission && readGranted) {
+                    scanSmsAfterPermission = false;
+                    importRecentBankAlerts();
+                } else {
+                    scanSmsAfterPermission = false;
+                    if ("expenses".equals(selectedScreen)) {
+                        new AlertDialog.Builder(this)
+                                .setTitle("Bank alerts are on")
+                                .setMessage("Only new bank transaction alerts will be watched. Existing messages are not scanned unless you choose that separately.")
+                                .setPositiveButton("Done", null)
+                                .show();
+                    }
+                    refreshMoneyAndSettings();
+                }
+            } else {
+                scanSmsAfterPermission = false;
+                SmsTransactionService.setEnabled(preferences, false);
+                Toast.makeText(this, "Automatic bank alerts stay off until SMS access is allowed.",
+                        Toast.LENGTH_LONG).show();
+                refreshMoneyAndSettings();
             }
             return;
         }
@@ -4659,7 +5448,8 @@ public class MainActivity extends Activity {
         if ("home".equals(screen)) return 0;
         if ("week".equals(screen)) return 1;
         if ("expenses".equals(screen)) return 2;
-        return 3;
+        if ("study".equals(screen)) return 3;
+        return 4;
     }
 
     private int themeHeadingSize() {

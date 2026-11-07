@@ -17,25 +17,34 @@ public final class ExpenseStore {
     private static final String KEY_EXPENSES = "expenses_v1";
     private static final String KEY_BUDGET_PREFIX = "expense_budget_";
     private static final String KEY_DAILY_LIMIT = "expense_daily_limit";
+    private static final String KEY_WEEKLY_ALLOWANCE = "expense_weekly_allowance";
     private static final String KEY_ALERT_THRESHOLD = "expense_alert_threshold";
     private static final String KEY_ALERT_ENABLED = "expense_alert_enabled";
     private static final String KEY_ALERT_LAST_NOTIFIED = "expense_alert_last_notified";
 
     public static final String[] CATEGORIES = {
             "Food & Drinks",
+            "Tea & Coffee",
             "Travel",
+            "Transport & Fuel",
             "College",
+            "Rent & Accommodation",
+            "Groceries",
             "Home & Bills",
+            "Bills & Recharge",
             "Mobile",
+            "Subscriptions",
             "Personal",
             "Fun & Social",
             "Shopping",
             "Health",
+            "Transfers & ATM",
+            "Income & Refunds",
             "Other"
     };
 
     public static final String[] PAYMENT_MODES = {
-            "UPI", "Cash", "Card", "Bank Transfer", "Other"
+            "UPI", "ATM", "Card", "NEFT", "IMPS", "RTGS", "Bank Transfer", "Cash", "Other"
     };
 
     public static final class Expense {
@@ -49,17 +58,27 @@ public final class ExpenseStore {
         public String source;
         public float confidence;
         public String fingerprint;
+        public String direction;
+        public long availableBalancePaise;
 
         public Expense(long id, long amountPaise, LocalDate date,
                        String category, String note, String paymentMode) {
             this(id, amountPaise, date, category, note, paymentMode,
-                    "", "MANUAL", 1.0f, "");
+                    "", "MANUAL", 1.0f, "", SmsTransactionParser.DEBIT, -1L);
         }
 
         public Expense(long id, long amountPaise, LocalDate date,
                        String category, String note, String paymentMode,
                        String merchant, String source,
                        float confidence, String fingerprint) {
+            this(id, amountPaise, date, category, note, paymentMode, merchant, source,
+                    confidence, fingerprint, SmsTransactionParser.DEBIT, -1L);
+        }
+
+        public Expense(long id, long amountPaise, LocalDate date,
+                       String category, String note, String paymentMode,
+                       String merchant, String source, float confidence,
+                       String fingerprint, String direction, long availableBalancePaise) {
             this.id = id;
             this.amountPaise = amountPaise;
             this.date = date;
@@ -70,6 +89,10 @@ public final class ExpenseStore {
             this.source = source == null ? "MANUAL" : source;
             this.confidence = confidence;
             this.fingerprint = fingerprint == null ? "" : fingerprint;
+            this.direction = SmsTransactionParser.CREDIT.equals(direction)
+                    ? SmsTransactionParser.CREDIT : SmsTransactionParser.DEBIT;
+            this.availableBalancePaise = availableBalancePaise >= 0L
+                    ? availableBalancePaise : -1L;
         }
     }
 
@@ -102,7 +125,9 @@ public final class ExpenseStore {
                         item.optString("merchant", ""),
                         item.optString("source", "MANUAL"),
                         (float) item.optDouble("confidence", 1.0),
-                        item.optString("fingerprint", "")
+                        item.optString("fingerprint", ""),
+                        item.optString("direction", SmsTransactionParser.DEBIT),
+                        item.optLong("availableBalancePaise", -1L)
                 ));
             } catch (Exception ignored) {
                 // Skip one damaged row without hiding the rest of the ledger.
@@ -134,6 +159,8 @@ public final class ExpenseStore {
                 item.put("source", expense.source);
                 item.put("confidence", expense.confidence);
                 item.put("fingerprint", expense.fingerprint);
+                item.put("direction", expense.direction);
+                item.put("availableBalancePaise", expense.availableBalancePaise);
                 array.put(item);
             } catch (Exception ignored) {
                 // Skip only an invalid object; other expenses remain persisted.
@@ -170,6 +197,14 @@ public final class ExpenseStore {
             if (fingerprint.equals(expense.fingerprint)) return true;
         }
         return false;
+    }
+
+    public static long nextId(SharedPreferences prefs) {
+        long next = System.currentTimeMillis();
+        for (Expense expense : load(prefs)) {
+            if (expense.id >= next && expense.id < Long.MAX_VALUE) next = expense.id + 1L;
+        }
+        return next;
     }
 
     public static int deleteByFingerprint(SharedPreferences prefs, String fingerprint) {
@@ -233,6 +268,7 @@ public final class ExpenseStore {
     public static long totalPaise(List<Expense> expenses) {
         long total = 0L;
         for (Expense expense : expenses) {
+            if (SmsTransactionParser.CREDIT.equals(expense.direction)) continue;
             long amountPaise = Math.max(0L, expense.amountPaise);
             if (Long.MAX_VALUE - total < amountPaise) return Long.MAX_VALUE;
             total += amountPaise;
@@ -245,6 +281,7 @@ public final class ExpenseStore {
         for (String category : CATEGORIES) totals.put(category, 0L);
 
         for (Expense expense : expenses) {
+            if (SmsTransactionParser.CREDIT.equals(expense.direction)) continue;
             long old = totals.containsKey(expense.category) ? totals.get(expense.category) : 0L;
             long amountPaise = Math.max(0L, expense.amountPaise);
             long next = Long.MAX_VALUE - old < amountPaise
@@ -278,6 +315,10 @@ public final class ExpenseStore {
             case "Mobile & Data": return "Mobile";
             case "Personal Care": return "Personal";
             case "Entertainment": return "Fun & Social";
+            case "Transport": return "Travel";
+            case "Fuel": return "Transport & Fuel";
+            case "Rent": return "Rent & Accommodation";
+            case "Recharge": return "Bills & Recharge";
             default: return isKnownCategory(value) ? value : "Other";
         }
     }
@@ -292,7 +333,8 @@ public final class ExpenseStore {
     public static long totalForDate(SharedPreferences prefs, LocalDate date) {
         long total = 0L;
         for (Expense expense : load(prefs)) {
-            if (date.equals(expense.date)) {
+            if (date.equals(expense.date)
+                    && !SmsTransactionParser.CREDIT.equals(expense.direction)) {
                 if (Long.MAX_VALUE - total < expense.amountPaise) return Long.MAX_VALUE;
                 total += expense.amountPaise;
             }
@@ -303,10 +345,22 @@ public final class ExpenseStore {
     public static long totalBetween(SharedPreferences prefs, LocalDate startInclusive, LocalDate endExclusive) {
         long total = 0L;
         for (Expense expense : load(prefs)) {
-            if (!expense.date.isBefore(startInclusive) && expense.date.isBefore(endExclusive)) {
+            if (!SmsTransactionParser.CREDIT.equals(expense.direction)
+                    && !expense.date.isBefore(startInclusive) && expense.date.isBefore(endExclusive)) {
                 if (Long.MAX_VALUE - total < expense.amountPaise) return Long.MAX_VALUE;
                 total += expense.amountPaise;
             }
+        }
+        return total;
+    }
+
+    public static long totalReceivedPaise(List<Expense> transactions) {
+        long total = 0L;
+        for (Expense transaction : transactions) {
+            if (!SmsTransactionParser.CREDIT.equals(transaction.direction)) continue;
+            long amount = Math.max(0L, transaction.amountPaise);
+            if (Long.MAX_VALUE - total < amount) return Long.MAX_VALUE;
+            total += amount;
         }
         return total;
     }
@@ -317,6 +371,14 @@ public final class ExpenseStore {
 
     public static void setDailyLimitPaise(SharedPreferences prefs, long paise) {
         prefs.edit().putLong(KEY_DAILY_LIMIT, Math.max(0L, paise)).apply();
+    }
+
+    public static long weeklyAllowancePaise(SharedPreferences prefs) {
+        return Math.max(0L, prefs.getLong(KEY_WEEKLY_ALLOWANCE, 0L));
+    }
+
+    public static void setWeeklyAllowancePaise(SharedPreferences prefs, long paise) {
+        prefs.edit().putLong(KEY_WEEKLY_ALLOWANCE, Math.max(0L, paise)).apply();
     }
 
     public static long dailyAlertThresholdPaise(SharedPreferences prefs) {

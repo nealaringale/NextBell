@@ -10,6 +10,7 @@ public class BootReceiver extends BroadcastReceiver {
         if (Intent.ACTION_BOOT_COMPLETED.equals(intent.getAction())
                 || Intent.ACTION_MY_PACKAGE_REPLACED.equals(intent.getAction())) {
             NotificationScheduler.scheduleUpcoming(context);
+            StudentPlannerScheduler.scheduleAll(context);
         }
     }
 }

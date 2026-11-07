@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">NextBell</string>
+    <string name="widget_next_class_description">Shows your current or next class from the saved timetable.</string>
 </resources>

@@ -57,6 +57,22 @@ public class ExpenseStoreTest {
         assertEquals(500L, ExpenseStore.totalPaise(damaged));
     }
 
+    @Test
+    public void creditsAreTrackedSeparatelyFromSpendingAndCategoryBars() {
+        LocalDate date = LocalDate.of(2026, 11, 7);
+        ExpenseStore.Expense debit = expense(1, date, 500);
+        ExpenseStore.Expense credit = new ExpenseStore.Expense(
+                2, 700, date, "Income & Refunds", "", "UPI", "Refund",
+                "SMS", 0.9f, "fingerprint", SmsTransactionParser.CREDIT, 20_000L
+        );
+        List<ExpenseStore.Expense> transactions = Arrays.asList(debit, credit);
+
+        assertEquals(500L, ExpenseStore.totalPaise(transactions));
+        assertEquals(700L, ExpenseStore.totalReceivedPaise(transactions));
+        assertEquals(500L, ExpenseStore.categoryTotals(transactions).get("Food & Drinks").longValue());
+        assertEquals(20_000L, credit.availableBalancePaise);
+    }
+
     private static ExpenseStore.Expense expense(long id, LocalDate date, long amount) {
         return new ExpenseStore.Expense(id, amount, date, "Food & Drinks", "", "Cash");
     }

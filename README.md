@@ -1,13 +1,15 @@
 # NextBell
 
-NextBell is a native Android day planner for FE Division B students. A student's roll number selects batch and tutorial entries from the published timetable. The app also includes a manual spending log, monthly budgets, recurring expenses, optional class reminders, six color themes, and reduced-motion controls.
+NextBell is a local-first Android student planner for FE Division B. A student's roll number selects batch and tutorial entries from the published timetable. It now includes attendance records and target-based bunk estimates, assignment/exam/task reminders, a next-class home-screen widget, daily and weekly money controls, recurring-expense suggestions, and optional on-device bank SMS parsing.
 
 ## Product and data model
 
-- **Android app:** Java, Android SDK 35, minimum Android 8.0 (API 26), target SDK 35. Screens are native views hosted in `MainActivity`; timetable, expense, notification, and backup logic live in separate Java classes.
+- **Android app:** Java, Android SDK 35, minimum Android 8.0 (API 26), target SDK 35. Screens are native views hosted in `MainActivity`; timetable, attendance, planner, finance, notification, SMS parsing, and backup logic live in Java classes.
 - **Timetable:** bundled official FE Division B timetable, W.E.F. 16 September 2026, Revision 00. Schedule data is available offline; batch filtering is based on the student's roll number.
-- **Profile and spending:** stored locally in the app's private `SharedPreferences`; there is no server, account system, or network permission. System cloud backup and device-to-device transfer are excluded. The user can export a readable JSON backup to a file they choose. Anyone who receives that file can read it.
-- **Money entry:** manual. The app requests no SMS permissions and does not read messages.
+- **Study planning:** attendance marks, assignment/exam/task items, and due dates are stored locally. Bunk estimates use only sessions the student has recorded. Deadline reminders are approximate Android alarms and require notifications to be enabled.
+- **Profile, study data, and money:** stored in the app's private `SharedPreferences`; there is no server, account system, or network permission. System cloud backup and device-to-device transfer are excluded. The user can export a readable JSON backup to a file they choose. Anyone who receives that file can read it.
+- **Money entry:** always supports manual entry. Optional SMS tracking requires explicit Android permissions and user opt-in. The app parses incoming alerts and, only after a separate choice, scans up to 30 days of inbox messages locally. It stores derived transaction fields and a one-way duplicate fingerprint, never message text or unrelated messages. A small curated merchant rule list and user-learned category corrections are used; this is not a 3,000-merchant database, and unknown matches fall back to keyword rules or `Other`.
+- **Distribution note:** Google Play classifies SMS access as sensitive and requires policy review/approval for an SMS money-management use case. The project has not been submitted for that review. See [Google Play's SMS permission policy](https://support.google.com/googleplay/android-developer/answer/10208820).
 - **Admin companion:** a separate local draft tool. It does not publish timetable changes to student devices.
 - **Browser prototype:** `src/` is an older Vite demo with fixture data; it is not the Android app or the download website and should not be treated as the live timetable source.
 
