@@ -290,7 +290,8 @@ public final class FirebaseSyncManager implements SharedPreferences.OnSharedPref
         if ("name".equals(key) || "roll_number".equals(key)) {
             writeSingleton("profile", localProfile());
         } else if ("theme".equals(key) || "attendance_target_percent".equals(key)
-                || "expense_daily_limit".equals(key)) {
+                || "expense_daily_limit".equals(key)
+                || "expense_weekly_allowance".equals(key)) {
             writeSingleton("settings", localSettings());
         }
     }
