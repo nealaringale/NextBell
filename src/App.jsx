@@ -507,6 +507,12 @@ export default function App() {
     return filterTimetableForRoll(profile.rollNo, selectedDay);
   }, [profile.rollNo, selectedDay]);
 
+  // Attendance IDs use the same meeting key as Android:
+  // date|lowercase subject|scheduled start time.
+  const todaySchedule = useMemo(() => {
+    return filterTimetableForRoll(profile.rollNo, todayName);
+  }, [profile.rollNo, todayName]);
+
   // Current and Next class calculations
   const academicClasses = useMemo(() => {
     return daySchedule.filter((c) => c.kind !== 'SHORT_BREAK' && c.kind !== 'LUNCH');
@@ -591,14 +597,14 @@ export default function App() {
   const todayDateStr = getTodayDateStringIST();
   const spentTodayPaise = useMemo(() => {
     return expenses
-      .filter((e) => e.date === todayDateStr)
+      .filter((e) => e.date === todayDateStr && e.direction !== 'CREDIT')
       .reduce((sum, e) => sum + (Number(e.amountPaise) || 0), 0);
   }, [expenses, todayDateStr]);
 
   const spentThisMonthPaise = useMemo(() => {
     const curMonth = todayDateStr.slice(0, 7);
     return expenses
-      .filter((e) => (e.date || '').startsWith(curMonth))
+      .filter((e) => (e.date || '').startsWith(curMonth) && e.direction !== 'CREDIT')
       .reduce((sum, e) => sum + (Number(e.amountPaise) || 0), 0);
   }, [expenses, todayDateStr]);
 
@@ -607,7 +613,7 @@ export default function App() {
     const curMonth = todayDateStr.slice(0, 7);
     const map = {};
     expenses
-      .filter((e) => (e.date || '').startsWith(curMonth))
+      .filter((e) => (e.date || '').startsWith(curMonth) && e.direction !== 'CREDIT')
       .forEach((e) => {
         const cat = e.category || 'Other';
         map[cat] = (map[cat] || 0) + (Number(e.amountPaise) || 0);
@@ -616,10 +622,17 @@ export default function App() {
   }, [expenses, todayDateStr]);
 
   // Attendance Mark Quick Action
-  const handleMarkAttendance = (subject, status) => {
+  const handleMarkAttendance = (subject, status, scheduledStart, scheduledEnd) => {
     const date = getTodayDateStringIST();
-    const key = `${subject}_${date}_${nowMinutes}`;
-    setAttendance((prev) => [{ key, subject, date, status }, ...prev]);
+    const matchingClass = todaySchedule.find((item) =>
+      item.subject === subject && item.kind !== 'SHORT_BREAK' && item.kind !== 'LUNCH'
+    );
+    const start = String(scheduledStart || matchingClass?.start || 'MANUAL');
+    const end = String(scheduledEnd || matchingClass?.end || '');
+    const normalizedSubject = String(subject || '').trim().toLowerCase();
+    const key = `${date}|${normalizedSubject}|${start}`;
+    const record = { key, subject, start, end, date, status };
+    setAttendance((prev) => [record, ...prev.filter((item) => item.key !== key)]);
     showToast(`Marked ${status === 'PRESENT' ? 'Present' : 'Absent'} for ${subject}`);
   };
 
@@ -691,6 +704,9 @@ export default function App() {
       note: newExpenseForm.note.trim() || newExpenseForm.category,
       paymentMode: newExpenseForm.paymentMode,
       date: newExpenseForm.date || getTodayDateStringIST(),
+      direction: 'DEBIT',
+      merchant: '',
+      source: 'MANUAL',
     };
     setExpenses((prev) => [expenseItem, ...prev]);
     setNewExpenseForm({
@@ -912,13 +928,13 @@ export default function App() {
                         <div className="quick-attendance-buttons">
                           <button
                             className="btn-attend-present"
-                            onClick={() => handleMarkAttendance(heroClass.subject, 'PRESENT')}
+                            onClick={() => handleMarkAttendance(heroClass.subject, 'PRESENT', heroClass.start, heroClass.end)}
                           >
                             ✓ Attended
                           </button>
                           <button
                             className="btn-attend-absent"
-                            onClick={() => handleMarkAttendance(heroClass.subject, 'ABSENT')}
+                            onClick={() => handleMarkAttendance(heroClass.subject, 'ABSENT', heroClass.start, heroClass.end)}
                           >
                             ✕ Missed
                           </button>
@@ -1028,14 +1044,14 @@ export default function App() {
                             <button
                               className="btn-mark-mini present"
                               title="Mark Present"
-                              onClick={() => handleMarkAttendance(item.subject, 'PRESENT')}
+                              onClick={() => handleMarkAttendance(item.subject, 'PRESENT', item.start, item.end)}
                             >
                               ✓
                             </button>
                             <button
                               className="btn-mark-mini absent"
                               title="Mark Absent"
-                              onClick={() => handleMarkAttendance(item.subject, 'ABSENT')}
+                              onClick={() => handleMarkAttendance(item.subject, 'ABSENT', item.start, item.end)}
                             >
                               ✕
                             </button>
@@ -1395,7 +1411,7 @@ export default function App() {
                           <p>{exp.category} · {exp.paymentMode} · {exp.date}</p>
                         </div>
                         <div className="trans-amount">
-                          ₹{(exp.amountPaise / 100).toFixed(0)}
+                          {exp.direction === 'CREDIT' ? '+' : '−'}₹{(exp.amountPaise / 100).toFixed(0)}
                         </div>
                         <button
                           className="btn-delete-trans"
