@@ -12,6 +12,56 @@ public class SmsTransactionParserTest {
     private static final LocalDate RECEIVED = LocalDate.of(2026, 11, 7);
 
     @Test
+    public void parsesBankSmsNotificationWithoutSmsPermission() {
+        SmsTransactionParser.ParsedTransaction parsed = SmsTransactionParser.parseNotification(
+                "com.google.android.apps.messaging",
+                "VM-HDFCBK",
+                "A/c XX1234 debited by Rs 240.00 at Swiggy. Avl Bal INR 1,700.00",
+                RECEIVED
+        );
+
+        assertNotNull(parsed);
+        assertEquals(24_000L, parsed.amountPaise);
+        assertEquals(170_000L, parsed.availableBalancePaise);
+        assertEquals(SmsTransactionParser.DEBIT, parsed.direction);
+        assertEquals("Swiggy", parsed.merchant);
+        assertEquals("Food & Drinks", parsed.category);
+    }
+
+    @Test
+    public void parsesPaymentAppNotificationAndRejectsUntrustedApps() {
+        SmsTransactionParser.ParsedTransaction parsed = SmsTransactionParser.parseNotification(
+                "com.phonepe.app",
+                "PhonePe",
+                "You paid Rs. 79.00 to Cafe successfully",
+                RECEIVED
+        );
+
+        assertNotNull(parsed);
+        assertEquals(7_900L, parsed.amountPaise);
+        assertEquals(SmsTransactionParser.DEBIT, parsed.direction);
+
+        assertNull(SmsTransactionParser.parseNotification(
+                "com.random.game", "Reward", "You paid Rs. 79.00 successfully", RECEIVED
+        ));
+    }
+
+    @Test
+    public void parsesIncomingCreditFromPaymentNotification() {
+        SmsTransactionParser.ParsedTransaction parsed = SmsTransactionParser.parseNotification(
+                "com.google.android.apps.messaging",
+                "Bank credit alert",
+                "You received INR 500.00 from Rahul",
+                RECEIVED
+        );
+
+        assertNotNull(parsed);
+        assertEquals(50_000L, parsed.amountPaise);
+        assertEquals(SmsTransactionParser.CREDIT, parsed.direction);
+        assertEquals("Income & Refunds", parsed.category);
+    }
+
+    @Test
     public void parsesDebitMerchantDateAndAvailableBalance() {
         SmsTransactionParser.ParsedTransaction parsed = SmsTransactionParser.parse(
                 "VM-HDFCBK",

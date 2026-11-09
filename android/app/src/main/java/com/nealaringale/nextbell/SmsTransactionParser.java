@@ -30,7 +30,7 @@ public final class SmsTransactionParser {
     // "credited to VPA" describes the UPI payee, not money credited to the sender's account.
     private static final Pattern CREDIT_TERMS = Pattern.compile(
             "(?i)\\b(?:refund(?:ed)?|reversal|reversed|cashback|credit\\s+received|"
-                    + "payment\\s+received|(?:amount|funds|money)\\s+credited|"
+                    + "payment\\s+received|you\\s+received|(?:amount|funds|money)\\s+credited|"
                     + "credit(?:ed)?\\s+(?:(?:to|into)\\s+)?(?:(?:your|my|the)\\s+)?(?:account|a/c)|"
                     + "(?:(?:your|my|the)\\s+)?account\\s+(?:has\\s+been\\s+)?credited|"
                     + "received\\s+(?:into|in)\\s+(?:(?:your|my|the)\\s+)?(?:account|a/c)|"
@@ -38,10 +38,10 @@ public final class SmsTransactionParser {
     );
     private static final Pattern DEBIT_TERMS = Pattern.compile(
             "(?i)\\b(?:debited|deducted|withdrawn|withdrawal|spent|purchase|sent|"
-                    + "paid\\s+to|transfer\\s+to|transferred\\s+to)\\b"
+                    + "paid|transfer\\s+to|transferred\\s+to)\\b"
     );
     private static final Pattern RAIL_SUCCESS = Pattern.compile(
-            "(?i)(?:upi|atm|pos|neft|imps|rtgs|card|nach|ach).{0,90}"
+            "(?i)(?:upi|atm|pos|neft|imps|rtgs|card|nach|ach|payment|transaction).{0,90}"
                     + "(?:successful|successfully|completed|processed|paid)"
     );
     private static final Pattern FAILED = Pattern.compile(
@@ -89,8 +89,25 @@ public final class SmsTransactionParser {
     private SmsTransactionParser() {}
 
     public static ParsedTransaction parse(String sender, String body, LocalDate receivedDate) {
-        if (!isBankLikeSender(sender) || body == null || body.trim().isEmpty()
-                || receivedDate == null) return null;
+        return parseInternal(sender, body, receivedDate, false);
+    }
+
+    /** Parses a transaction preview only when it came from a supported messaging/payment app. */
+    public static ParsedTransaction parseNotification(String packageName, String title,
+                                                       String body, LocalDate receivedDate) {
+        if (!TransactionNotificationAccess.isSupportedPackage(packageName)
+                || body == null || body.trim().isEmpty() || receivedDate == null) return null;
+        String cleanTitle = title == null ? "" : title.trim();
+        String sender = packageName + "|" + cleanTitle;
+        String message = cleanTitle.isEmpty() ? body : cleanTitle + ". " + body;
+        return parseInternal(sender, message, receivedDate, true);
+    }
+
+    private static ParsedTransaction parseInternal(String sender, String body,
+                                                    LocalDate receivedDate,
+                                                    boolean trustedNotificationSource) {
+        if ((!trustedNotificationSource && !isBankLikeSender(sender))
+                || body == null || body.trim().isEmpty() || receivedDate == null) return null;
 
         String normalized = body.replace('\u00a0', ' ')
                 .replaceAll("\\s+", " ")
