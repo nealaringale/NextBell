@@ -63,6 +63,51 @@ public class SmsTransactionParserTest {
     }
 
     @Test
+    public void debitWithCreditedToVpaRemainsDebitAndExtractsIndianDate() {
+        SmsTransactionParser.ParsedTransaction parsed = SmsTransactionParser.parse(
+                "VM-HDFCBK",
+                "UPI Rs 150.00 debited from A/c XX1234 on 09-Nov-26 "
+                        + "and credited to VPA swiggy@icici. Avl Bal INR 4,500.00",
+                RECEIVED
+        );
+
+        assertNotNull(parsed);
+        assertEquals(15_000L, parsed.amountPaise);
+        assertEquals(450_000L, parsed.availableBalancePaise);
+        assertEquals(LocalDate.of(2026, 11, 9), parsed.date);
+        assertEquals(SmsTransactionParser.DEBIT, parsed.direction);
+        assertEquals("Swiggy", parsed.merchant);
+        assertEquals("Food & Drinks", parsed.category);
+    }
+
+    @Test
+    public void balanceBeforeDebitDoesNotBecomeTransactionAmount() {
+        SmsTransactionParser.ParsedTransaction parsed = SmsTransactionParser.parse(
+                "VM-SBIINB",
+                "Bal INR 5,000. Rs 200 debited at Cafe on 09-11-2026",
+                RECEIVED
+        );
+
+        assertNotNull(parsed);
+        assertEquals(20_000L, parsed.amountPaise);
+        assertEquals(500_000L, parsed.availableBalancePaise);
+        assertEquals(SmsTransactionParser.DEBIT, parsed.direction);
+    }
+
+    @Test
+    public void creditedToOwnAccountIsStillRecognizedAsIncome() {
+        SmsTransactionParser.ParsedTransaction parsed = SmsTransactionParser.parse(
+                "AD-ICICIB",
+                "INR 500.00 credited to your account from Rahul",
+                RECEIVED
+        );
+
+        assertNotNull(parsed);
+        assertEquals(50_000L, parsed.amountPaise);
+        assertEquals(SmsTransactionParser.CREDIT, parsed.direction);
+    }
+
+    @Test
     public void fuzzyMerchantMatchAndStableFingerprintWork() {
         String body = "UPI payment of Rs 150 debited at flipkartt successfully";
         SmsTransactionParser.ParsedTransaction first =
