@@ -389,7 +389,7 @@ public final class FirebaseSyncManager implements SharedPreferences.OnSharedPref
         try {
             SharedPreferences.Editor editor = preferences.edit();
             if (settings.has("themeIndex")) {
-                editor.putInt("theme", Math.max(0, Math.min(3, settings.optInt("themeIndex", 0))));
+                editor.putInt("theme", Math.max(0, Math.min(5, settings.optInt("themeIndex", 0))));
             }
             if (settings.has("attendanceTarget")) {
                 editor.putInt("attendance_target_percent",
