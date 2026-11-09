@@ -255,13 +255,14 @@ public final class FirebaseSyncManager implements SharedPreferences.OnSharedPref
             SyncedRecord record = fromDocument(document);
             if (record == null) continue;
             SyncedRecord previous = knownRecords.get(document.getId());
-            boolean isNewer = previous == null
-                    || record.updatedAtMs > previous.updatedAtMs
-                    || (record.updatedAtMs == previous.updatedAtMs
-                    && (record.deleted != previous.deleted
-                    || !safeJson(record.payload).equals(safeJson(previous.payload))));
+            // The snapshot represents Firestore's committed document state.
+            // Client clocks can be skewed and offline writes can arrive late, so
+            // compare content rather than trusting local wall-clock timestamps.
+            boolean changed = previous == null
+                    || record.deleted != previous.deleted
+                    || !safeJson(record.payload).equals(safeJson(previous.payload));
             knownRecords.put(document.getId(), record);
-            if (!isNewer || document.getMetadata().hasPendingWrites()) continue;
+            if (!changed || document.getMetadata().hasPendingWrites()) continue;
 
             if ("profile".equals(record.collection)) {
                 if (!record.deleted && record.payload != null) applyProfile(record.payload);
