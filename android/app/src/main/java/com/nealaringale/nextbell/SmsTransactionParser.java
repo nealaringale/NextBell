@@ -37,7 +37,7 @@ public final class SmsTransactionParser {
                     + "deposit(?:ed)?\\s+(?:into|to)\\s+(?:(?:your|my|the)\\s+)?(?:account|a/c))\\b"
     );
     private static final Pattern DEBIT_TERMS = Pattern.compile(
-            "(?i)\\b(?:debited|debit|deducted|withdrawn|withdrawal|spent|purchase|sent|"
+            "(?i)\\b(?:debited|deducted|withdrawn|withdrawal|spent|purchase|sent|"
                     + "paid\\s+to|transfer\\s+to|transferred\\s+to)\\b"
     );
     private static final Pattern RAIL_SUCCESS = Pattern.compile(
