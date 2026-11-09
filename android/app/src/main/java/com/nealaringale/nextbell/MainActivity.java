@@ -1440,7 +1440,7 @@ public class MainActivity extends Activity {
         autoStatusTitle.setLetterSpacing(0.06f);
         autoStatus.addView(autoStatusTitle, new LinearLayout.LayoutParams(0, -2, 1f));
 
-        TextView sync = text(
+        TextView syncStatus = text(
                 SmsTransactionService.isEnabled(preferences)
                         && SmsTransactionService.hasReceivePermission(this)
                         ? "AUTO ON" : (SmsTransactionService.isEnabled(preferences)
@@ -1448,7 +1448,18 @@ public class MainActivity extends Activity {
                 8,
                 SUBTLE
         );
-        autoStatus.addView(sync);
+        autoStatus.addView(syncStatus);
+
+        TextView syncButton = actionButton("SYNC SMS", false);
+        LinearLayout.LayoutParams syncButtonParams =
+                new LinearLayout.LayoutParams(dp(76), dp(34));
+        syncButtonParams.setMargins(dp(9), 0, 0, 0);
+        autoStatus.addView(syncButton, syncButtonParams);
+        syncButton.setOnClickListener(v -> {
+            tap(v);
+            requestSmsAccess(true);
+        });
+
         autoStatus.setClickable(true);
         autoStatus.setFocusable(true);
         autoStatus.setBackground(ripple(SURFACE_2, blend(SURFACE_2, BG, 0.20f),
