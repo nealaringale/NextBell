@@ -248,18 +248,31 @@ public final class FirebaseSyncManager implements SharedPreferences.OnSharedPref
                 saveRows(preferenceKey, merged);
             }
 
+            JSONObject localProfile = localProfile();
             SyncedRecord cloudProfile = getRemoteSingleton(remoteByCollection, "profile");
             if (cloudProfile != null && !cloudProfile.deleted && cloudProfile.payload != null) {
-                applyProfile(cloudProfile.payload);
+                // Cloud values win where present; device-only profile fields are preserved.
+                JSONObject mergedProfile = mergeJson(localProfile, cloudProfile.payload);
+                applyProfile(mergedProfile);
+                if (!mergedProfile.toString().equals(cloudProfile.payload.toString())) {
+                    writeSingleton("profile", mergedProfile);
+                }
             } else {
-                writeSingleton("profile", localProfile());
+                writeSingleton("profile", localProfile);
             }
 
+            JSONObject localSettings = localSettings();
             SyncedRecord cloudSettings = getRemoteSingleton(remoteByCollection, "settings");
             if (cloudSettings != null && !cloudSettings.deleted && cloudSettings.payload != null) {
-                applySettings(cloudSettings.payload);
+                // Do not lose Android-only budgets/alerts when the website created
+                // a smaller settings document before the phone signed in.
+                JSONObject mergedSettings = mergeJson(localSettings, cloudSettings.payload);
+                applySettings(mergedSettings);
+                if (!mergedSettings.toString().equals(cloudSettings.payload.toString())) {
+                    writeSingleton("settings", mergedSettings);
+                }
             } else {
-                writeSingleton("settings", localSettings());
+                writeSingleton("settings", localSettings);
             }
         } finally {
             applyingRemote = false;
@@ -272,6 +285,26 @@ public final class FirebaseSyncManager implements SharedPreferences.OnSharedPref
         }
         setStatus("Synced · live updates enabled");
         notifyRemoteDataChanged();
+    }
+
+    private JSONObject mergeJson(JSONObject local, JSONObject remote) {
+        JSONObject merged;
+        try {
+            merged = new JSONObject(local == null ? "{}" : local.toString());
+        } catch (Exception ignored) {
+            merged = new JSONObject();
+        }
+        if (remote == null) return merged;
+        Iterator<String> keys = remote.keys();
+        while (keys.hasNext()) {
+            String key = keys.next();
+            try {
+                merged.put(key, remote.get(key));
+            } catch (Exception ignored) {
+                // Keep other settings even when one remote value is malformed.
+            }
+        }
+        return merged;
     }
 
     private SyncedRecord getRemoteSingleton(Map<String, Map<String, SyncedRecord>> remote,
