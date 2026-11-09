@@ -99,9 +99,7 @@ public final class TransactionNotificationListener extends NotificationListenerS
         Parcelable[] messages = extras.getParcelableArray(Notification.EXTRA_MESSAGES);
         if (messages != null) {
             for (Parcelable item : messages) {
-                if (item instanceof Notification.MessagingStyle.Message) {
-                    append(body, ((Notification.MessagingStyle.Message) item).getText());
-                } else if (item instanceof Bundle) {
+                if (item instanceof Bundle) {
                     append(body, ((Bundle) item).getCharSequence("text"));
                 }
             }
