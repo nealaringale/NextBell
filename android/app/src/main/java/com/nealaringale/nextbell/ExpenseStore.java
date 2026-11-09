@@ -407,13 +407,23 @@ public final class ExpenseStore {
 
     public static int spendingStreakDays(SharedPreferences prefs, LocalDate endDate) {
         long limit = dailyLimitPaise(prefs);
-        if (limit <= 0L) return 0;
+        if (limit <= 0L || endDate == null) return 0;
+
+        // Do not award a streak for dates before the user's first recorded expense.
+        // After tracking has begun, a zero-spend day is a valid under-budget day.
+        LocalDate firstRecordedDate = null;
+        for (Expense expense : load(prefs)) {
+            if (expense.date != null
+                    && (firstRecordedDate == null || expense.date.isBefore(firstRecordedDate))) {
+                firstRecordedDate = expense.date;
+            }
+        }
+        if (firstRecordedDate == null || endDate.isBefore(firstRecordedDate)) return 0;
 
         int streak = 0;
         LocalDate cursor = endDate;
-        for (int i = 0; i < 366; i++) {
-            long dayTotal = totalForDate(prefs, cursor);
-            if (dayTotal <= limit) {
+        for (int i = 0; i < 366 && !cursor.isBefore(firstRecordedDate); i++) {
+            if (totalForDate(prefs, cursor) <= limit) {
                 streak++;
                 cursor = cursor.minusDays(1);
             } else {
@@ -428,8 +438,20 @@ public final class ExpenseStore {
     }
 
     public static long parseAmountToPaise(String raw) {
-        BigDecimal amount = new BigDecimal(raw.trim());
+        if (raw == null) throw new NumberFormatException("Amount is empty");
+
+        String normalized = raw.trim()
+                .replace(",", "")
+                .replaceAll("\\s+", "")
+                .replaceFirst("(?i)^(?:₹|rs\\.?|inr)", "");
+        if (!normalized.matches("[0-9]+(?:\\.[0-9]{1,2})?")) {
+            throw new NumberFormatException("Enter a valid amount, for example 1200 or 1200.50");
+        }
+
+        BigDecimal amount = new BigDecimal(normalized);
         if (amount.signum() < 0) throw new NumberFormatException("Negative amount");
-        return amount.movePointRight(2).setScale(0, java.math.RoundingMode.HALF_UP).longValueExact();
+        return amount.movePointRight(2)
+                .setScale(0, java.math.RoundingMode.HALF_UP)
+                .longValueExact();
     }
 }
