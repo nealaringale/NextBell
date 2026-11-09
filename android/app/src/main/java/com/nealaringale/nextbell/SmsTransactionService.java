@@ -14,7 +14,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-/** Locally parses only transaction-like SMS and saves derived ledger fields, never message text. */
+/** Locally parses transaction alerts and saves derived ledger fields, never alert text. */
 public final class SmsTransactionService {
     public static final String PREFS_NAME = "nextbell_profile";
     public static final String KEY_ENABLED = "sms_transaction_tracking_enabled";

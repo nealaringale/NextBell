@@ -67,7 +67,15 @@ public final class TransactionNotificationAccess {
         if (SUPPORTED_PACKAGES.contains(value)) return true;
         return value.contains("messaging")
                 || value.endsWith(".mms")
-                || value.endsWith(".sms");
+                || value.endsWith(".sms")
+                || value.contains("bank")
+                || value.contains("upi")
+                || value.contains("wallet")
+                || value.contains("phonepe")
+                || value.contains("paytm")
+                || value.contains("gpay")
+                || value.contains("mobikwik")
+                || value.contains("freecharge");
     }
 
     public static String shortStatus(Context context, android.content.SharedPreferences preferences) {
