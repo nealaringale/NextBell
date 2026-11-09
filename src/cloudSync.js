@@ -1,5 +1,7 @@
 import { firebaseConfig, isFirebaseConfigured } from './firebaseConfig.js';
 
+export { isFirebaseConfigured };
+
 let services;
 
 export function getFirebaseServices() {
