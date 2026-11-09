@@ -1,0 +1,42 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isOwner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    match /users/{uid}/records/{recordId} {
+      allow read: if isOwner(uid);
+
+      allow create, update: if isOwner(uid)
+        && request.resource.data.keys().hasOnly([
+          'collection',
+          'recordId',
+          'payloadJson',
+          'deleted',
+          'updatedAtMs',
+          'schemaVersion'
+        ])
+        && request.resource.data.collection in [
+          'expenses',
+          'attendance',
+          'tasks',
+          'recurringExpenses',
+          'profile',
+          'settings'
+        ]
+        && request.resource.data.recordId is string
+        && request.resource.data.deleted is bool
+        && request.resource.data.updatedAtMs is number
+        && request.resource.data.schemaVersion == 1
+        && (
+          request.resource.data.deleted == true
+          || (request.resource.data.payloadJson is string
+              && request.resource.data.payloadJson.size() <= 900000)
+        );
+
+      allow delete: if isOwner(uid);
+    }
+  }
+}
