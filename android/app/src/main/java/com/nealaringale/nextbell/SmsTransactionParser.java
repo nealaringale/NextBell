@@ -12,49 +12,49 @@ import java.util.regex.Pattern;
 /** Parses a narrow set of bank transaction alerts without retaining the message text. */
 public final class SmsTransactionParser {
     private static final Pattern AMOUNT = Pattern.compile(
-            "(?i)(?:₹|\\\\bINR\\\\b|\\\\bRs\\\\.?\\\\s*)\\\\s*([0-9][0-9,]*(?:\\\\.[0-9]{1,2})?)"
+            "(?i)(?:₹|\\bINR\\b|\\bRs\\.?\\s*)\\s*([0-9][0-9,]*(?:\\.[0-9]{1,2})?)"
     );
     private static final Pattern BALANCE = Pattern.compile(
-            "(?i)(?:(?:available|avl\\\\.?|closing|current|ledger|account|acct|a/c)\\\\s+)?"
-                    + "(?:balance|bal\\\\.?)(?:\\\\s+(?:is|of))?\\\\s*[:=\\\\-]?\\\\s*"
-                    + "(?:₹|INR|Rs\\\\.?\\\\s*)?\\\\s*([0-9][0-9,]*(?:\\\\.[0-9]{1,2})?)"
+            "(?i)(?:(?:available|avl\\.?|closing|current|ledger|account|acct|a/c)\\s+)?"
+                    + "(?:balance|bal\\.?)(?:\\s+(?:is|of))?\\s*[:=\\-]?\\s*"
+                    + "(?:₹|INR|Rs\\.?\\s*)?\\s*([0-9][0-9,]*(?:\\.[0-9]{1,2})?)"
     );
     private static final Pattern BARE_TRANSACTION_AMOUNT = Pattern.compile(
-            "(?i)\\\\b(?:debited|credited|deducted|withdrawn)\\\\s+(?:by|of)\\\\s+"
-                    + "([0-9][0-9,]*(?:\\\\.[0-9]{1,2})?)\\\\b"
+            "(?i)\\b(?:debited|credited|deducted|withdrawn)\\s+(?:by|of)\\s+"
+                    + "([0-9][0-9,]*(?:\\.[0-9]{1,2})?)\\b"
     );
     private static final Pattern EXPLICIT_DATE = Pattern.compile(
-            "(?i)(?:on|dated|txn(?:\\\\s+date)?)\\\\s*[:\\\\-]?\\\\s*"
-                    + "(\\\\d{1,2})[-/ ]([A-Za-z]{3,9}|\\\\d{1,2})[-/ ](\\\\d{2,4})"
+            "(?i)(?:on|dated|txn(?:\\s+date)?)\\s*[:\\-]?\\s*"
+                    + "(\\d{1,2})[-/ ]([A-Za-z]{3,9}|\\d{1,2})[-/ ](\\d{2,4})"
     );
     // "credited to VPA" describes the UPI payee, not money credited to the sender's account.
     private static final Pattern CREDIT_TERMS = Pattern.compile(
-            "(?i)\\\\b(?:refund(?:ed)?|reversal|reversed|cashback|credit\\\\s+received|"
-                    + "payment\\\\s+received|(?:amount|funds|money)\\\\s+credited|"
-                    + "credit(?:ed)?\\\\s+(?:(?:to|into)\\\\s+)?(?:(?:your|my|the)\\\\s+)?(?:account|a/c)|"
-                    + "(?:(?:your|my|the)\\\\s+)?account\\\\s+(?:has\\\\s+been\\\\s+)?credited|"
-                    + "received\\\\s+(?:into|in)\\\\s+(?:(?:your|my|the)\\\\s+)?(?:account|a/c)|"
-                    + "deposit(?:ed)?\\\\s+(?:into|to)\\\\s+(?:(?:your|my|the)\\\\s+)?(?:account|a/c))\\\\b"
+            "(?i)\\b(?:refund(?:ed)?|reversal|reversed|cashback|credit\\s+received|"
+                    + "payment\\s+received|(?:amount|funds|money)\\s+credited|"
+                    + "credit(?:ed)?\\s+(?:(?:to|into)\\s+)?(?:(?:your|my|the)\\s+)?(?:account|a/c)|"
+                    + "(?:(?:your|my|the)\\s+)?account\\s+(?:has\\s+been\\s+)?credited|"
+                    + "received\\s+(?:into|in)\\s+(?:(?:your|my|the)\\s+)?(?:account|a/c)|"
+                    + "deposit(?:ed)?\\s+(?:into|to)\\s+(?:(?:your|my|the)\\s+)?(?:account|a/c))\\b"
     );
     private static final Pattern DEBIT_TERMS = Pattern.compile(
-            "(?i)\\\\b(?:debited|debit|deducted|withdrawn|withdrawal|spent|purchase|sent|"
-                    + "paid\\\\s+to|transfer\\\\s+to|transferred\\\\s+to)\\\\b"
+            "(?i)\\b(?:debited|debit|deducted|withdrawn|withdrawal|spent|purchase|sent|"
+                    + "paid\\s+to|transfer\\s+to|transferred\\s+to)\\b"
     );
     private static final Pattern RAIL_SUCCESS = Pattern.compile(
             "(?i)(?:upi|atm|pos|neft|imps|rtgs|card|nach|ach).{0,90}"
                     + "(?:successful|successfully|completed|processed|paid)"
     );
     private static final Pattern FAILED = Pattern.compile(
-            "(?i)\\\\b(?:failed|failure|declined|unsuccessful|rejected|pending|not processed)\\\\b"
+            "(?i)\\b(?:failed|failure|declined|unsuccessful|rejected|pending|not processed)\\b"
     );
     private static final Pattern TRANSACTION_CONTEXT = Pattern.compile(
-            "(?i)\\\\b(?:debited|debit|deducted|withdrawn|withdrawal|spent|purchase|payment|"
-                    + "transfer|transferred|sent|received|credited|refund|cashback|deposit|txn|transaction)\\\\b"
+            "(?i)\\b(?:debited|debit|deducted|withdrawn|withdrawal|spent|purchase|payment|"
+                    + "transfer|transferred|sent|received|credited|refund|cashback|deposit|txn|transaction)\\b"
     );
     private static final Pattern MERCHANT = Pattern.compile(
-            "(?i)\\\\b(?:at|to|merchant|towards)\\\\s+(.{2,56}?)"
-                    + "(?=\\\\s+(?:on|ref|upi|txn|transaction|avl|available|balance|"
-                    + "a/c|ac|from|using|via)\\\\b|[,.;]|$)"
+            "(?i)\\b(?:at|to|merchant|towards)\\s+(.{2,56}?)"
+                    + "(?=\\s+(?:on|ref|upi|txn|transaction|avl|available|balance|"
+                    + "a/c|ac|from|using|via)\\b|[,.;]|$)"
     );
 
     public static final String DEBIT = "DEBIT";
@@ -92,11 +92,11 @@ public final class SmsTransactionParser {
         if (!isBankLikeSender(sender) || body == null || body.trim().isEmpty()
                 || receivedDate == null) return null;
 
-        String normalized = body.replace('\\u00a0', ' ')
-                .replaceAll("\\\\s+", " ")
+        String normalized = body.replace('\u00a0', ' ')
+                .replaceAll("\\s+", " ")
                 .trim();
         if (FAILED.matcher(normalized).find()
-                || normalized.matches("(?i).*\\\\bnot\\\\s+(?:debited|credited)\\\\b.*")) {
+                || normalized.matches("(?i).*\\bnot\\s+(?:debited|credited)\\b.*")) {
             return null;
         }
 
@@ -191,7 +191,7 @@ public final class SmsTransactionParser {
         int left = 0;
         for (int i = start - 1; i >= 0; i--) {
             char c = body.charAt(i);
-            if (c == '.' || c == ';' || c == '|' || c == '\\n' || c == '\\r') {
+            if (c == '.' || c == ';' || c == '|' || c == '\n' || c == '\r') {
                 left = i + 1;
                 break;
             }
@@ -200,7 +200,7 @@ public final class SmsTransactionParser {
         int right = body.length();
         for (int i = end; i < body.length(); i++) {
             char c = body.charAt(i);
-            if (c == '.' || c == ';' || c == '|' || c == '\\n' || c == '\\r') {
+            if (c == '.' || c == ';' || c == '|' || c == '\n' || c == '\r') {
                 right = i;
                 break;
             }
