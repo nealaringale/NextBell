@@ -2,6 +2,12 @@ plugins {
     id "com.android.application"
 }
 
+// Firebase configuration is deliberately local to this app module. The build
+// remains reproducible in CI without a private project's google-services.json.
+if (file("google-services.json").exists()) {
+    apply plugin: "com.google.gms.google-services"
+}
+
 def stableStorePath = System.getenv("NEXTBELL_KEYSTORE_PATH")
 def stableStorePassword = System.getenv("NEXTBELL_KEYSTORE_PASSWORD")
 def stableKeyAlias = System.getenv("NEXTBELL_KEY_ALIAS")
@@ -65,5 +71,9 @@ android {
 }
 
 dependencies {
+    implementation platform("com.google.firebase:firebase-bom:35.1.0")
+    implementation "com.google.firebase:firebase-auth"
+    implementation "com.google.firebase:firebase-firestore"
+
     testImplementation "junit:junit:4.13.2"
 }
