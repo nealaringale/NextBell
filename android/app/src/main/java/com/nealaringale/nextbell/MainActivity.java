@@ -50,6 +50,8 @@ import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.google.firebase.auth.FirebaseUser;
+
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -86,6 +88,7 @@ public class MainActivity extends Activity {
     private final ZoneId zone = ZoneId.of("Asia/Kolkata");
 
     private SharedPreferences preferences;
+    private FirebaseSyncManager firebaseSyncManager;
     private FrameLayout root;
     private FrameLayout contentHost;
     private LinearLayout bottomNav;
@@ -206,6 +209,27 @@ public class MainActivity extends Activity {
         super.onCreate(savedInstanceState);
 
         preferences = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        firebaseSyncManager = new FirebaseSyncManager(this, preferences,
+                new FirebaseSyncManager.StatusListener() {
+                    @Override
+                    public void onStatusChanged(String status) {
+                        if ("settings".equals(selectedScreen)) {
+                            buildSettingsScreen();
+                            updateBottomNav();
+                        }
+                    }
+
+                    @Override
+                    public void onRemoteDataChanged() {
+                        themeIndex = clampTheme(preferences.getInt(KEY_THEME, themeIndex));
+                        applyTheme();
+                        if ("home".equals(selectedScreen)) buildHomeScreen();
+                        else if ("week".equals(selectedScreen)) buildWeekScreen();
+                        else if ("study".equals(selectedScreen)) buildStudyScreen();
+                        else refreshMoneyAndSettings();
+                    }
+                });
+        firebaseSyncManager.attach();
         themeIndex = clampTheme(preferences.getInt(KEY_THEME, 0));
         reducedMotion = preferences.getBoolean(KEY_REDUCED_MOTION, false);
         applyTheme();
@@ -272,6 +296,7 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        if (firebaseSyncManager != null) firebaseSyncManager.destroy();
         super.onDestroy();
         if (refreshRunnable != null) handler.removeCallbacks(refreshRunnable);
         stopHeroPulse();
@@ -1299,7 +1324,7 @@ public class MainActivity extends Activity {
         done.setOnClickListener(v -> {
             StudentPlannerStore.Item updated = new StudentPlannerStore.Item(
                     item.id, item.type, item.title, item.course, item.details,
-                    item.dueDate, !item.completed
+                    item.dueDate, !item.completed, item.priority
             );
             StudentPlannerStore.upsert(preferences, updated);
             if (updated.completed) StudentPlannerScheduler.cancel(this, updated.id);
@@ -1317,7 +1342,7 @@ public class MainActivity extends Activity {
                     if (which == 0) {
                         StudentPlannerStore.Item updated = new StudentPlannerStore.Item(
                                 item.id, item.type, item.title, item.course, item.details,
-                                item.dueDate, !item.completed
+                                item.dueDate, !item.completed, item.priority
                         );
                         StudentPlannerStore.upsert(preferences, updated);
                         if (updated.completed) StudentPlannerScheduler.cancel(this, updated.id);
@@ -1390,7 +1415,8 @@ public class MainActivity extends Activity {
                     StudentPlannerStore.Item updated = new StudentPlannerStore.Item(
                             id, type, cleanTitle, course.getText().toString(),
                             details.getText().toString(), dueDate[0],
-                            existing != null && existing.completed
+                            existing != null && existing.completed,
+                            existing == null ? "MEDIUM" : existing.priority
                     );
                     StudentPlannerStore.upsert(preferences, updated);
                     StudentPlannerScheduler.schedule(this, updated);
@@ -3536,6 +3562,105 @@ public class MainActivity extends Activity {
         return (paise < 0 ? "-₹" : "₹") + value;
     }
 
+    private void showFirebaseSyncDialog() {
+        if (firebaseSyncManager == null || !firebaseSyncManager.isAvailable()) {
+            new AlertDialog.Builder(this)
+                    .setTitle("Firebase setup required")
+                    .setMessage("To connect the website and Android app, add your Firebase Android configuration file at "
+                            + "android/app/google-services.json, then rebuild NextBell. Use the same Firebase project "
+                            + "and enable Email/Password under Firebase Authentication. The website also needs the "
+                            + "Web app values in src/firebaseConfig.js.")
+                    .setPositiveButton("OK", null)
+                    .show();
+            return;
+        }
+
+        FirebaseUser currentUser = firebaseSyncManager.currentUser();
+        if (currentUser != null) {
+            new AlertDialog.Builder(this)
+                    .setTitle("NextBell Cloud Sync")
+                    .setMessage("Signed in as " + currentUser.getEmail()
+                            + "\n\nExpenses, attendance, planner tasks and profile settings sync with the website.")
+                    .setNegativeButton("Close", null)
+                    .setPositiveButton("Sign out", (dialog, which) -> {
+                        firebaseSyncManager.signOut();
+                        Toast.makeText(this, "Signed out. Local data remains on this phone.",
+                                Toast.LENGTH_LONG).show();
+                        buildSettingsScreen();
+                    })
+                    .show();
+            return;
+        }
+
+        LinearLayout form = new LinearLayout(this);
+        form.setOrientation(LinearLayout.VERTICAL);
+        form.setPadding(dp(22), dp(12), dp(22), dp(4));
+
+        EditText emailInput = new EditText(this);
+        emailInput.setSingleLine(true);
+        emailInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS);
+        emailInput.setHint("Email address");
+        form.addView(emailInput, new LinearLayout.LayoutParams(-1, dp(52)));
+
+        EditText passwordInput = new EditText(this);
+        passwordInput.setSingleLine(true);
+        passwordInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        passwordInput.setHint("Password (6+ characters)");
+        form.addView(passwordInput, new LinearLayout.LayoutParams(-1, dp(52)));
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle("Connect NextBell")
+                .setMessage("Use the same email and password on the website and Android app.")
+                .setView(form)
+                .setNegativeButton("Cancel", null)
+                .setPositiveButton("Sign in", null)
+                .setNeutralButton("Create account", null)
+                .create();
+
+        dialog.setOnShowListener(ignored -> {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+                String email = emailInput.getText().toString().trim();
+                String password = passwordInput.getText().toString();
+                if (email.isEmpty() || password.isEmpty()) {
+                    Toast.makeText(this, "Enter your email and password.", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                firebaseSyncManager.signIn(email, password).addOnCompleteListener(this, task -> {
+                    if (task.isSuccessful()) {
+                        Toast.makeText(this, "Connected to NextBell Cloud.", Toast.LENGTH_LONG).show();
+                        dialog.dismiss();
+                        buildSettingsScreen();
+                    } else {
+                        String message = task.getException() == null ? "Sign in failed."
+                                : task.getException().getLocalizedMessage();
+                        Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+                    }
+                });
+            });
+            dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener(v -> {
+                String email = emailInput.getText().toString().trim();
+                String password = passwordInput.getText().toString();
+                if (email.isEmpty() || password.length() < 6) {
+                    Toast.makeText(this, "Enter a valid email and a password with at least 6 characters.",
+                            Toast.LENGTH_LONG).show();
+                    return;
+                }
+                firebaseSyncManager.createAccount(email, password).addOnCompleteListener(this, task -> {
+                    if (task.isSuccessful()) {
+                        Toast.makeText(this, "NextBell Cloud account created.", Toast.LENGTH_LONG).show();
+                        dialog.dismiss();
+                        buildSettingsScreen();
+                    } else {
+                        String message = task.getException() == null ? "Account creation failed."
+                                : task.getException().getLocalizedMessage();
+                        Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+                    }
+                });
+            });
+        });
+        dialog.show();
+    }
+
     private void buildSettingsScreen() {
         LinearLayout page = scrollPage();
 
@@ -3555,6 +3680,40 @@ public class MainActivity extends Activity {
         );
         subtitle.setPadding(0, dp(5), 0, dp(21));
         page.addView(subtitle);
+
+        page.addView(sectionLabel("CLOUD SYNC"), sectionParams(0, 8));
+        LinearLayout cloudCard = cardColumn();
+        TextView cloudTitle = text(
+                firebaseSyncManager != null && firebaseSyncManager.currentUser() != null
+                        ? firebaseSyncManager.currentUser().getEmail() : "Website + Android",
+                14, TEXT
+        );
+        cloudTitle.setTypeface(Typeface.DEFAULT_BOLD);
+        cloudCard.addView(cloudTitle);
+
+        TextView cloudDescription = text(
+                firebaseSyncManager == null ? "Firebase is not initialized."
+                        : firebaseSyncManager.status(),
+                10, MUTED
+        );
+        cloudDescription.setPadding(0, dp(4), 0, dp(10));
+        cloudCard.addView(cloudDescription);
+
+        LinearLayout cloudActions = new LinearLayout(this);
+        cloudActions.setGravity(Gravity.CENTER_VERTICAL);
+        cloudActions.setOrientation(LinearLayout.HORIZONTAL);
+        TextView cloudButton = actionButton(
+                firebaseSyncManager != null && firebaseSyncManager.currentUser() != null
+                        ? "MANAGE" : "CONNECT",
+                false
+        );
+        cloudActions.addView(cloudButton, new LinearLayout.LayoutParams(dp(112), CONTROL_HEIGHT_DP()));
+        cloudButton.setOnClickListener(v -> {
+            tap(v);
+            showFirebaseSyncDialog();
+        });
+        cloudCard.addView(cloudActions);
+        page.addView(cloudCard, sectionParams(0, 20));
 
         page.addView(sectionLabel("PROFILE"), sectionParams(0, 9));
 

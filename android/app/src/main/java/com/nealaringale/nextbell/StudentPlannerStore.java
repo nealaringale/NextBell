@@ -26,9 +26,15 @@ public final class StudentPlannerStore {
         public final String details;
         public final LocalDate dueDate;
         public final boolean completed;
+        public final String priority;
 
         public Item(long id, String type, String title, String course,
                     String details, LocalDate dueDate, boolean completed) {
+            this(id, type, title, course, details, dueDate, completed, "MEDIUM");
+        }
+
+        public Item(long id, String type, String title, String course,
+                    String details, LocalDate dueDate, boolean completed, String priority) {
             this.id = id;
             this.type = normalizeType(type);
             this.title = clean(title, 120);
@@ -36,6 +42,7 @@ public final class StudentPlannerStore {
             this.details = clean(details, 500);
             this.dueDate = dueDate;
             this.completed = completed;
+            this.priority = normalizePriority(priority);
         }
     }
 
@@ -55,7 +62,8 @@ public final class StudentPlannerStore {
                     items.add(new Item(
                             value.optLong("id"), value.optString("type", TASK), title,
                             value.optString("course", ""), value.optString("details", ""),
-                            dueDate, value.optBoolean("completed", false)
+                            dueDate, value.optBoolean("completed", false),
+                            value.optString("priority", "MEDIUM")
                     ));
                 } catch (Exception ignored) {
                     // Keep every valid planner entry if one row is damaged.
@@ -120,6 +128,7 @@ public final class StudentPlannerStore {
                 value.put("details", item.details);
                 value.put("dueDate", item.dueDate == null ? "" : item.dueDate.toString());
                 value.put("completed", item.completed);
+                value.put("priority", item.priority);
                 values.put(value);
             } catch (Exception ignored) {}
         }
@@ -129,6 +138,11 @@ public final class StudentPlannerStore {
     private static String normalizeType(String type) {
         if (EXAM.equals(type) || ASSIGNMENT.equals(type)) return type;
         return TASK;
+    }
+
+    private static String normalizePriority(String priority) {
+        if ("HIGH".equals(priority) || "LOW".equals(priority)) return priority;
+        return "MEDIUM";
     }
 
     private static String clean(String value, int maxLength) {
