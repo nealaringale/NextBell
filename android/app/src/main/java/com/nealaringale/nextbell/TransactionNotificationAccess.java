@@ -40,7 +40,22 @@ public final class TransactionNotificationAccess {
             "com.bankofbaroda.mconnect",
             "com.pnbindia.mconnect",
             "com.unionbankofindia",
-            "com.canarabank.mpassbook"
+            "com.canarabank.mpassbook",
+            "com.snapwork.hdfc",
+            "com.kotak.bank.mobile",
+            "com.aubank.au0101",
+            "com.indianbank.indsmart",
+            "com.bankofindia",
+            "com.centralbank.mobilebanking",
+            "com.ucobank.mbanking",
+            "com.idbibank.mobilebanking",
+            "com.bandhanbank.mobilebanking",
+            "com.unionbank.usmart",
+            "com.hdfcbank.payzapp",
+            "com.dreamplug.androidapp",
+            "com.mobikwik_new",
+            "com.freecharge.android",
+            "com.naviapp"
     ));
 
     private TransactionNotificationAccess() {}
@@ -64,18 +79,58 @@ public final class TransactionNotificationAccess {
     public static boolean isSupportedPackage(String packageName) {
         if (packageName == null) return false;
         String value = packageName.trim().toLowerCase(Locale.ENGLISH);
-        if (SUPPORTED_PACKAGES.contains(value)) return true;
-        return value.contains("messaging")
+        return SUPPORTED_PACKAGES.contains(value)
+                || isMessagingPackage(value)
+                || isRecognizedFinancePackage(value);
+    }
+
+    public static boolean isMessagingPackage(String packageName) {
+        if (packageName == null) return false;
+        String value = packageName.trim().toLowerCase(Locale.ENGLISH);
+        return value.equals("com.google.android.apps.messaging")
+                || value.equals("com.android.messaging")
+                || value.equals("com.samsung.android.messaging")
+                || value.equals("com.miui.mms")
+                || value.equals("com.android.mms")
+                || value.equals("com.coloros.mms")
+                || value.equals("com.oneplus.mms")
+                || value.contains("messaging")
                 || value.endsWith(".mms")
-                || value.endsWith(".sms")
-                || value.contains("bank")
-                || value.contains("upi")
-                || value.contains("wallet")
-                || value.contains("phonepe")
-                || value.contains("paytm")
-                || value.contains("gpay")
-                || value.contains("mobikwik")
-                || value.contains("freecharge");
+                || value.endsWith(".sms");
+    }
+
+    private static boolean isRecognizedFinancePackage(String value) {
+        return value.contains("bank") || value.contains("hdfc")
+                || value.contains("icici") || value.contains("sbi")
+                || value.contains("axis") || value.contains("kotak")
+                || value.contains("indus") || value.contains("yesbank")
+                || value.contains("federal") || value.contains("baroda")
+                || value.contains("canara") || value.contains("punjabnational")
+                || value.contains("pnb") || value.contains("unionbank")
+                || value.contains("idfc") || value.contains("rbl")
+                || value.contains("upi") || value.contains("wallet")
+                || value.contains("phonepe") || value.contains("paytm")
+                || value.contains("gpay") || value.contains("mobikwik")
+                || value.contains("freecharge") || value.contains("payzapp")
+                || value.contains("dreamplug") || value.contains("naviapp")
+                || value.contains("au0101");
+    }
+
+    /** Keeps ordinary personal SMS out of the finance parser. */
+    public static boolean isLikelyFinancialSms(String title, String body) {
+        String value = ((title == null ? "" : title) + " "
+                + (body == null ? "" : body)).toLowerCase(Locale.ENGLISH);
+        String[] cues = {
+                "bank", "a/c", "account", "upi", "neft", "imps", "rtgs",
+                "debited", "credited", "debit", "credit", "withdraw",
+                "transaction", "txn", "avl bal", "available balance",
+                "ledger balance", "refund", "cashback", "deposit",
+                "pos txn", "atm", "card ending", "card xx", "transfer"
+        };
+        for (String cue : cues) {
+            if (value.contains(cue)) return true;
+        }
+        return false;
     }
 
     public static String shortStatus(Context context, android.content.SharedPreferences preferences) {
