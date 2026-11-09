@@ -86,10 +86,6 @@ export default function App() {
       || localStorage.getItem('nextbell_daily_limit') !== null,
     recurringExpenses: localStorage.getItem('nextbell_recurring_expenses') !== null,
   });
-  const firstPersistenceEffectsRef = useRef({
-    profile: true, theme: true, attendance: true, attendanceTarget: true,
-    tasks: true, expenses: true, dailyLimit: true, recurringExpenses: true,
-  });
 
   // --- Persistent State ---
   const [profile, setProfile] = useState(() => {
@@ -223,6 +219,20 @@ export default function App() {
     settings: { themeIndex, attendanceTarget, dailyLimitPaise },
   };
 
+  // Capture the first rendered data snapshot. In React StrictMode, effects
+  // can run twice on mount; comparing values avoids mistaking that replay for
+  // a user edit and uploading untouched demo seed data.
+  const initialLocalStateRef = useRef({
+    profile: JSON.stringify(profile),
+    attendance: JSON.stringify(attendance),
+    tasks: JSON.stringify(tasks),
+    expenses: JSON.stringify(expenses),
+    recurringExpenses: JSON.stringify(recurringExpenses),
+    themeIndex,
+    attendanceTarget,
+    dailyLimitPaise,
+  });
+
   // --- Dialog References ---
   const profileDialogRef = useRef(null);
   const taskDialogRef = useRef(null);
@@ -255,52 +265,44 @@ export default function App() {
   // Save to LocalStorage
   useEffect(() => {
     localStorage.setItem('nextbell_profile', JSON.stringify(profile));
-    if (firstPersistenceEffectsRef.current.profile) firstPersistenceEffectsRef.current.profile = false;
-    else persistedLocalDataRef.current.profile = true;
+    if (JSON.stringify(profile) !== initialLocalStateRef.current.profile) persistedLocalDataRef.current.profile = true;
   }, [profile]);
 
   useEffect(() => {
     localStorage.setItem('nextbell_theme', String(themeIndex));
-    if (firstPersistenceEffectsRef.current.theme) firstPersistenceEffectsRef.current.theme = false;
-    else persistedLocalDataRef.current.settings = true;
+    if (themeIndex !== initialLocalStateRef.current.themeIndex) persistedLocalDataRef.current.settings = true;
     const activeTheme = THEMES[themeIndex] || THEMES[0];
     document.documentElement.setAttribute('data-theme', activeTheme.id);
   }, [themeIndex]);
 
   useEffect(() => {
     localStorage.setItem('nextbell_attendance', JSON.stringify(attendance));
-    if (firstPersistenceEffectsRef.current.attendance) firstPersistenceEffectsRef.current.attendance = false;
-    else persistedLocalDataRef.current.attendance = true;
+    if (JSON.stringify(attendance) !== initialLocalStateRef.current.attendance) persistedLocalDataRef.current.attendance = true;
   }, [attendance]);
 
   useEffect(() => {
     localStorage.setItem('nextbell_attendance_target', String(attendanceTarget));
-    if (firstPersistenceEffectsRef.current.attendanceTarget) firstPersistenceEffectsRef.current.attendanceTarget = false;
-    else persistedLocalDataRef.current.settings = true;
+    if (attendanceTarget !== initialLocalStateRef.current.attendanceTarget) persistedLocalDataRef.current.settings = true;
   }, [attendanceTarget]);
 
   useEffect(() => {
     localStorage.setItem('nextbell_tasks', JSON.stringify(tasks));
-    if (firstPersistenceEffectsRef.current.tasks) firstPersistenceEffectsRef.current.tasks = false;
-    else persistedLocalDataRef.current.tasks = true;
+    if (JSON.stringify(tasks) !== initialLocalStateRef.current.tasks) persistedLocalDataRef.current.tasks = true;
   }, [tasks]);
 
   useEffect(() => {
     localStorage.setItem('nextbell_expenses', JSON.stringify(expenses));
-    if (firstPersistenceEffectsRef.current.expenses) firstPersistenceEffectsRef.current.expenses = false;
-    else persistedLocalDataRef.current.expenses = true;
+    if (JSON.stringify(expenses) !== initialLocalStateRef.current.expenses) persistedLocalDataRef.current.expenses = true;
   }, [expenses]);
 
   useEffect(() => {
     localStorage.setItem('nextbell_recurring_expenses', JSON.stringify(recurringExpenses));
-    if (firstPersistenceEffectsRef.current.recurringExpenses) firstPersistenceEffectsRef.current.recurringExpenses = false;
-    else persistedLocalDataRef.current.recurringExpenses = true;
+    if (JSON.stringify(recurringExpenses) !== initialLocalStateRef.current.recurringExpenses) persistedLocalDataRef.current.recurringExpenses = true;
   }, [recurringExpenses]);
 
   useEffect(() => {
     localStorage.setItem('nextbell_daily_limit', String(dailyLimitPaise));
-    if (firstPersistenceEffectsRef.current.dailyLimit) firstPersistenceEffectsRef.current.dailyLimit = false;
-    else persistedLocalDataRef.current.settings = true;
+    if (dailyLimitPaise !== initialLocalStateRef.current.dailyLimitPaise) persistedLocalDataRef.current.settings = true;
   }, [dailyLimitPaise]);
 
   // One Firebase account is shared by the website and Android app.
