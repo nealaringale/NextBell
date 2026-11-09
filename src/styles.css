@@ -1848,3 +1848,49 @@ footer {
     grid-template-columns: 1fr;
   }
 }
+
+
+/* Firebase cross-device sync card */
+.cloud-sync-card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.cloud-sync-card .settings-row {
+  align-items: center;
+}
+
+.cloud-sync-card .settings-row p {
+  margin: 5px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.cloud-auth-fields {
+  margin-top: 2px;
+}
+
+.cloud-sync-warning {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  color: var(--muted);
+  background: var(--surface);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.cloud-sync-warning code {
+  color: var(--accent);
+  font-weight: 800;
+}
+
+.cloud-sync-footnote {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.6;
+}
