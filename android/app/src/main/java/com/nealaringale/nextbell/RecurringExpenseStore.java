@@ -182,7 +182,8 @@ public final class RecurringExpenseStore {
             if (month.equals(rule.lastGeneratedMonth)) continue;
 
             LocalDate dueDate = today.withDayOfMonth(rule.dayOfMonth);
-            long id = Math.abs((rule.id * 31L) ^ dueDate.toEpochDay() ^ rule.amountPaise);
+            long rawId = (rule.id * 31L) ^ dueDate.toEpochDay() ^ rule.amountPaise;
+            long id = rawId == Long.MIN_VALUE ? Long.MAX_VALUE : Math.abs(rawId);
             if (id == 0L) id = Math.max(1L, System.nanoTime());
 
             ExpenseStore.upsert(
