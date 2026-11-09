@@ -30,7 +30,7 @@ public final class SmsTransactionParser {
     // "credited to VPA" describes the UPI payee, not money credited to the sender's account.
     private static final Pattern CREDIT_TERMS = Pattern.compile(
             "(?i)\\b(?:refund(?:ed)?|reversal|reversed|cashback|credit\\s+received|"
-                    + "payment\\s+received|(?:amount|funds|money)\\s+credited|"
+                    + "payment\\s+received|you\\s+received|(?:amount|funds|money)\\s+credited|"
                     + "credit(?:ed)?\\s+(?:(?:to|into)\\s+)?(?:(?:your|my|the)\\s+)?(?:account|a/c)|"
                     + "(?:(?:your|my|the)\\s+)?account\\s+(?:has\\s+been\\s+)?credited|"
                     + "received\\s+(?:into|in)\\s+(?:(?:your|my|the)\\s+)?(?:account|a/c)|"
@@ -41,7 +41,7 @@ public final class SmsTransactionParser {
                     + "paid|transfer\\s+to|transferred\\s+to)\\b"
     );
     private static final Pattern RAIL_SUCCESS = Pattern.compile(
-            "(?i)(?:upi|atm|pos|neft|imps|rtgs|card|nach|ach).{0,90}"
+            "(?i)(?:upi|atm|pos|neft|imps|rtgs|card|nach|ach|payment|transaction).{0,90}"
                     + "(?:successful|successfully|completed|processed|paid)"
     );
     private static final Pattern FAILED = Pattern.compile(

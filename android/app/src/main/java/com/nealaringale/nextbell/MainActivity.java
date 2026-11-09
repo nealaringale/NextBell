@@ -1458,7 +1458,7 @@ public class MainActivity extends Activity {
         );
         autoStatus.addView(syncStatus);
 
-        TextView syncButton = actionButton(paymentAccess ? "MANAGE" : "CONNECT", false);
+        TextView syncButton = actionButton(paymentAccess ? (paymentTracking ? "MANAGE" : "ENABLE") : "CONNECT", false);
         LinearLayout.LayoutParams syncButtonParams =
                 new LinearLayout.LayoutParams(dp(84), dp(34));
         syncButtonParams.setMargins(dp(9), 0, 0, 0);
@@ -2161,7 +2161,7 @@ public class MainActivity extends Activity {
         TextView message = text(
                 (SmsTransactionParser.CREDIT.equals(expense.direction) ? "+" : "")
                         + formatRupees(expense.amountPaise) + "  •  " + expense.category
-                        + "\\n" + formatLongDate(expense.date),
+                        + "\n" + formatLongDate(expense.date),
                 10,
                 MUTED
         );
@@ -3678,7 +3678,9 @@ public class MainActivity extends Activity {
                 TransactionNotificationAccess.hasAccess(this)
                         && SmsTransactionService.isEnabled(preferences)
                         ? "Connected. Supported bank and UPI notification alerts are parsed locally; raw notification text is not saved."
-                        : "Connect notification access to detect supported bank and UPI alerts automatically.",
+                        : (TransactionNotificationAccess.hasAccess(this)
+                        ? "Access is ready but tracking is paused. Tap to enable automatic payment alerts."
+                        : "Connect notification access to detect supported bank and UPI alerts automatically."),
                 10,
                 MUTED
         );
@@ -3688,7 +3690,8 @@ public class MainActivity extends Activity {
 
         TextView safeBadge = text(
                 TransactionNotificationAccess.hasAccess(this)
-                        && SmsTransactionService.isEnabled(preferences) ? "AUTO ON" : "CONNECT",
+                        ? (SmsTransactionService.isEnabled(preferences) ? "AUTO ON" : "PAUSED")
+                        : "CONNECT",
                 8, ACCENT
         );
         safeBadge.setGravity(Gravity.CENTER);
@@ -4169,8 +4172,8 @@ public class MainActivity extends Activity {
                             + "  •  " + minutes + " min"
             );
             heroTimeRange.setText("BREAK NOW");
-            heroRoomText.setText(lunch ? "TYPE\\nLUNCH" : "TYPE\\nBREAK");
-            heroWingText.setText("DURATION\\n" + minutes + " MIN");
+            heroRoomText.setText(lunch ? "TYPE\nLUNCH" : "TYPE\nBREAK");
+            heroWingText.setText("DURATION\n" + minutes + " MIN");
             heroWingText.setTextColor(breakAccent);
             heroCountdown.setText(
                     formatCountdown(Math.max(0, toSeconds(currentBreak.end) - now))
@@ -5063,19 +5066,19 @@ public class MainActivity extends Activity {
         );
 
         String diagnostics = "Notification access: " + (access ? "GRANTED" : "NOT GRANTED")
-                + "\\nTracking: " + (active ? "ON" : enabled ? "WAITING FOR ACCESS" : "OFF")
-                + "\\nSupported-app notifications seen: " + seenCount
-                + "\\nTransactions added: " + importedCount
-                + "\\nLast alert: " + lastSeen
+                + "\nTracking: " + (active ? "ON" : enabled ? "WAITING FOR ACCESS" : "OFF")
+                + "\nSupported-app notifications seen: " + seenCount
+                + "\nTransactions added: " + importedCount
+                + "\nLast alert: " + lastSeen
                 + (lastPackage.isEmpty() ? "" : " (" + lastPackage + ")")
-                + "\\nLast result: " + lastResult;
+                + "\nLast result: " + lastResult;
 
         String disclosure = "NextBell watches notification previews from supported messaging, bank "
                 + "and UPI apps after you explicitly enable Android notification access. Matching "
                 + "transaction details are saved on this phone; notification text is not retained "
                 + "or uploaded. This does not scan old SMS messages. Your bank or messaging app "
                 + "must show transaction details in its notifications, and notifications hidden "
-                + "by Android cannot be read.\\n\\n"
+                + "by Android cannot be read.\n\n"
                 + diagnostics;
 
         AlertDialog.Builder builder = new AlertDialog.Builder(this)
