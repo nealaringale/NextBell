@@ -103,7 +103,7 @@ public final class SmsTransactionService {
             return false;
         }
         long count = preferences.getLong(KEY_SMS_IMPORTED_COUNT, 0L) + 1L;
-        String amount = new java.math.BigDecimal(parsed.amountPaise, 2)
+        String amount = java.math.BigDecimal.valueOf(parsed.amountPaise, 2)
                 .stripTrailingZeros().toPlainString();
         String direction = SmsTransactionParser.CREDIT.equals(parsed.direction)
                 ? "credit" : "debit";
