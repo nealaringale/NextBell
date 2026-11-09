@@ -60,9 +60,9 @@ public final class SmsTransactionParser {
                     + "transfer|transferred|sent|received|credited|refund|cashback|deposit|txn|transaction)\\b"
     );
     private static final Pattern DEBIT_MERCHANT = Pattern.compile(
-            "(?i)\\b(?:paid\\s+to|sent\\s+to|transferred\\s+to|transfer\\s+to|"
-                    + "payment\\s+to|merchant(?:\\s+name)?|towards|at|spent\\s+at|"
-                    + "spent\\s+on|purchase\\s+at)\\s+(.{2,64}?)"
+            "(?i)\\b(?:(?:paid|sent|transferred|transfer|payment|purchase)\\b.{0,40}?\\bto\\b|"
+                    + "(?:merchant(?:\\s+name)?|towards|at|spent\\s+at|spent\\s+on|"
+                    + "purchase\\s+at|to))\\s+(.{2,64}?)"
                     + "(?=\\s+(?:on|ref|upi|txn|transaction|avl|available|balance|"
                     + "a/c|ac|from|using|via|through|success|completed|for|rrn|utr)\\b|[,.;]|$)"
     );

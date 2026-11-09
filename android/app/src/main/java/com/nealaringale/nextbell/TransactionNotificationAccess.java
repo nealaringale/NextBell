@@ -139,13 +139,13 @@ public final class TransactionNotificationAccess {
                 "transaction id", "transaction", "txn", "avl bal",
                 "available balance", "ledger balance", "card ending",
                 "card xx", "vpa", "ifsc");
+        // Generic chat such as "I spent Rs 100" is not enough on its own.
         boolean explicitBankMovement = text.matches("(?s).*(?:\\bdebited\\b|\\bdeducted\\b|"
                 + "\\bwithdrawn\\b|\\bwithdrawal\\b|\\bcredited\\b|"
-                + "\\brefunded\\b|\\bcashback\\b|\\bcharged\\b|"
-                + "\\bspent\\b|\\bpurchase\\b|\\brefund\\b).*");
-        boolean completedPayTo = text.matches("(?s).*(?:paid\\s+to|sent\\s+to|"
-                + "transferred\\s+to|payment\\s+to|purchase\\s+at).*(?:success|completed|"
-                + "successfully|upi|payment|transaction).*");
+                + "\\brefunded\\b|\\bcashback\\b|\\brefund\\b).*");
+        boolean completedPayTo = text.matches("(?s).*(?:paid|sent|transferred|payment|purchase)"
+                + ".{0,40}\\b(?:to|at)\\b.{2,64}(?:success|completed|successfully|upi|"
+                + "payment|transaction).*");
         boolean knownFinancialApp = isRecognizedFinancePackage(
                 packageName == null ? "" : packageName.toLowerCase(Locale.ENGLISH)
         );

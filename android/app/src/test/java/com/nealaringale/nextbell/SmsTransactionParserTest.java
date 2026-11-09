@@ -23,8 +23,8 @@ public class SmsTransactionParserTest {
         assertNotNull(parsed);
         assertEquals(125_000L, parsed.amountPaise);
         assertEquals(SmsTransactionParser.DEBIT, parsed.direction);
-        assertEquals("Local Cafe", parsed.merchant);
-        assertEquals("Other", parsed.category);
+        assertEquals("Cafe", parsed.merchant);
+        assertEquals("Food & Drinks", parsed.category);
     }
 
     @Test
