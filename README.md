@@ -57,40 +57,90 @@ Android only accepts an in-place update when the app ID and signing certificate 
 
 ## Firebase cross-device sync (website + Android)
 
-NextBell uses Firebase Authentication (Email/Password) and Cloud Firestore. The website and Android app must use the **same Firebase project** and the **same account email/password**.
+NextBell uses one Firebase project for Firebase Authentication (Email/Password) and Cloud Firestore. Both clients write per-record documents under `users/{uid}/records`. The website and Android app must use the **same Firebase project** and the **same account email/password**.
 
-### 1. Configure Firebase
+### 1. Configure the Firebase project
 
-1. In Firebase Console, open the project you created for NextBell.
-2. In **Authentication → Sign-in method**, enable **Email/Password**.
-3. Create a **Cloud Firestore** database.
-4. In Project settings → General, add a **Web app** and copy its Firebase config into `src/firebaseConfig.js` (apiKey, authDomain, projectId, appId, messagingSenderId).
-5. In Project settings → General, add an **Android app** with package name `com.nealaringale.nextbell`.
-6. Download that Android app's `google-services.json` and place it at `android/app/google-services.json`. It is ignored by Git, so it stays local to your build machine.
-7. In Firestore → Rules, publish the contents of `firestore.rules`.
+1. Open the Firebase Console and select the project you already created for NextBell.
+2. Under **Authentication → Sign-in method**, enable **Email/Password**.
+3. Create **Cloud Firestore** in production mode.
+4. In **Project settings → General → Your apps**, register a Web app and copy its config values.
+5. Register an Android app with package name `com.nealaringale.nextbell`, download its `google-services.json`, and keep that file private to your build machine.
+6. In **Firestore → Rules**, publish the repository's `firestore.rules`. These rules restrict reads and writes to the authenticated user's own `users/{uid}` path.
 
-Firebase client config values are public identifiers, not service-account credentials. Never put a service-account JSON/private key in this repository, website, or APK. Firestore rules must remain owner-only.
+Firebase Web config values (apiKey, authDomain, projectId, appId, messagingSenderId and storageBucket) are public client identifiers. Never use a service-account JSON, service-account private key, or Admin SDK credential in either client.
 
-### 2. Build and install
+### 2. Local website configuration
 
-- Website: run `npm run build` and deploy the Vite output as usual. The Firebase Web SDK is loaded from Google's CDN; the values in `src/firebaseConfig.js` must belong to the same project as Android.
-- Android: sync Gradle and build the student app after placing `google-services.json` in `android/app/`. The Google Services plugin is only applied when that file exists, so CI can still run without your private project config.
-- Open **Settings → Cloud Sync** on the website and **Settings → Cloud Sync** in Android. Create an account on one side, then sign in with the same email/password on the other.
+Copy `.env.example` to `.env.local` in the repository root and fill in the six `VITE_FIREBASE_*` values from the Web app config. Then run:
 
-### 3. What syncs
+```powershell
+npm install
+npm run dev
+```
 
-- Expenses (including merchant, payment mode, amount, source and direction fields supported by Android)
+The website uses Firebase Auth's local persistence and Firestore multi-tab offline persistence on a trusted personal browser. The browser's localStorage copy is retained as a fallback and as the first-sync migration source.
+
+### 3. Local Android configuration
+
+Place the downloaded Android client file at:
+
+```
+android/app/google-services.json
+```
+
+It is deliberately ignored by Git. Gradle applies the Google Services plugin only when this file exists. After placing it, rebuild the student app and open **Settings → Cloud Sync**.
+
+### 4. Configure GitHub Actions for the live website and APK builds
+
+In GitHub, open **NextBell → Settings → Secrets and variables → Actions → New repository secret**.
+
+Add these six secrets from the Web app config:
+
+- `VITE_FIREBASE_API_KEY`
+- `VITE_FIREBASE_AUTH_DOMAIN`
+- `VITE_FIREBASE_PROJECT_ID`
+- `VITE_FIREBASE_STORAGE_BUCKET`
+- `VITE_FIREBASE_MESSAGING_SENDER_ID`
+- `VITE_FIREBASE_APP_ID`
+
+For Android APKs built by GitHub Actions, create a base64 copy of `google-services.json` on Windows PowerShell:
+
+```powershell
+[Convert]::ToBase64String([IO.File]::ReadAllBytes(".\\google-services.json")) | Set-Clipboard
+```
+
+Create one more repository secret named `NEXTBELL_GOOGLE_SERVICES_JSON_BASE64` and paste the clipboard value. Do not commit the JSON file or its base64 contents. When this secret is absent, CI still builds an APK, but Firebase cloud sign-in is not configured in that APK.
+
+The website deployment workflow injects the six `VITE_FIREBASE_*` secrets at build time. The Android workflow decodes the Google Services file into the ignored app module path before Gradle runs.
+
+### 5. Connect both clients
+
+1. Deploy the website after adding the six web secrets.
+2. Install the Android APK built after adding `NEXTBELL_GOOGLE_SERVICES_JSON_BASE64`.
+3. Open **Settings → Cloud Sync** on either client and create one Email/Password account.
+4. On the other client, sign in using that exact same email and password.
+
+Do not create separate accounts for the website and app.
+
+### 6. What syncs
+
+- Expenses and transaction metadata (merchant, payment mode, amount, source and debit/credit direction)
 - Attendance sessions and attendance target
-- Planner tasks
-- Profile and theme/daily-limit settings
-- Android recurring expense rules are retained in the shared Firestore records, even though the current website does not yet have a recurring-rules editor.
+- Planner tasks and completion status
+- Profile and settings, including theme and daily limit
+- Recurring-expense rules, retained in Firestore even though the website does not yet expose their editor
 
-Each row is a separate Firestore record with an update time and a deletion tombstone. This avoids replacing the entire user's data document when one row changes. Firestore offline persistence queues writes and replays them after reconnecting. Initial migration merges local-only rows with the cloud; an existing cloud version wins when both sides already have the same record ID.
+Each expense, attendance session, task and recurring rule is a separate Firestore record. Deletions use tombstones so an offline device does not resurrect removed rows. Initial sync merges local-only records with cloud records; cloud copies win when both sides already have the same record ID. The Android client also merges device-only finance settings (weekly allowance, monthly budgets, daily alerts and learned merchant categories) into the cloud settings document rather than discarding them when the website signs in first.
 
-### 4. First connection / migration notes
+**Attendance keys are shared across platforms:** `date|lowercase subject|scheduled start time`. That lets the same class meeting update one attendance record rather than create a second row.
 
-- Back up the Android app and export the website JSON before linking accounts.
-- If the cloud is empty, each client uploads its existing local-only records at first sign-in.
-- If both devices have an item with the same ID, the cloud copy wins during first migration. Subsequent edits use record-level update timestamps.
-- Do not enable public read/write Firestore rules. The rules in `firestore.rules` require `request.auth.uid` to match the user path.
+Offline edits are queued by Firestore and delivered after reconnecting. Different records merge independently. If two devices edit the exact same record while offline, Firestore uses last-write-wins for that record; the app does not attempt field-level merging of simultaneous edits.
 
+### 7. First connection / migration safety
+
+- Export the Android backup and website JSON backup before linking accounts.
+- The first successful online snapshot is used to merge existing local records; demo fixture data that has never been saved by the user is not bulk-uploaded.
+- When linking a different Firebase account on a device, NextBell clears the previous account's synced local data before loading the new account, to avoid mixing students' records.
+- Never set Firestore rules to public read/write. Keep the owner-only rules in `firestore.rules`.
+- Web Firestore persistence stores cached documents in the browser profile. Use it only on a trusted personal browser and sign out on shared computers.
