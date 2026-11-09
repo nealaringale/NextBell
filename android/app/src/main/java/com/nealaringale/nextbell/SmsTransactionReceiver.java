@@ -37,6 +37,7 @@ public final class SmsTransactionReceiver extends BroadcastReceiver {
                 || !SmsTransactionService.hasReceivePermission(appContext)) {
             return;
         }
+        SmsTransactionService.recordSmsReceived(preferences);
 
         final SmsMessage[] messages;
         try {
@@ -67,22 +68,28 @@ public final class SmsTransactionReceiver extends BroadcastReceiver {
 
         try {
             WORKER.execute(() -> {
+                SharedPreferences currentPreferences = appContext.getSharedPreferences(
+                        SmsTransactionService.PREFS_NAME, Context.MODE_PRIVATE
+                );
                 try {
-                    SharedPreferences currentPreferences = appContext.getSharedPreferences(
-                            SmsTransactionService.PREFS_NAME, Context.MODE_PRIVATE
-                    );
                     // Re-check opt-in and permission in case the user disabled tracking
                     // while this broadcast was waiting in the worker queue.
                     if (SmsTransactionService.isEnabled(currentPreferences)
                             && SmsTransactionService.hasReceivePermission(appContext)) {
-                        boolean imported = SmsTransactionService.processMessage(
+                        boolean imported = SmsTransactionService.processIncomingSms(
                                 currentPreferences, messageSender, messageBody, receivedDate
                         );
                         if (imported) ExpenseDailyAlertReceiver.maybeNotifyNow(appContext);
                     }
-                } catch (RuntimeException ignored) {
-                    // A malformed bank alert must never crash the SMS broadcast path.
+                } catch (RuntimeException error) {
+                    currentPreferences.edit()
+                            .putString(SmsTransactionService.KEY_LAST_SMS_RESULT,
+                                    "SMS processing error: " + error.getClass().getSimpleName())
+                            .apply();
                 } finally {
+                    Intent processed = new Intent(SmsTransactionService.ACTION_NOTIFICATION_PROCESSED);
+                    processed.setPackage(appContext.getPackageName());
+                    appContext.sendBroadcast(processed);
                     pending.finish();
                 }
             });

@@ -23,6 +23,16 @@ public final class SmsTransactionService {
     public static final String KEY_LAST_NOTIFICATION_RESULT = "payment_alert_last_result";
     public static final String KEY_NOTIFICATION_IMPORTED_COUNT = "payment_alert_imported_count";
     public static final String KEY_NOTIFICATION_SEEN_COUNT = "payment_alert_seen_count";
+    public static final String KEY_LISTENER_CONNECTED = "payment_listener_connected";
+    public static final String KEY_LISTENER_CONNECTED_AT = "payment_listener_connected_at";
+    public static final String KEY_NOTIFICATION_CALLBACK_COUNT = "payment_notification_callback_count";
+    public static final String KEY_LAST_CALLBACK_PACKAGE = "payment_last_callback_package";
+    public static final String KEY_LAST_CALLBACK_AT = "payment_last_callback_at";
+    public static final String KEY_LAST_CALLBACK_RESULT = "payment_last_callback_result";
+    public static final String KEY_SMS_RECEIVED_COUNT = "payment_sms_received_count";
+    public static final String KEY_SMS_IMPORTED_COUNT = "payment_sms_imported_count";
+    public static final String KEY_LAST_SMS_AT = "payment_last_sms_at";
+    public static final String KEY_LAST_SMS_RESULT = "payment_last_sms_result";
     public static final String KEY_LAST_NOTIFICATION_AMOUNT = "payment_alert_last_amount_paise";
     public static final String KEY_LAST_NOTIFICATION_DIRECTION = "payment_alert_last_direction";
     public static final String KEY_LAST_NOTIFICATION_MERCHANT = "payment_alert_last_merchant";
@@ -57,12 +67,91 @@ public final class SmsTransactionService {
         return hasReadPermission(context) && hasReceivePermission(context);
     }
 
-    /** @return true only when a new supported transaction was added. */
+    /** Counts an incoming SMS without persisting its text. */
+    public static void recordSmsReceived(SharedPreferences preferences) {
+        preferences.edit()
+                .putLong(KEY_SMS_RECEIVED_COUNT,
+                        preferences.getLong(KEY_SMS_RECEIVED_COUNT, 0L) + 1L)
+                .putLong(KEY_LAST_SMS_AT, System.currentTimeMillis())
+                .putString(KEY_LAST_SMS_RESULT, "SMS received; checking transaction details")
+                .apply();
+    }
+
+    /** Parses a real incoming SMS and persists a matching financial transaction. */
+    public static synchronized boolean processIncomingSms(
+            SharedPreferences preferences, String sender, String body, LocalDate receivedDate
+    ) {
+        SmsTransactionParser.ParsedTransaction parsed =
+                SmsTransactionParser.parseIncomingSms(sender, body, receivedDate);
+        if (parsed == null) {
+            preferences.edit().putString(KEY_LAST_SMS_RESULT,
+                    "SMS received; no completed financial transaction found").apply();
+            return false;
+        }
+        if (parsed.fingerprint.isEmpty()
+                || ExpenseStore.hasFingerprint(preferences, parsed.fingerprint)) {
+            preferences.edit().putString(KEY_LAST_SMS_RESULT,
+                    "Duplicate SMS transaction ignored").apply();
+            return false;
+        }
+        ExpenseStore.upsert(preferences, toExpense(
+                preferences, parsed, ExpenseStore.nextId(preferences), "SMS"
+        ));
+        if (!ExpenseStore.hasFingerprint(preferences, parsed.fingerprint)) {
+            preferences.edit().putString(KEY_LAST_SMS_RESULT,
+                    "SMS transaction save failed").apply();
+            return false;
+        }
+        long count = preferences.getLong(KEY_SMS_IMPORTED_COUNT, 0L) + 1L;
+        String amount = java.math.BigDecimal.valueOf(parsed.amountPaise, 2)
+                .stripTrailingZeros().toPlainString();
+        String direction = SmsTransactionParser.CREDIT.equals(parsed.direction)
+                ? "credit" : "debit";
+        preferences.edit()
+                .putLong(KEY_SMS_IMPORTED_COUNT, count)
+                .putString(KEY_LAST_SMS_RESULT,
+                        "Added ₹" + amount + " " + direction + " · " + parsed.merchant)
+                .apply();
+        return true;
+    }
+
+    public static void recordListenerConnected(SharedPreferences preferences) {
+        preferences.edit()
+                .putBoolean(KEY_LISTENER_CONNECTED, true)
+                .putLong(KEY_LISTENER_CONNECTED_AT, System.currentTimeMillis())
+                .putString(KEY_LAST_CALLBACK_RESULT, "Notification listener connected")
+                .apply();
+    }
+
+    public static void recordListenerDisconnected(SharedPreferences preferences) {
+        preferences.edit()
+                .putBoolean(KEY_LISTENER_CONNECTED, false)
+                .putString(KEY_LAST_CALLBACK_RESULT, "Notification listener disconnected")
+                .apply();
+    }
+
+    public static void recordNotificationCallback(
+            SharedPreferences preferences, String packageName
+    ) {
+        preferences.edit()
+                .putLong(KEY_NOTIFICATION_CALLBACK_COUNT,
+                        preferences.getLong(KEY_NOTIFICATION_CALLBACK_COUNT, 0L) + 1L)
+                .putString(KEY_LAST_CALLBACK_PACKAGE, packageName == null ? "" : packageName)
+                .putLong(KEY_LAST_CALLBACK_AT, System.currentTimeMillis())
+                .putString(KEY_LAST_CALLBACK_RESULT, "Notification callback received")
+                .apply();
+    }
+
+    public static void recordNotificationCallbackIgnored(
+            SharedPreferences preferences, String reason
+    ) {
+        preferences.edit().putString(KEY_LAST_CALLBACK_RESULT, reason).apply();
+    }
+
+    /** Compatibility entry point used by the SMS broadcast receiver. */
     public static synchronized boolean processMessage(SharedPreferences preferences, String sender,
                                          String body, LocalDate receivedDate) {
-        SmsTransactionParser.ParsedTransaction parsed =
-                SmsTransactionParser.parse(sender, body, receivedDate);
-        return saveParsedTransaction(preferences, parsed);
+        return processIncomingSms(preferences, sender, body, receivedDate);
     }
 
     /** Records one supported notification and adds a matching transaction only once. */
@@ -214,15 +303,18 @@ public final class SmsTransactionService {
                 long timestamp = cursor.getLong(dateIndex);
                 LocalDate receivedDate = Instant.ofEpochMilli(timestamp).atZone(INDIA).toLocalDate();
                 SmsTransactionParser.ParsedTransaction parsed =
-                        SmsTransactionParser.parse(sender, body, receivedDate);
+                        SmsTransactionParser.parseIncomingSms(sender, body, receivedDate);
                 if (parsed == null || parsed.fingerprint.isEmpty()
                         || !fingerprints.add(parsed.fingerprint)) continue;
-                expenses.add(toExpense(preferences, parsed, nextId++));
+                expenses.add(toExpense(preferences, parsed, nextId++, "SMS"));
                 imported++;
             }
         } catch (SecurityException | IllegalArgumentException ignored) {
         }
         if (imported > 0) ExpenseStore.save(preferences, expenses);
+        preferences.edit().putString(KEY_LAST_SMS_RESULT, imported > 0
+                ? "Imported " + imported + " recent bank transactions"
+                : "No supported bank transactions found in recent inbox").apply();
         return imported;
     }
 }
