@@ -1324,7 +1324,7 @@ public class MainActivity extends Activity {
         done.setOnClickListener(v -> {
             StudentPlannerStore.Item updated = new StudentPlannerStore.Item(
                     item.id, item.type, item.title, item.course, item.details,
-                    item.dueDate, !item.completed
+                    item.dueDate, !item.completed, item.priority
             );
             StudentPlannerStore.upsert(preferences, updated);
             if (updated.completed) StudentPlannerScheduler.cancel(this, updated.id);
@@ -1342,7 +1342,7 @@ public class MainActivity extends Activity {
                     if (which == 0) {
                         StudentPlannerStore.Item updated = new StudentPlannerStore.Item(
                                 item.id, item.type, item.title, item.course, item.details,
-                                item.dueDate, !item.completed
+                                item.dueDate, !item.completed, item.priority
                         );
                         StudentPlannerStore.upsert(preferences, updated);
                         if (updated.completed) StudentPlannerScheduler.cancel(this, updated.id);
