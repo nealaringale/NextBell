@@ -197,6 +197,7 @@ export default function App() {
   const [cloudPassword, setCloudPassword] = useState('');
   const [cloudBusy, setCloudBusy] = useState(false);
   const cloudSyncRef = useRef(null);
+  const cloudSettingsExtrasRef = useRef({});
   const latestCloudStateRef = useRef(null);
   latestCloudStateRef.current = {
     profile, themeIndex, attendance, attendanceTarget, tasks, expenses, dailyLimitPaise,
@@ -296,15 +297,12 @@ export default function App() {
           setTasks(Array.isArray(state.tasks) ? state.tasks : []);
           setExpenses(Array.isArray(state.expenses) ? state.expenses : []);
           if (state.settings) {
-            if (Number.isFinite(Number(state.settings.themeIndex))) {
-              setThemeIndex(Number(state.settings.themeIndex));
-            }
-            if (Number.isFinite(Number(state.settings.attendanceTarget))) {
-              setAttendanceTarget(Number(state.settings.attendanceTarget));
-            }
-            if (Number.isFinite(Number(state.settings.dailyLimitPaise))) {
-              setDailyLimitPaise(Number(state.settings.dailyLimitPaise));
-            }
+            const { themeIndex: remoteTheme, attendanceTarget: remoteTarget,
+              dailyLimitPaise: remoteLimit, ...extras } = state.settings;
+            cloudSettingsExtrasRef.current = extras;
+            if (Number.isFinite(Number(remoteTheme))) setThemeIndex(Number(remoteTheme));
+            if (Number.isFinite(Number(remoteTarget))) setAttendanceTarget(Number(remoteTarget));
+            if (Number.isFinite(Number(remoteLimit))) setDailyLimitPaise(Number(remoteLimit));
           }
         },
         onRemoteRecord: (collection, id, payload, deleted) => {
@@ -324,13 +322,12 @@ export default function App() {
           } else if (collection === 'profile' && !deleted && payload) {
             setProfile(payload);
           } else if (collection === 'settings' && !deleted && payload) {
-            if (Number.isFinite(Number(payload.themeIndex))) setThemeIndex(Number(payload.themeIndex));
-            if (Number.isFinite(Number(payload.attendanceTarget))) {
-              setAttendanceTarget(Number(payload.attendanceTarget));
-            }
-            if (Number.isFinite(Number(payload.dailyLimitPaise))) {
-              setDailyLimitPaise(Number(payload.dailyLimitPaise));
-            }
+            const { themeIndex: remoteTheme, attendanceTarget: remoteTarget,
+              dailyLimitPaise: remoteLimit, ...extras } = payload;
+            cloudSettingsExtrasRef.current = extras;
+            if (Number.isFinite(Number(remoteTheme))) setThemeIndex(Number(remoteTheme));
+            if (Number.isFinite(Number(remoteTarget))) setAttendanceTarget(Number(remoteTarget));
+            if (Number.isFinite(Number(remoteLimit))) setDailyLimitPaise(Number(remoteLimit));
           }
         },
       });
@@ -365,6 +362,7 @@ export default function App() {
 
   useEffect(() => {
     cloudSyncRef.current?.pushSettings({
+      ...cloudSettingsExtrasRef.current,
       themeIndex,
       attendanceTarget,
       dailyLimitPaise,
