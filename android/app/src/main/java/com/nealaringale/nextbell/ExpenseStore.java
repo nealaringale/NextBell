@@ -444,7 +444,7 @@ public final class ExpenseStore {
                 .replace(",", "")
                 .replaceAll("\\s+", "")
                 .replaceFirst("(?i)^(?:₹|rs\\.?|inr)", "");
-        if (!normalized.matches("[0-9]+(?:\\.[0-9]{1,2})?")) {
+        if (!normalized.matches("[0-9]+(?:\\.[0-9]+)?")) {
             throw new NumberFormatException("Enter a valid amount, for example 1200 or 1200.50");
         }
 
