@@ -291,7 +291,11 @@ public final class FirebaseSyncManager implements SharedPreferences.OnSharedPref
             writeSingleton("profile", localProfile());
         } else if ("theme".equals(key) || "attendance_target_percent".equals(key)
                 || "expense_daily_limit".equals(key)
-                || "expense_weekly_allowance".equals(key)) {
+                || "expense_weekly_allowance".equals(key)
+                || "expense_alert_threshold".equals(key)
+                || "expense_alert_enabled".equals(key)
+                || "expense_merchant_categories".equals(key)
+                || key.startsWith("expense_budget_")) {
             writeSingleton("settings", localSettings());
         }
     }
@@ -399,6 +403,29 @@ public final class FirebaseSyncManager implements SharedPreferences.OnSharedPref
                 editor.putLong("expense_weekly_allowance",
                         Math.max(0L, settings.optLong("weeklyAllowancePaise", 0L)));
             }
+            if (settings.has("dailyAlertThresholdPaise")) {
+                editor.putLong("expense_alert_threshold",
+                        Math.max(0L, settings.optLong("dailyAlertThresholdPaise", 5000L)));
+            }
+            if (settings.has("dailyAlertsEnabled")) {
+                editor.putBoolean("expense_alert_enabled",
+                        settings.optBoolean("dailyAlertsEnabled", true));
+            }
+            JSONObject budgets = settings.optJSONObject("monthlyBudgets");
+            if (budgets != null) {
+                Iterator<String> budgetKeys = budgets.keys();
+                while (budgetKeys.hasNext()) {
+                    String month = budgetKeys.next();
+                    if (month.matches("\\d{4}-\\d{2}")) {
+                        editor.putLong("expense_budget_" + month,
+                                Math.max(0L, budgets.optLong(month, 0L)));
+                    }
+                }
+            }
+            JSONObject merchantCategories = settings.optJSONObject("merchantCategories");
+            if (merchantCategories != null) {
+                editor.putString("expense_merchant_categories", merchantCategories.toString());
+            }
             JSONObject extras = new JSONObject(settings.toString());
             extras.remove("themeIndex");
             extras.remove("attendanceTarget");
@@ -437,6 +464,24 @@ public final class FirebaseSyncManager implements SharedPreferences.OnSharedPref
             value.put("attendanceTarget", preferences.getInt("attendance_target_percent", 75));
             value.put("dailyLimitPaise", preferences.getLong("expense_daily_limit", 0L));
             value.put("weeklyAllowancePaise", preferences.getLong("expense_weekly_allowance", 0L));
+            value.put("dailyAlertThresholdPaise", preferences.getLong("expense_alert_threshold", 5000L));
+            value.put("dailyAlertsEnabled", preferences.getBoolean("expense_alert_enabled", true));
+
+            JSONObject monthlyBudgets = new JSONObject();
+            for (Map.Entry<String, ?> entry : preferences.getAll().entrySet()) {
+                if (entry.getKey().startsWith("expense_budget_")
+                        && entry.getValue() instanceof Long) {
+                    String month = entry.getKey().substring("expense_budget_".length());
+                    if (month.matches("\\d{4}-\\d{2}")) {
+                        monthlyBudgets.put(month, (Long) entry.getValue());
+                    }
+                }
+            }
+            value.put("monthlyBudgets", monthlyBudgets);
+            JSONObject merchantCategories = new JSONObject(
+                    preferences.getString("expense_merchant_categories", "{}")
+            );
+            value.put("merchantCategories", merchantCategories);
         } catch (Exception ignored) {}
         return value;
     }
