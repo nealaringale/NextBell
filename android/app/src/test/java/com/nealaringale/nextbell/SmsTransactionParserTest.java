@@ -27,6 +27,43 @@ public class SmsTransactionParserTest {
     }
 
     @Test
+    public void parsesIciciBankIncomingSmsWithNonStandardSenderAndPayee() {
+        SmsTransactionParser.ParsedTransaction parsed = SmsTransactionParser.parseIncomingSms(
+                "AX-ICICIT-S",
+                "ICICI Bank Acct XX702 debited for Rs 1.00 on 09-Nov-26; "
+                        + "REKHA VDARAKANA credited. UPI:242765527003. Call 18002662 for dispute.",
+                LocalDate.of(2026, 11, 9)
+        );
+        assertNotNull(parsed);
+        assertEquals(100L, parsed.amountPaise);
+        assertEquals(SmsTransactionParser.DEBIT, parsed.direction);
+        assertEquals(LocalDate.of(2026, 11, 9), parsed.date);
+        assertEquals("REKHA VDARAKANA", parsed.merchant);
+        assertEquals("UPI", parsed.paymentMode);
+    }
+
+    @Test
+    public void parsesCreditSmsFromNonStandardAlphanumericSender() {
+        SmsTransactionParser.ParsedTransaction parsed = SmsTransactionParser.parseIncomingSms(
+                "AX-ICICIT-S",
+                "INR 2,000.00 credited to your account from REKHA VDARAKANA.",
+                LocalDate.of(2026, 11, 9)
+        );
+        assertNotNull(parsed);
+        assertEquals(200_000L, parsed.amountPaise);
+        assertEquals(SmsTransactionParser.CREDIT, parsed.direction);
+        assertEquals("REKHA VDARAKANA", parsed.merchant);
+    }
+
+    @Test
+    public void rejectsPersonalSmsEvenWhenMoneyIsMentioned() {
+        assertNull(SmsTransactionParser.parseIncomingSms(
+                "MOM", "I paid Rs 100 for lunch; send me later.",
+                LocalDate.of(2026, 11, 9)
+        ));
+    }
+
+    @Test
     public void parsesBankDebitFromAnUnlistedNotificationPackage() {
         SmsTransactionParser.ParsedTransaction parsed = SmsTransactionParser.parseNotification(
                 "com.vendor.smsclient",
