@@ -47,7 +47,7 @@ public final class SmsTransactionService {
     }
 
     /** @return true only when a new supported transaction was added. */
-    public static boolean processMessage(SharedPreferences preferences, String sender,
+    public static synchronized boolean processMessage(SharedPreferences preferences, String sender,
                                          String body, LocalDate receivedDate) {
         SmsTransactionParser.ParsedTransaction parsed =
                 SmsTransactionParser.parse(sender, body, receivedDate);
@@ -77,7 +77,7 @@ public final class SmsTransactionService {
     }
 
     /** Explicit user action: scan at most the last 30 days of inbox messages on this device. */
-    public static int importRecentInbox(Context context, SharedPreferences preferences) {
+    public static synchronized int importRecentInbox(Context context, SharedPreferences preferences) {
         if (!hasReadPermission(context)) return 0;
         long since = System.currentTimeMillis() - HISTORY_DAYS * 24L * 60L * 60L * 1000L;
         int imported = 0;
