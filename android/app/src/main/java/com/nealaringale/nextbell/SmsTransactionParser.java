@@ -132,15 +132,23 @@ public final class SmsTransactionParser {
         if (body == null || body.trim().isEmpty() || receivedDate == null) {
             return "Notification preview contains no readable message text";
         }
-        if (!TransactionNotificationAccess.isLikelyFinancialNotification(packageName, title, body)) {
-            return "Preview does not contain enough bank or payment evidence";
-        }
         String cleanTitle = title == null ? "" : title.trim();
         String message = (cleanTitle.isEmpty() ? "" : cleanTitle + ". ") + body;
         if (FAILED.matcher(message).find()) return "Payment is failed, declined or pending";
+
         if (extractSignedDebitAmountPaise(message) <= 0L
                 && extractTransactionAmountPaise(message) <= 0L) {
-            return "Amount not present in the notification preview";
+            String lower = message.toLowerCase(Locale.ENGLISH);
+            boolean bankContext = lower.contains("bank") || lower.contains("account")
+                    || lower.contains("a/c") || lower.contains("upi")
+                    || lower.contains("debited") || lower.contains("credited")
+                    || lower.contains("transaction") || lower.contains("card");
+            return bankContext ? "Amount not present in the notification preview"
+                    : "Preview does not contain enough bank or payment evidence";
+        }
+        if (!TransactionNotificationAccess.isLikelyFinancialNotification(
+                packageName, title, body)) {
+            return "Preview does not contain enough bank or payment evidence";
         }
         boolean hasDirection = DEBIT_TERMS.matcher(message).find()
                 || CREDIT_TERMS.matcher(message).find()
