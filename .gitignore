@@ -7,3 +7,10 @@ android/.gradle/
 android/app/build/
 android/build/
 android/app/nextbell-upload.jks
+
+# Firebase app config contains public identifiers for a specific project.
+# Keep Android and local web configuration out of this repository.
+**/google-services.json
+.env
+.env.*
+!.env.example
