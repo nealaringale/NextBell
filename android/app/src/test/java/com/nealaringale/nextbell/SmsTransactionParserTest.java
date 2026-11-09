@@ -12,6 +12,21 @@ public class SmsTransactionParserTest {
     private static final LocalDate RECEIVED = LocalDate.of(2026, 11, 7);
 
     @Test
+    public void parsesTransactionWhenNotificationTitleContainsAllDetails() {
+        SmsTransactionParser.ParsedTransaction parsed = SmsTransactionParser.parseNotification(
+                "com.unlisted.bank.wrapper",
+                "ICICI Bank: A/c XX702 debited by Rs 75.00 at Cafe",
+                "",
+                RECEIVED
+        );
+
+        assertNotNull(parsed);
+        assertEquals(7_500L, parsed.amountPaise);
+        assertEquals(SmsTransactionParser.DEBIT, parsed.direction);
+        assertEquals("Cafe", parsed.merchant);
+    }
+
+    @Test
     public void parsesBankDebitFromAnUnlistedNotificationPackage() {
         SmsTransactionParser.ParsedTransaction parsed = SmsTransactionParser.parseNotification(
                 "com.vendor.smsclient",

@@ -45,7 +45,7 @@ public final class SmsTransactionParser {
                     + "deposit(?:ed)?\\s+(?:into|to)\\s+(?:(?:your|my|the)\\s+)?(?:account|a/c))\\b"
     );
     private static final Pattern DEBIT_TERMS = Pattern.compile(
-            "(?i)\\b(?:debited|debit|deducted|withdrawn|withdrawal|spent|purchase|purchased|sent|charged|"
+            "(?i)\\b(?:debited|deducted|withdrawn|withdrawal|spent|purchase|purchased|sent|charged|"
                     + "paid|transfer\\s+to|transferred\\s+to)\\b"
     );
     private static final Pattern RAIL_SUCCESS = Pattern.compile(
@@ -110,12 +110,14 @@ public final class SmsTransactionParser {
     /** Parses a transaction preview only when it came from a supported messaging/payment app. */
     public static ParsedTransaction parseNotification(String packageName, String title,
                                                        String body, LocalDate receivedDate) {
-        if (body == null || body.trim().isEmpty() || receivedDate == null
-                || !TransactionNotificationAccess.isLikelyFinancialNotification(
-                        packageName, title, body)) return null;
         String cleanTitle = title == null ? "" : title.trim();
+        String cleanBody = body == null ? "" : body.trim();
+        if ((cleanTitle.isEmpty() && cleanBody.isEmpty()) || receivedDate == null
+                || !TransactionNotificationAccess.isLikelyFinancialNotification(
+                        packageName, cleanTitle, cleanBody)) return null;
         String sender = "PAYMENT_NOTIFICATION";
-        String message = cleanTitle.isEmpty() ? body : cleanTitle + ". " + body;
+        String message = cleanTitle.isEmpty() ? cleanBody
+                : cleanBody.isEmpty() ? cleanTitle : cleanTitle + ". " + cleanBody;
         ParsedTransaction parsed = parseInternal(sender, message, receivedDate, true);
         if (parsed == null) return null;
 
@@ -129,11 +131,13 @@ public final class SmsTransactionParser {
     /** Returns a safe, non-sensitive explanation for why a notification was not imported. */
     public static String notificationFailureReason(String packageName, String title,
                                                    String body, LocalDate receivedDate) {
-        if (body == null || body.trim().isEmpty() || receivedDate == null) {
+        String cleanTitle = title == null ? "" : title.trim();
+        String cleanBody = body == null ? "" : body.trim();
+        if ((cleanTitle.isEmpty() && cleanBody.isEmpty()) || receivedDate == null) {
             return "Notification preview contains no readable message text";
         }
-        String cleanTitle = title == null ? "" : title.trim();
-        String message = (cleanTitle.isEmpty() ? "" : cleanTitle + ". ") + body;
+        String message = cleanTitle.isEmpty() ? cleanBody
+                : cleanBody.isEmpty() ? cleanTitle : cleanTitle + ". " + cleanBody;
         if (FAILED.matcher(message).find()) return "Payment is failed, declined or pending";
 
         if (extractSignedDebitAmountPaise(message) <= 0L
