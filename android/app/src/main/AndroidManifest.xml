@@ -3,11 +3,19 @@
 
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.READ_SMS" />
+    <uses-permission android:name="android.permission.RECEIVE_SMS" />
+
+    <uses-feature
+        android:name="android.hardware.telephony"
+        android:required="false" />
 
     <application
-        android:allowBackup="true"
-        android:icon="@drawable/ic_nextbell_logo"
-        android:roundIcon="@drawable/ic_nextbell_logo"
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:icon="@mipmap/ic_nextbell"
+        android:roundIcon="@mipmap/ic_nextbell"
         android:label="@string/app_name"
         android:supportsRtl="true"
         android:theme="@style/Theme.NextBell">
@@ -28,6 +36,30 @@
         <receiver
             android:name=".ExpenseDailyAlertReceiver"
             android:exported="false" />
+
+        <receiver
+            android:name=".SmsTransactionReceiver"
+            android:exported="true"
+            android:permission="android.permission.BROADCAST_SMS">
+            <intent-filter>
+                <action android:name="android.provider.Telephony.SMS_RECEIVED" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
+            android:name=".PlannerReminderReceiver"
+            android:exported="false" />
+
+        <receiver
+            android:name=".NextClassWidgetProvider"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/next_class_widget_info" />
+        </receiver>
 
         <receiver
             android:name=".LiveStatusReceiver"

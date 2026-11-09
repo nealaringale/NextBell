@@ -1,0 +1,89 @@
+name: Publish NextBell Student APK and Download Site
+
+on:
+  # Publishing to the public Pages site is an explicit, manual action.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: nextbell-download-site
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          packages: 'platforms;android-35 build-tools;35.0.0'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+
+      - name: Prepare stable NextBell signing when configured
+        env:
+          NEXTBELL_KEYSTORE_BASE64: ${{ secrets.NEXTBELL_KEYSTORE_BASE64 }}
+          NEXTBELL_KEYSTORE_PASSWORD: ${{ secrets.NEXTBELL_KEYSTORE_PASSWORD }}
+          NEXTBELL_KEY_ALIAS: ${{ secrets.NEXTBELL_KEY_ALIAS }}
+          NEXTBELL_KEY_PASSWORD: ${{ secrets.NEXTBELL_KEY_PASSWORD }}
+        run: |
+          if [ -n "${NEXTBELL_KEYSTORE_BASE64:-}" ]; then
+            if [ -z "${NEXTBELL_KEYSTORE_PASSWORD:-}" ] || [ -z "${NEXTBELL_KEY_ALIAS:-}" ] || [ -z "${NEXTBELL_KEY_PASSWORD:-}" ]; then
+              echo "::error::NextBell signing is only partially configured. Check the four documented repository secrets."
+              exit 1
+            fi
+            keystore="$GITHUB_WORKSPACE/android/app/nextbell-upload.jks"
+            printf '%s' "$NEXTBELL_KEYSTORE_BASE64" | base64 --decode > "$keystore"
+            chmod 600 "$keystore"
+            echo "NEXTBELL_KEYSTORE_PATH=$keystore" >> "$GITHUB_ENV"
+            echo "Stable NextBell signing is configured."
+          else
+            echo "::notice::No stable NextBell signing key is configured; this CI build will use its temporary debug key."
+          fi
+
+      - name: Build student APK
+        working-directory: android
+        env:
+          NEXTBELL_KEYSTORE_PASSWORD: ${{ secrets.NEXTBELL_KEYSTORE_PASSWORD }}
+          NEXTBELL_KEY_ALIAS: ${{ secrets.NEXTBELL_KEY_ALIAS }}
+          NEXTBELL_KEY_PASSWORD: ${{ secrets.NEXTBELL_KEY_PASSWORD }}
+        run: gradle --no-daemon :app:assembleDebug
+
+      - name: Add APK to download site
+        run: |
+          set -euo pipefail
+          APK="android/app/build/outputs/apk/debug/app-debug.apk"
+          test -s "$APK"
+          mkdir -p docs/downloads
+          cp "$APK" docs/downloads/NextBell.apk
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload website and APK
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./docs
+
+      - name: Deploy website
+        id: deployment
+        uses: actions/deploy-pages@v4

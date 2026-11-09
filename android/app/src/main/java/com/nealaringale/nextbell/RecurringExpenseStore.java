@@ -6,9 +6,12 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
 
 public final class RecurringExpenseStore {
     private static final String KEY = "recurring_expenses_v1";
@@ -39,7 +42,69 @@ public final class RecurringExpenseStore {
         }
     }
 
+    public static final class Candidate {
+        public final String merchant;
+        public final String category;
+        public final long suggestedAmountPaise;
+        public final LocalDate latestDate;
+        public final int occurrences;
+
+        Candidate(String merchant, String category, long suggestedAmountPaise,
+                  LocalDate latestDate, int occurrences) {
+            this.merchant = merchant;
+            this.category = category;
+            this.suggestedAmountPaise = suggestedAmountPaise;
+            this.latestDate = latestDate;
+            this.occurrences = occurrences;
+        }
+    }
+
     private RecurringExpenseStore() {}
+
+    /** Finds repeat-like monthly debits; these are suggestions and are never auto-created. */
+    public static List<Candidate> detectMonthlyCandidates(List<ExpenseStore.Expense> transactions) {
+        Map<String, List<ExpenseStore.Expense>> groups = new HashMap<>();
+        for (ExpenseStore.Expense expense : transactions) {
+            if (expense == null || expense.date == null || expense.amountPaise <= 0L
+                    || SmsTransactionParser.CREDIT.equals(expense.direction)
+                    || expense.merchant.trim().isEmpty()) continue;
+            String key = expense.merchant.trim().toLowerCase(java.util.Locale.ENGLISH)
+                    + "|" + expense.category;
+            groups.computeIfAbsent(key, ignored -> new ArrayList<>()).add(expense);
+        }
+
+        List<Candidate> result = new ArrayList<>();
+        for (List<ExpenseStore.Expense> group : groups.values()) {
+            group.sort(Comparator.comparing(value -> value.date));
+            int matches = 0;
+            LocalDate latestMatch = null;
+            long amount = 0L;
+            for (int newer = group.size() - 1; newer >= 1; newer--) {
+                ExpenseStore.Expense recent = group.get(newer);
+                for (int older = newer - 1; older >= 0; older--) {
+                    ExpenseStore.Expense prior = group.get(older);
+                    long days = ChronoUnit.DAYS.between(prior.date, recent.date);
+                    if (days < 25L || days > 35L) continue;
+                    long larger = Math.max(prior.amountPaise, recent.amountPaise);
+                    long smaller = Math.min(prior.amountPaise, recent.amountPaise);
+                    if (larger - smaller > larger / 7L) continue;
+                    if (matches == 0) {
+                        latestMatch = recent.date;
+                        amount = recent.amountPaise;
+                    }
+                    matches++;
+                    break;
+                }
+            }
+            if (matches > 0 && latestMatch != null) {
+                ExpenseStore.Expense example = group.get(group.size() - 1);
+                result.add(new Candidate(example.merchant, example.category, amount,
+                        latestMatch, matches + 1));
+            }
+        }
+        result.sort(Comparator.comparing((Candidate value) -> value.latestDate).reversed());
+        return result;
+    }
 
     public static List<Rule> load(SharedPreferences prefs) {
         List<Rule> result = new ArrayList<>();
@@ -117,7 +182,8 @@ public final class RecurringExpenseStore {
             if (month.equals(rule.lastGeneratedMonth)) continue;
 
             LocalDate dueDate = today.withDayOfMonth(rule.dayOfMonth);
-            long id = Math.abs((rule.id * 31L) ^ dueDate.toEpochDay() ^ rule.amountPaise);
+            long rawId = (rule.id * 31L) ^ dueDate.toEpochDay() ^ rule.amountPaise;
+            long id = rawId == Long.MIN_VALUE ? Long.MAX_VALUE : Math.abs(rawId);
             if (id == 0L) id = Math.max(1L, System.nanoTime());
 
             ExpenseStore.upsert(

@@ -51,7 +51,7 @@ public class ClassReminderReceiver extends BroadcastReceiver {
         }
 
         builder
-                .setSmallIcon(android.R.drawable.ic_popup_reminder)
+                .setSmallIcon(R.drawable.ic_nextbell_notification)
                 .setContentTitle("NextBell · 15 min")
                 .setContentText(subject + (start.isEmpty() ? "" : " starts at " + formatTime(start)))
                 .setStyle(new android.app.Notification.BigTextStyle()

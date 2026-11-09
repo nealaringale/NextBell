@@ -139,7 +139,7 @@ public class ExpenseDailyAlertReceiver extends BroadcastReceiver {
             builder = new Notification.Builder(context);
         }
 
-        builder.setSmallIcon(android.R.drawable.ic_dialog_info)
+        builder.setSmallIcon(R.drawable.ic_nextbell_notification)
                 .setContentTitle("NextBell · " + title)
                 .setContentText(body.toString())
                 .setStyle(new Notification.BigTextStyle().bigText(

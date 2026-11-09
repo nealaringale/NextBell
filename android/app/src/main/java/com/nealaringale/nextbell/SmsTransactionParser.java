@@ -2,256 +2,435 @@ package com.nealaringale.nextbell;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.LocalDate;
-import java.time.ZoneId;
-import java.util.HashMap;
 import java.util.Locale;
-import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+/** Parses a narrow set of bank transaction alerts without retaining the message text. */
 public final class SmsTransactionParser {
+    private static final Pattern AMOUNT = Pattern.compile(
+            "(?i)(?:₹|\\bINR\\b|\\bRs\\.?\\s*)\\s*([0-9][0-9,]*(?:\\.[0-9]{1,2})?)"
+    );
+    private static final Pattern BALANCE = Pattern.compile(
+            "(?i)(?:(?:available|avl\\.?|closing|current|ledger|account|acct|a/c)\\s+)?"
+                    + "(?:balance|bal\\.?)(?:\\s+(?:is|of))?\\s*[:=\\-]?\\s*"
+                    + "(?:₹|INR|Rs\\.?\\s*)?\\s*([0-9][0-9,]*(?:\\.[0-9]{1,2})?)"
+    );
+    private static final Pattern BARE_TRANSACTION_AMOUNT = Pattern.compile(
+            "(?i)\\b(?:debited|credited|deducted|withdrawn)\\s+(?:by|of)\\s+"
+                    + "([0-9][0-9,]*(?:\\.[0-9]{1,2})?)\\b"
+    );
+    private static final Pattern EXPLICIT_DATE = Pattern.compile(
+            "(?i)(?:on|dated|txn(?:\\s+date)?)\\s*[:\\-]?\\s*"
+                    + "(\\d{1,2})[-/ ]([A-Za-z]{3,9}|\\d{1,2})[-/ ](\\d{2,4})"
+    );
+    // "credited to VPA" describes the UPI payee, not money credited to the sender's account.
+    private static final Pattern CREDIT_TERMS = Pattern.compile(
+            "(?i)\\b(?:refund(?:ed)?|reversal|reversed|cashback|credit\\s+received|"
+                    + "payment\\s+received|(?:amount|funds|money)\\s+credited|"
+                    + "credit(?:ed)?\\s+(?:(?:to|into)\\s+)?(?:(?:your|my|the)\\s+)?(?:account|a/c)|"
+                    + "(?:(?:your|my|the)\\s+)?account\\s+(?:has\\s+been\\s+)?credited|"
+                    + "received\\s+(?:into|in)\\s+(?:(?:your|my|the)\\s+)?(?:account|a/c)|"
+                    + "deposit(?:ed)?\\s+(?:into|to)\\s+(?:(?:your|my|the)\\s+)?(?:account|a/c))\\b"
+    );
+    private static final Pattern DEBIT_TERMS = Pattern.compile(
+            "(?i)\\b(?:debited|deducted|withdrawn|withdrawal|spent|purchase|sent|"
+                    + "paid\\s+to|transfer\\s+to|transferred\\s+to)\\b"
+    );
+    private static final Pattern RAIL_SUCCESS = Pattern.compile(
+            "(?i)(?:upi|atm|pos|neft|imps|rtgs|card|nach|ach).{0,90}"
+                    + "(?:successful|successfully|completed|processed|paid)"
+    );
+    private static final Pattern FAILED = Pattern.compile(
+            "(?i)\\b(?:failed|failure|declined|unsuccessful|rejected|pending|not processed)\\b"
+    );
+    private static final Pattern TRANSACTION_CONTEXT = Pattern.compile(
+            "(?i)\\b(?:debited|debit|deducted|withdrawn|withdrawal|spent|purchase|payment|"
+                    + "transfer|transferred|sent|received|credited|refund|cashback|deposit|txn|transaction)\\b"
+    );
+    private static final Pattern MERCHANT = Pattern.compile(
+            "(?i)\\b(?:at|to|merchant|towards)\\s+(.{2,56}?)"
+                    + "(?=\\s+(?:on|ref|upi|txn|transaction|avl|available|balance|"
+                    + "a/c|ac|from|using|via)\\b|[,.;]|$)"
+    );
+
+    public static final String DEBIT = "DEBIT";
+    public static final String CREDIT = "CREDIT";
+
     public static final class ParsedTransaction {
         public final long amountPaise;
+        public final long availableBalancePaise;
+        public final LocalDate date;
+        public final String direction;
         public final String merchant;
         public final String category;
         public final String paymentMode;
         public final float confidence;
-        public final long smsTime;
         public final String fingerprint;
 
-        ParsedTransaction(
-                long amountPaise,
-                String merchant,
-                String category,
-                String paymentMode,
-                float confidence,
-                long smsTime,
-                String fingerprint
-        ) {
+        ParsedTransaction(long amountPaise, long availableBalancePaise, LocalDate date,
+                          String direction, String merchant, String category,
+                          String paymentMode, float confidence, String fingerprint) {
             this.amountPaise = amountPaise;
+            this.availableBalancePaise = availableBalancePaise;
+            this.date = date;
+            this.direction = direction;
             this.merchant = merchant;
             this.category = category;
             this.paymentMode = paymentMode;
             this.confidence = confidence;
-            this.smsTime = smsTime;
             this.fingerprint = fingerprint;
         }
     }
 
-    private static final Pattern CURRENCY_AMOUNT = Pattern.compile(
-            "(?:₹|rs\\.?|inr\\.?)[ ]*([0-9][0-9,]*(?:\\.[0-9]{1,2})?)",
-            Pattern.CASE_INSENSITIVE
-    );
-    private static final Pattern KEYWORD_AMOUNT = Pattern.compile(
-            "(?:debited|debit|spent|paid|purchase|withdrawn|txn|transaction)"
-                    + "(?:[^0-9₹]{0,80})([0-9][0-9,]*(?:\\.[0-9]{1,2})?)",
-            Pattern.CASE_INSENSITIVE
-    );
-    private static final Pattern MERCHANT_AFTER_WORD = Pattern.compile(
-            "(?:at|to|for|towards|merchant)[ :\\-]+([A-Za-z0-9][A-Za-z0-9 &._'()/#@-]{2,48})",
-            Pattern.CASE_INSENSITIVE
-    );
-    private static final Pattern VPA = Pattern.compile(
-            "\\b([A-Za-z0-9][A-Za-z0-9._-]{2,})@[A-Za-z][A-Za-z0-9._-]{1,}\\b"
-    );
-
-    private static final String[] DEBIT_WORDS = {
-            "debited", "debit", "spent", "paid", "purchase", "withdrawn",
-            "sent", "payment successful", "transaction successful", "txn successful"
-    };
-
-    private static final String[] CREDIT_WORDS = {
-            "credited", "credit", "received", "refund", "refunded",
-            "cashback", "reversal", "reversed", "interest credited"
-    };
-
-    private static final String[] IGNORE_WORDS = {
-            "otp", "one time password", "verification code", "login",
-            "failed", "declined", "unsuccessful", "cancelled", "canceled",
-            "will be debited", "will be charged", "standing instruction due"
-    };
-
-    private static final Map<String, String> CATEGORY_RULES = new HashMap<>();
-
-    static {
-        add("Food & Drinks", "swiggy,zomato,blinkit,zepto,bigbasket,instamart,ubereats,dominos,pizza hut,mcdonald,kfc,subway,starbucks,cafe,café,coffee,tea,chai,canteen,mess,restaurant,hotel,bakery,juice,dhaba,snacks,food,thali,ice cream,icecream,paratha,poha,samosa,vada pav");
-        add("Travel", "uber,ola,rapido,redbus,irctc,metro,bus,train,parking,toll,petrol,fuel,iocl,indian oil,bpcl,bharat petroleum,hpcl,hindustan petroleum,shell,reliance petroleum,jio-bp,pump,gas station,auto,rickshaw,cab");
-        add("College", "college,university,institute,school,tuition,coaching,exam,admission,fees,fee,semester,stationery,xerox,photocopy,print,printing,notebook,book,books,lab,project,assignment");
-        add("Home & Bills", "rent,electricity,mseb,mahadiscom,water,gas cylinder,indane,hp gas,bharatgas,broadband,wifi,internet,airtel fiber,jiofiber,dish tv,dth");
-        add("Mobile", "mobile recharge,recharge,airtel,jio,vi,vodafone,bsnl,data pack,talktime");
-        add("Personal", "salon,barber,haircut,laundry,cleaning,tailor,spa,personal care");
-        add("Fun & Social", "pvr,inox,cinema,movie,bookmyshow,bowling,arcade,game,concert,event,cafe social,party");
-        add("Shopping", "amazon,flipkart,myntra,ajio,meesho,nykaa,decathlon,ikea,store,mart,supermarket,market,clothing,shoe,shoes,electronics");
-        add("Health", "pharmacy,medical,medicine,medplus,apollo,netmeds,1mg,clinic,hospital,doctor,diagnostic,lab test");
-    }
-
-    private static void add(String category, String terms) {
-        CATEGORY_RULES.put(category, terms);
-    }
-
     private SmsTransactionParser() {}
 
-    public static ParsedTransaction parse(String sender, String body, long smsTime) {
-        if (body == null) return null;
-        String text = normalize(body);
-        String lower = text.toLowerCase(Locale.ENGLISH);
+    public static ParsedTransaction parse(String sender, String body, LocalDate receivedDate) {
+        if (!isBankLikeSender(sender) || body == null || body.trim().isEmpty()
+                || receivedDate == null) return null;
 
-        if (!containsAny(lower, DEBIT_WORDS)) return null;
-        if (containsAny(lower, CREDIT_WORDS) || containsAny(lower, IGNORE_WORDS)) return null;
-
-        long amountPaise = extractAmountPaise(text);
-        if (amountPaise <= 0) return null;
-
-        String merchant = extractMerchant(text);
-        String category = categorize(lower, merchant);
-        String paymentMode = detectPayment(lower);
-        float confidence = 0.52f;
-        if (!merchant.isEmpty()) confidence += 0.20f;
-        if (!"Other".equals(category)) confidence += 0.20f;
-        if (!"Other".equals(paymentMode)) confidence += 0.05f;
-        if (containsAny(lower, new String[]{"upi", "bank", "account", "a/c", "card"})) confidence += 0.03f;
-        confidence = Math.min(0.99f, confidence);
-
-        String fingerprint = fingerprint(sender, amountPaise, smsTime, merchant, text);
-        return new ParsedTransaction(
-                amountPaise,
-                merchant,
-                category,
-                paymentMode,
-                confidence,
-                smsTime,
-                fingerprint
-        );
-    }
-
-    private static long extractAmountPaise(String text) {
-        Matcher m = CURRENCY_AMOUNT.matcher(text);
-        if (m.find()) return toPaise(m.group(1));
-
-        m = KEYWORD_AMOUNT.matcher(text);
-        if (m.find()) return toPaise(m.group(1));
-
-        return 0L;
-    }
-
-    private static long toPaise(String raw) {
-        try {
-            return new BigDecimal(raw.replace(",", ""))
-                    .movePointRight(2)
-                    .setScale(0, RoundingMode.HALF_UP)
-                    .longValueExact();
-        } catch (Exception ignored) {
-            return 0L;
-        }
-    }
-
-    private static String extractMerchant(String text) {
-        Matcher m = MERCHANT_AFTER_WORD.matcher(text);
-        if (m.find()) {
-            String value = cleanMerchant(m.group(1));
-            if (isNoiseMerchant(value)) return "";
-            return value;
+        String normalized = body.replace('\u00a0', ' ')
+                .replaceAll("\\s+", " ")
+                .trim();
+        if (FAILED.matcher(normalized).find()
+                || normalized.matches("(?i).*\\bnot\\s+(?:debited|credited)\\b.*")) {
+            return null;
         }
 
-        m = VPA.matcher(text);
-        if (m.find()) {
-            String value = cleanMerchant(m.group(1));
-            if (!isNoiseMerchant(value)) return value;
+        long amountPaise = extractTransactionAmountPaise(normalized);
+        if (amountPaise <= 0L) return null;
+
+        boolean explicitDebit = DEBIT_TERMS.matcher(normalized).find();
+        boolean accountCredit = CREDIT_TERMS.matcher(normalized).find();
+        boolean successfulRail = RAIL_SUCCESS.matcher(normalized).find();
+
+        // Explicit debit wording wins over recipient-side phrases such as
+        // "credited to VPA". A rail success message is a debit only when no
+        // account-credit wording was found.
+        String direction;
+        if (explicitDebit) {
+            direction = DEBIT;
+        } else if (accountCredit) {
+            direction = CREDIT;
+        } else if (successfulRail) {
+            direction = DEBIT;
+        } else {
+            return null;
         }
 
-        return "";
+        long balancePaise = extractAvailableBalancePaise(normalized);
+        String paymentMode = paymentMode(normalized);
+        String merchant = MerchantCatalog.match(normalized);
+        if (merchant.isEmpty()) merchant = extractMerchant(normalized);
+        String category = MerchantCatalog.categoryFor(normalized, merchant, direction);
+        String fingerprint = fingerprint(sender, normalized);
+        float confidence = merchant.isEmpty() ? 0.72f : 0.92f;
+
+        return new ParsedTransaction(amountPaise, balancePaise,
+                transactionDate(normalized, receivedDate), direction, merchant,
+                category, paymentMode, confidence, fingerprint);
     }
 
-    private static String cleanMerchant(String raw) {
-        String value = raw == null ? "" : raw.trim();
-        value = value.replaceAll("\\s+", " ");
-        value = value.replaceAll("(?i)\\b(on|dated|date|using|via|through|ref|reference|txn|transaction)\\b.*$", "");
-        value = value.replaceAll("[,.;:]+$", "").trim();
-        if (value.length() > 42) value = value.substring(0, 42).trim();
-        return value;
-    }
+    /**
+     * Chooses the money movement amount, not the first currency value in the SMS.
+     * Explicit balance fields are excluded before transaction-context scoring.
+     */
+    private static long extractTransactionAmountPaise(String body) {
+        Matcher amountMatcher = AMOUNT.matcher(body);
+        String bestAmount = null;
+        int bestScore = Integer.MIN_VALUE;
 
-    private static boolean isNoiseMerchant(String value) {
-        if (value.isEmpty()) return true;
-        String lower = value.toLowerCase(Locale.ENGLISH);
-        return lower.equals("your account")
-                || lower.equals("your a/c")
-                || lower.equals("bank")
-                || lower.equals("account")
-                || lower.equals("card")
-                || lower.equals("mobile");
-    }
+        while (amountMatcher.find()) {
+            if (insideBalanceField(body, amountMatcher.start(), amountMatcher.end())) continue;
 
-    public static String categorize(String bodyLower, String merchant) {
-        String haystack = (merchant + " " + bodyLower).toLowerCase(Locale.ENGLISH);
-        String best = "Other";
-        int bestScore = 0;
+            String context = sentenceContext(body, amountMatcher.start(), amountMatcher.end());
+            boolean hasTransactionContext = TRANSACTION_CONTEXT.matcher(context).find();
+            if (!hasTransactionContext && BALANCE.matcher(context).find()) continue;
 
-        for (Map.Entry<String, String> entry : CATEGORY_RULES.entrySet()) {
-            int score = 0;
-            for (String term : entry.getValue().split(",")) {
-                if (haystack.contains(term)) score += term.length() >= 5 ? 3 : 2;
+            int score = hasTransactionContext ? 10 : 0;
+            if (DEBIT_TERMS.matcher(context).find() || CREDIT_TERMS.matcher(context).find()) {
+                score += 4;
             }
             if (score > bestScore) {
                 bestScore = score;
-                best = entry.getKey();
+                bestAmount = amountMatcher.group(1);
             }
         }
 
-        return best;
+        if (bestAmount != null) {
+            try {
+                return toPaise(bestAmount);
+            } catch (RuntimeException ignored) {
+                return 0L;
+            }
+        }
+
+        Matcher bare = BARE_TRANSACTION_AMOUNT.matcher(body);
+        if (bare.find()) {
+            try {
+                return toPaise(bare.group(1));
+            } catch (RuntimeException ignored) {
+                return 0L;
+            }
+        }
+        return 0L;
     }
 
-    private static String detectPayment(String lower) {
-        if (containsAny(lower, new String[]{"upi", "vpa", "upi ref", "upi id"})) return "UPI";
-        if (containsAny(lower, new String[]{"credit card", "credit card ending", "cc ending"})) return "Card";
-        if (containsAny(lower, new String[]{"debit card", "debit card ending", "dc ending"})) return "Card";
-        if (containsAny(lower, new String[]{"atm", "cash withdrawal", "cash withdrawn"})) return "Cash";
-        if (containsAny(lower, new String[]{"imps", "neft", "rtgs", "bank transfer"})) return "Bank Transfer";
-        return "Other";
-    }
-
-    private static String paymentModeKey(String normalizedText) {
-        String lower = normalizedText.toLowerCase(Locale.ENGLISH);
-        if (containsAny(lower, new String[]{"upi", "vpa"})) return "upi";
-        if (containsAny(lower, new String[]{"card", "atm"})) return "card";
-        if (containsAny(lower, new String[]{"imps", "neft", "rtgs"})) return "bank";
-        return "other";
-    }
-
-    private static boolean containsAny(String value, String[] words) {
-        for (String word : words) {
-            if (value.contains(word)) return true;
+    private static boolean insideBalanceField(String body, int start, int end) {
+        Matcher balance = BALANCE.matcher(body);
+        while (balance.find()) {
+            if (start >= balance.start() && end <= balance.end()) return true;
         }
         return false;
     }
 
-    private static String normalize(String text) {
-        return text.replace('\n', ' ')
-                .replace('\r', ' ')
-                .replaceAll("\\s+", " ")
-                .trim();
+    private static String sentenceContext(String body, int start, int end) {
+        int left = 0;
+        for (int i = start - 1; i >= 0; i--) {
+            char c = body.charAt(i);
+            if (c == '.' || c == ';' || c == '|' || c == '\n' || c == '\r') {
+                left = i + 1;
+                break;
+            }
+        }
+
+        int right = body.length();
+        for (int i = end; i < body.length(); i++) {
+            char c = body.charAt(i);
+            if (c == '.' || c == ';' || c == '|' || c == '\n' || c == '\r') {
+                right = i;
+                break;
+            }
+        }
+        return body.substring(left, right);
     }
 
-    private static String fingerprint(String sender, long amountPaise, long smsTime,
-                                      String merchant, String normalizedText) {
+    private static long extractAvailableBalancePaise(String body) {
+        Matcher matcher = BALANCE.matcher(body);
+        if (!matcher.find()) return -1L;
         try {
-            LocalDate date = LocalDate.ofInstant(
-                    java.time.Instant.ofEpochMilli(smsTime),
-                    ZoneId.of("Asia/Kolkata")
-            );
-            long minuteBucket = smsTime / 60_000L;
-            String input = amountPaise + "|" + date + "|" + minuteBucket
-                    + "|" + merchant.toLowerCase(Locale.ENGLISH)
-                    + "|" + paymentModeKey(normalizedText);
+            return toPaise(matcher.group(1));
+        } catch (RuntimeException ignored) {
+            return -1L;
+        }
+    }
+
+    private static boolean isBankLikeSender(String sender) {
+        if (sender == null) return false;
+        String value = sender.trim().toUpperCase(Locale.ENGLISH);
+        if (value.length() < 4 || value.length() > 18 || value.contains(" ")) return false;
+        if (value.matches("[A-Z]{2,3}-[A-Z0-9]{4,12}")) return true;
+        return value.matches("(?:HDFC|HDFCBK|SBI|SBIINB|SBIUPI|ICICI|ICICIB|AXIS|AXISBK|"
+                + "KOTAK|KOTAKB|YESBNK|YESBANK|PNBSMS|BOIIND|BARODA|CANBNK|INDUSB|"
+                + "IDFCFB|PAYTM|PHONEPE|BANKEX)[A-Z0-9]{0,6}");
+    }
+
+    private static LocalDate transactionDate(String body, LocalDate fallback) {
+        Matcher matcher = EXPLICIT_DATE.matcher(body);
+        if (!matcher.find()) return fallback;
+        try {
+            int day = Integer.parseInt(matcher.group(1));
+            String monthText = matcher.group(2);
+            int month = monthText.matches("\\d{1,2}")
+                    ? Integer.parseInt(monthText)
+                    : java.time.Month.from(
+                            java.time.format.DateTimeFormatter.ofPattern("MMM", Locale.ENGLISH)
+                                    .parse(monthText)
+                    ).getValue();
+            int year = Integer.parseInt(matcher.group(3));
+            if (year < 100) year += 2000;
+            return LocalDate.of(year, month, day);
+        } catch (RuntimeException ignored) {
+            return fallback;
+        }
+    }
+
+    private static long toPaise(String value) {
+        return new BigDecimal(value.replace(",", ""))
+                .movePointRight(2).setScale(0, RoundingMode.HALF_UP).longValueExact();
+    }
+
+    private static String paymentMode(String body) {
+        String lower = body.toLowerCase(Locale.ENGLISH);
+        if (lower.contains("upi")) return "UPI";
+        if (lower.contains("atm")) return "ATM";
+        if (lower.contains("pos") || lower.contains("card")) return "Card";
+        if (lower.contains("neft")) return "NEFT";
+        if (lower.contains("imps")) return "IMPS";
+        if (lower.contains("rtgs")) return "RTGS";
+        if (lower.contains("nach") || lower.contains("ach")) return "Bank Transfer";
+        return "Bank Transfer";
+    }
+
+    private static String extractMerchant(String body) {
+        Matcher matcher = MERCHANT.matcher(body);
+        if (!matcher.find()) return "";
+        String value = matcher.group(1).replaceAll("(?i)\\b(?:a/c|ac|account)\\b.*$", "")
+                .replaceAll("[.\\s]+$", "").trim();
+        if (value.length() > 40 || value.matches("(?i)your account|the account|account")) return "";
+        return value;
+    }
+
+    private static String fingerprint(String sender, String normalizedBody) {
+        try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(input.getBytes(java.nio.charset.StandardCharsets.UTF_8));
-            StringBuilder out = new StringBuilder();
-            for (byte b : hash) out.append(String.format(Locale.ENGLISH, "%02x", b));
+            String input = (sender == null ? "" : sender.trim().toUpperCase(Locale.ENGLISH))
+                    + "|" + normalizedBody.toLowerCase(Locale.ENGLISH);
+            byte[] bytes = digest.digest(input.getBytes(StandardCharsets.UTF_8));
+            StringBuilder out = new StringBuilder(bytes.length * 2);
+            for (byte b : bytes) out.append(String.format(Locale.ROOT, "%02x", b & 0xff));
             return out.toString();
-        } catch (Exception ignored) {
-            return String.valueOf(sender) + "|" + amountPaise + "|" + smsTime;
+        } catch (Exception impossible) {
+            return "";
+        }
+    }
+
+    /** Small, local, human-maintained seed catalog; corrections extend it per user. */
+    private static final class MerchantCatalog {
+        private static final String[][] MERCHANTS = {
+                {"Swiggy", "Food & Drinks", "swiggy"},
+                {"Zomato", "Food & Drinks", "zomato"},
+                {"Blinkit", "Groceries", "blinkit"},
+                {"Zepto", "Groceries", "zepto"},
+                {"BigBasket", "Groceries", "bigbasket, big basket"},
+                {"DMart", "Groceries", "dmart, d mart, avenue supermarts"},
+                {"JioMart", "Groceries", "jiomart, jio mart"},
+                {"Reliance Smart", "Groceries", "reliance smart, smart bazaar"},
+                {"Amazon", "Shopping", "amazon, amzn"},
+                {"Flipkart", "Shopping", "flipkart, flip kart"},
+                {"Myntra", "Shopping", "myntra"},
+                {"Ajio", "Shopping", "ajio"},
+                {"Meesho", "Shopping", "meesho"},
+                {"Uber", "Travel", "uber"},
+                {"Ola", "Travel", "ola cabs, ola"},
+                {"Rapido", "Travel", "rapido"},
+                {"IRCTC", "Travel", "irctc, indian railways"},
+                {"redBus", "Travel", "redbus, red bus"},
+                {"MakeMyTrip", "Travel", "makemytrip, make my trip, mmt"},
+                {"IndianOil", "Travel", "indianoil, indian oil, iocl"},
+                {"Bharat Petroleum", "Travel", "bharat petroleum, bpcl"},
+                {"Hindustan Petroleum", "Travel", "hindustan petroleum, hpcl"},
+                {"Shell", "Travel", "shell petrol, shell"},
+                {"Netflix", "Subscriptions", "netflix"},
+                {"Spotify", "Subscriptions", "spotify"},
+                {"YouTube Premium", "Subscriptions", "youtube premium, youtube"},
+                {"Prime Video", "Subscriptions", "prime video, amazon prime"},
+                {"Jio", "Bills & Recharge", "jio recharge, reliance jio"},
+                {"Airtel", "Bills & Recharge", "airtel recharge, bharti airtel"},
+                {"Vi", "Bills & Recharge", "vodafone idea, vi recharge"},
+                {"BSNL", "Bills & Recharge", "bsnl"},
+                {"Google Play", "Entertainment", "google play, play store"},
+                {"BookMyShow", "Fun & Social", "bookmyshow, book my show"},
+                {"PVR INOX", "Fun & Social", "pvr, inox"},
+                {"Apollo Pharmacy", "Health", "apollo pharmacy, apollo 24|7"},
+                {"PharmEasy", "Health", "pharmeasy, pharm easy"},
+                {"Tata 1mg", "Health", "1mg, tata 1mg"},
+                {"Decathlon", "Shopping", "decathlon"},
+                {"IKEA", "Shopping", "ikea"},
+                {"Croma", "Shopping", "croma"},
+                {"Reliance Digital", "Shopping", "reliance digital"},
+                {"Maharashtra State Electricity", "Home & Bills", "mahadiscom, mseb, mahavitaran"},
+                {"Tata Power", "Home & Bills", "tata power"},
+                {"Mahanagar Gas", "Home & Bills", "mahanagar gas, mgl"},
+                {"Tata Play", "Home & Bills", "tata play, tata sky"},
+                {"College Fees", "College", "college fee, tuition fee, examination fee, exam fee"},
+                {"Canteen", "Food & Drinks", "canteen, cafeteria, mess"},
+                {"Cafe", "Food & Drinks", "cafe, coffee shop, tea stall"},
+                {"Grocery Store", "Groceries", "grocery, supermarket, kirana"},
+                {"Rent", "Rent & Accommodation", "rent, hostel fee, accommodation"}
+        };
+
+        static String match(String body) {
+            String normalized = normalize(body);
+            for (String[] merchant : MERCHANTS) {
+                for (String alias : merchant[2].split(",")) {
+                    String candidate = normalize(alias);
+                    if (candidate.isEmpty()) continue;
+                    if (containsPhrase(normalized, candidate)) return merchant[0];
+                    if (!candidate.contains(" ") && candidate.length() >= 5
+                            && fuzzyWordPresent(normalized, candidate)) return merchant[0];
+                }
+            }
+            return "";
+        }
+
+        static String categoryFor(String body, String merchant, String direction) {
+            if (direction.equals(CREDIT)) return "Income & Refunds";
+            String normalized = normalize(body + " " + merchant);
+            String known = match(body);
+            if (!known.isEmpty()) {
+                for (String[] item : MERCHANTS) if (item[0].equals(known)) return item[1];
+            }
+            if (containsAny(normalized, "tea", "coffee", "snack", "chai", "bakery")) {
+                return "Tea & Coffee";
+            }
+            if (containsAny(normalized, "petrol", "fuel", "diesel")) {
+                return "Transport & Fuel";
+            }
+            if (containsAny(normalized, "metro", "bus", "taxi", "railway", "travel")) {
+                return "Travel";
+            }
+            if (containsAny(normalized, "rent", "hostel", "electricity", "water bill", "gas bill")) {
+                return "Home & Bills";
+            }
+            if (containsAny(normalized, "grocery", "vegetable", "supermarket", "kirana")) {
+                return "Groceries";
+            }
+            if (containsAny(normalized, "college", "tuition", "university", "exam fee", "stationery")) {
+                return "College";
+            }
+            if (containsAny(normalized, "recharge", "mobile bill", "broadband", "internet bill")) {
+                return "Bills & Recharge";
+            }
+            if (containsAny(normalized, "subscription", "monthly plan", "membership")) {
+                return "Subscriptions";
+            }
+            if (containsAny(normalized, "atm", "cash withdrawal", "self transfer")) {
+                return "Transfers & ATM";
+            }
+            if (containsAny(normalized, "restaurant", "food", "dining", "swiggy", "zomato")) {
+                return "Food & Drinks";
+            }
+            return "Other";
+        }
+
+        private static boolean containsPhrase(String text, String phrase) {
+            return (" " + text + " ").contains(" " + phrase + " ");
+        }
+
+        private static boolean containsAny(String text, String... terms) {
+            for (String term : terms) if (containsPhrase(text, normalize(term))) return true;
+            return false;
+        }
+
+        private static String normalize(String value) {
+            return value.toLowerCase(Locale.ENGLISH).replaceAll("[^a-z0-9]+", " ")
+                    .trim().replaceAll("\\s+", " ");
+        }
+
+        private static boolean fuzzyWordPresent(String normalizedText, String candidate) {
+            for (String word : normalizedText.split(" ")) {
+                if (Math.abs(word.length() - candidate.length()) > 1) continue;
+                if (editDistanceAtMostOne(word, candidate)) return true;
+            }
+            return false;
+        }
+
+        private static boolean editDistanceAtMostOne(String a, String b) {
+            if (a.equals(b)) return true;
+            if (Math.abs(a.length() - b.length()) > 1) return false;
+            int i = 0, j = 0, edits = 0;
+            while (i < a.length() && j < b.length()) {
+                if (a.charAt(i) == b.charAt(j)) { i++; j++; continue; }
+                if (++edits > 1) return false;
+                if (a.length() > b.length()) i++;
+                else if (b.length() > a.length()) j++;
+                else { i++; j++; }
+            }
+            return edits + (i < a.length() || j < b.length() ? 1 : 0) <= 1;
         }
     }
 }
