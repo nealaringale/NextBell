@@ -245,7 +245,8 @@ export class NextBellCloudSync {
       expenses: local.persisted?.expenses ? [...(local.expenses || [])] : [],
       attendance: local.persisted?.attendance ? [...(local.attendance || [])] : [],
       tasks: local.persisted?.tasks ? [...(local.tasks || [])] : [],
-      recurringExpenses: [],
+      recurringExpenses: local.persisted?.recurringExpenses
+        ? [...(local.recurringExpenses || [])] : [],
     };
     const remoteByCollection = new Map();
 
