@@ -18,6 +18,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Configure Firebase Android client when provided
+        env:
+          NEXTBELL_GOOGLE_SERVICES_JSON_BASE64: ${{ secrets.NEXTBELL_GOOGLE_SERVICES_JSON_BASE64 }}
+        run: |
+          if [ -n "${NEXTBELL_GOOGLE_SERVICES_JSON_BASE64:-}" ]; then
+            printf '%s' "$NEXTBELL_GOOGLE_SERVICES_JSON_BASE64" | base64 --decode > android/app/google-services.json
+            python3 -m json.tool android/app/google-services.json > /dev/null
+            echo "Firebase Android client configuration is ready."
+          else
+            echo "::notice::No Firebase Android client secret configured; APK will build but cloud sign-in will remain unavailable."
+          fi
+
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
