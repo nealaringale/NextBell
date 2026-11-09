@@ -38,7 +38,7 @@ public final class SmsTransactionParser {
     );
     private static final Pattern DEBIT_TERMS = Pattern.compile(
             "(?i)\\b(?:debited|deducted|withdrawn|withdrawal|spent|purchase|sent|"
-                    + "paid\\s+to|transfer\\s+to|transferred\\s+to)\\b"
+                    + "paid|transfer\\s+to|transferred\\s+to)\\b"
     );
     private static final Pattern RAIL_SUCCESS = Pattern.compile(
             "(?i)(?:upi|atm|pos|neft|imps|rtgs|card|nach|ach).{0,90}"
@@ -89,8 +89,23 @@ public final class SmsTransactionParser {
     private SmsTransactionParser() {}
 
     public static ParsedTransaction parse(String sender, String body, LocalDate receivedDate) {
-        if (!isBankLikeSender(sender) || body == null || body.trim().isEmpty()
-                || receivedDate == null) return null;
+        return parseInternal(sender, body, receivedDate, false);
+    }
+
+    /** Parses a transaction preview only when it came from a supported messaging/payment app. */
+    public static ParsedTransaction parseNotification(String packageName, String title,
+                                                       String body, LocalDate receivedDate) {
+        if (!TransactionNotificationAccess.isSupportedPackage(packageName)
+                || body == null || body.trim().isEmpty() || receivedDate == null) return null;
+        String sender = packageName + "|" + (title == null ? "" : title.trim());
+        return parseInternal(sender, body, receivedDate, true);
+    }
+
+    private static ParsedTransaction parseInternal(String sender, String body,
+                                                    LocalDate receivedDate,
+                                                    boolean trustedNotificationSource) {
+        if ((!trustedNotificationSource && !isBankLikeSender(sender))
+                || body == null || body.trim().isEmpty() || receivedDate == null) return null;
 
         String normalized = body.replace('\u00a0', ' ')
                 .replaceAll("\\s+", " ")

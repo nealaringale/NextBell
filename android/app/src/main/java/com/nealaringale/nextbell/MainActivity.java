@@ -65,12 +65,11 @@ public class MainActivity extends Activity {
     private static final String KEY_ROLL_NUMBER = "roll_number";
     private static final String KEY_NOTIFICATION_PROMPTED = "notification_prompted";
     private static final String KEY_NOTIFICATION_PERMISSION_REQUESTED = "notification_permission_requested";
-    private static final String KEY_SMS_PERMISSION_REQUESTED = "sms_permission_requested";
     private static final String KEY_THEME = "theme";
     private static final String KEY_REDUCED_MOTION = "reduced_motion";
+    private static final String KEY_PENDING_PAYMENT_ALERT_SETUP = "pending_payment_alert_setup";
     private static final int REQUEST_EXPORT_BACKUP = 8101;
     private static final int REQUEST_IMPORT_BACKUP = 8102;
-    private static final int REQUEST_SMS_ACCESS = 8103;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final DateTimeFormatter timeFormatter =
@@ -137,7 +136,6 @@ public class MainActivity extends Activity {
     private String selectedScreen = "home";
     private Runnable refreshRunnable;
     private boolean openedNotificationSettings;
-    private boolean scanSmsAfterPermission;
     private android.animation.ObjectAnimator heroPulseAnimator;
     private String lastHeroState = "";
 
@@ -210,6 +208,17 @@ public class MainActivity extends Activity {
             openedNotificationSettings = false;
             NotificationScheduler.scheduleUpcoming(this);
         }
+        if (preferences != null
+                && preferences.getBoolean(KEY_PENDING_PAYMENT_ALERT_SETUP, false)) {
+            preferences.edit().remove(KEY_PENDING_PAYMENT_ALERT_SETUP).apply();
+            if (TransactionNotificationAccess.hasAccess(this)) {
+                SmsTransactionService.setEnabled(preferences, true);
+                Toast.makeText(this, "Payment alert tracking is connected.", Toast.LENGTH_LONG).show();
+            } else {
+                Toast.makeText(this, "Notification access was not enabled. Tracking remains off.",
+                        Toast.LENGTH_LONG).show();
+            }
+        }
         if (preferences != null && "settings".equals(selectedScreen)) {
             buildSettingsScreen();
             updateBottomNav();
@@ -217,7 +226,6 @@ public class MainActivity extends Activity {
             buildExpensesScreen();
             updateBottomNav();
         }
-
     }
 
     @Override
@@ -1432,7 +1440,7 @@ public class MainActivity extends Activity {
         ));
 
         TextView autoStatusTitle = text(
-                "AUTOMATIC BANK ALERTS",
+                "AUTOMATIC PAYMENT ALERTS",
                 9,
                 MUTED
         );
@@ -1440,24 +1448,24 @@ public class MainActivity extends Activity {
         autoStatusTitle.setLetterSpacing(0.06f);
         autoStatus.addView(autoStatusTitle, new LinearLayout.LayoutParams(0, -2, 1f));
 
+        boolean paymentAccess = TransactionNotificationAccess.hasAccess(this);
+        boolean paymentTracking = SmsTransactionService.isEnabled(preferences);
         TextView syncStatus = text(
-                SmsTransactionService.isEnabled(preferences)
-                        && SmsTransactionService.hasReceivePermission(this)
-                        ? "AUTO ON" : (SmsTransactionService.isEnabled(preferences)
-                        ? "PAUSED" : "OFF · LOCAL"),
+                paymentAccess && paymentTracking ? "CONNECTED"
+                        : paymentAccess ? "READY" : "NOT CONNECTED",
                 8,
-                SUBTLE
+                paymentAccess && paymentTracking ? ACCENT : SUBTLE
         );
         autoStatus.addView(syncStatus);
 
-        TextView syncButton = actionButton("SYNC SMS", false);
+        TextView syncButton = actionButton(paymentAccess ? "MANAGE" : "CONNECT", false);
         LinearLayout.LayoutParams syncButtonParams =
-                new LinearLayout.LayoutParams(dp(76), dp(34));
+                new LinearLayout.LayoutParams(dp(84), dp(34));
         syncButtonParams.setMargins(dp(9), 0, 0, 0);
         autoStatus.addView(syncButton, syncButtonParams);
         syncButton.setOnClickListener(v -> {
             tap(v);
-            requestSmsAccess(true);
+            showPaymentAlertTrackingManager();
         });
 
         autoStatus.setClickable(true);
@@ -1466,10 +1474,15 @@ public class MainActivity extends Activity {
                 BORDER, SMALL_RADIUS));
         autoStatus.setOnClickListener(v -> {
             tap(v);
-            showSmsTrackingManager();
+            showPaymentAlertTrackingManager();
         });
 
-        page.addView(autoStatus, sectionParams(0, 14));
+        page.addView(autoStatus, sectionParams(0, 8));
+        TextView paymentStatusHint = text(
+                TransactionNotificationAccess.shortStatus(this, preferences), 8, MUTED
+        );
+        paymentStatusHint.setPadding(dp(4), 0, dp(4), 0);
+        page.addView(paymentStatusHint, sectionParams(0, 12));
 
         LinearLayout toolsCard = cardColumn();
         TextView toolsTitle = text("Daily controls", 15, TEXT);
@@ -3662,10 +3675,10 @@ public class MainActivity extends Activity {
         autoText.addView(autoTitle);
 
         TextView autoDescription = text(
-                SmsTransactionService.isEnabled(preferences)
-                        && SmsTransactionService.hasReceivePermission(this)
-                        ? "Only transaction alerts are parsed on this device. Message text is never saved."
-                        : "Optional local bank-alert detection. You can keep using manual entry.",
+                TransactionNotificationAccess.hasAccess(this)
+                        && SmsTransactionService.isEnabled(preferences)
+                        ? "Connected. Supported bank and UPI notification alerts are parsed locally; raw notification text is not saved."
+                        : "Connect notification access to detect supported bank and UPI alerts automatically.",
                 10,
                 MUTED
         );
@@ -3674,8 +3687,8 @@ public class MainActivity extends Activity {
         autoText.addView(autoDescription);
 
         TextView safeBadge = text(
-                SmsTransactionService.isEnabled(preferences)
-                        && SmsTransactionService.hasReceivePermission(this) ? "AUTO ON" : "SET UP",
+                TransactionNotificationAccess.hasAccess(this)
+                        && SmsTransactionService.isEnabled(preferences) ? "AUTO ON" : "CONNECT",
                 8, ACCENT
         );
         safeBadge.setGravity(Gravity.CENTER);
@@ -3689,7 +3702,7 @@ public class MainActivity extends Activity {
         autoCard.setFocusable(true);
         autoCard.setOnClickListener(v -> {
             tap(v);
-            showSmsTrackingManager();
+            showPaymentAlertTrackingManager();
         });
 
         page.addView(autoCard, sectionParams(0, 22));
@@ -5025,120 +5038,84 @@ public class MainActivity extends Activity {
         }
     }
 
-    private void showSmsTrackingManager() {
-        boolean active = SmsTransactionService.isEnabled(preferences)
-                && SmsTransactionService.hasReceivePermission(this);
-        String disclosure = "Optional bank-alert tracking. NextBell parses messages only on this phone, "
-                + "keeps only transaction details (amount, date, merchant, category, type and available balance), "
-                + "and never saves or uploads message text or unrelated messages. New alerts are watched only "
-                + "while enabled. Scanning older messages is a separate choice limited to the last 30 days. "
-                + "Turning this off keeps transactions already added to Money. SMS access is sensitive and "
-                + "Google Play distribution requires its permission review.";
+    private void showPaymentAlertTrackingManager() {
+        boolean access = TransactionNotificationAccess.hasAccess(this);
+        boolean enabled = SmsTransactionService.isEnabled(preferences);
+        boolean active = access && enabled;
+
+        long lastSeenAt = preferences.getLong(
+                SmsTransactionService.KEY_LAST_NOTIFICATION_AT, 0L
+        );
+        String lastSeen = lastSeenAt <= 0L ? "Never"
+                : java.time.Instant.ofEpochMilli(lastSeenAt).atZone(zone)
+                        .format(DateTimeFormatter.ofPattern("dd MMM, hh:mm a", Locale.ENGLISH));
+        String lastPackage = preferences.getString(
+                SmsTransactionService.KEY_LAST_NOTIFICATION_PACKAGE, ""
+        );
+        String lastResult = preferences.getString(
+                SmsTransactionService.KEY_LAST_NOTIFICATION_RESULT, "No alert processed yet"
+        );
+        long importedCount = preferences.getLong(
+                SmsTransactionService.KEY_NOTIFICATION_IMPORTED_COUNT, 0L
+        );
+        long seenCount = preferences.getLong(
+                SmsTransactionService.KEY_NOTIFICATION_SEEN_COUNT, 0L
+        );
+
+        String diagnostics = "Notification access: " + (access ? "GRANTED" : "NOT GRANTED")
+                + "\\nTracking: " + (active ? "ON" : enabled ? "WAITING FOR ACCESS" : "OFF")
+                + "\\nSupported-app notifications seen: " + seenCount
+                + "\\nTransactions added: " + importedCount
+                + "\\nLast alert: " + lastSeen
+                + (lastPackage.isEmpty() ? "" : " (" + lastPackage + ")")
+                + "\\nLast result: " + lastResult;
+
+        String disclosure = "NextBell watches notification previews from supported messaging, bank "
+                + "and UPI apps after you explicitly enable Android notification access. Matching "
+                + "transaction details are saved on this phone; notification text is not retained "
+                + "or uploaded. This does not scan old SMS messages. Your bank or messaging app "
+                + "must show transaction details in its notifications, and notifications hidden "
+                + "by Android cannot be read.\\n\\n"
+                + diagnostics;
 
         AlertDialog.Builder builder = new AlertDialog.Builder(this)
-                .setTitle(active ? "Bank alerts are on" : "Automatic bank alerts")
+                .setTitle(active ? "Payment alerts connected" : "Automatic payment tracking")
                 .setMessage(disclosure)
-                .setNegativeButton(active ? "Turn off" : "Cancel", (dialog, which) -> {
-                    if (active) {
+                .setNegativeButton(enabled ? "Turn off" : "Close", (dialog, which) -> {
+                    if (enabled) {
                         SmsTransactionService.setEnabled(preferences, false);
                         refreshMoneyAndSettings();
-                        Toast.makeText(this, "Automatic bank alerts are off. Existing transactions remain.",
+                        Toast.makeText(this, "Automatic payment tracking is off.",
                                 Toast.LENGTH_LONG).show();
                     }
                 })
-                .setPositiveButton(active ? "Scan last 30 days" : "Enable new alerts",
-                        (dialog, which) -> requestSmsAccess(active))
-                .setNeutralButton(active ? "Done" : "Enable + scan 30 days", (dialog, which) -> {
-                    if (!active) requestSmsAccess(true);
-                });
+                .setPositiveButton(access ? (enabled ? "Done" : "Enable tracking")
+                                : "Open notification settings", (dialog, which) -> {
+                    if (access) {
+                        SmsTransactionService.setEnabled(preferences, true);
+                        refreshMoneyAndSettings();
+                        Toast.makeText(this, "Payment alert tracking is enabled.",
+                                Toast.LENGTH_LONG).show();
+                    } else {
+                        openPaymentNotificationSettings();
+                    }
+                })
+                .setNeutralButton("Manage access", (dialog, which) -> openPaymentNotificationSettings());
         builder.show();
     }
 
-    private void requestSmsAccess(boolean scanRecent) {
-        scanSmsAfterPermission = scanRecent;
-        java.util.ArrayList<String> missing = new java.util.ArrayList<>();
-        if (!SmsTransactionService.hasReceivePermission(this)) {
-            missing.add(Manifest.permission.RECEIVE_SMS);
-        }
-        if (scanRecent && !SmsTransactionService.hasReadPermission(this)) {
-            missing.add(Manifest.permission.READ_SMS);
-        }
-
-        if (missing.isEmpty()) {
-            SmsTransactionService.setEnabled(preferences, true);
-            if (scanRecent) importRecentBankAlerts();
-            else refreshMoneyAndSettings();
-            return;
-        }
-
-        boolean requestedBefore = preferences.getBoolean(KEY_SMS_PERMISSION_REQUESTED, false);
-        boolean blocked = false;
-        for (String permission : missing) {
-            if (requestedBefore && !shouldShowRequestPermissionRationale(permission)) {
-                blocked = true;
-            }
-        }
-        if (blocked) {
-            scanSmsAfterPermission = false;
-            new AlertDialog.Builder(this)
-                    .setTitle("Allow bank-alert access")
-                    .setMessage("Android has this permission switched off. Open NextBell's app settings to enable only the SMS access you want.")
-                    .setNegativeButton("Cancel", null)
-                    .setPositiveButton("Open settings", (dialog, which) -> openSmsPermissionSettings())
-                    .show();
-            return;
-        }
-
-        preferences.edit().putBoolean(KEY_SMS_PERMISSION_REQUESTED, true).apply();
-        requestPermissions(missing.toArray(new String[0]), REQUEST_SMS_ACCESS);
-    }
-
-    private void openSmsPermissionSettings() {
-        Intent settingsIntent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                Uri.parse("package:" + getPackageName()));
+    private void openPaymentNotificationSettings() {
+        preferences.edit().putBoolean(KEY_PENDING_PAYMENT_ALERT_SETUP, true).apply();
         try {
-            startActivity(settingsIntent);
-        } catch (ActivityNotFoundException ignored) {
-            Toast.makeText(this, "Open NextBell's app settings to manage SMS access.",
-                    Toast.LENGTH_LONG).show();
+            startActivity(TransactionNotificationAccess.settingsIntent());
+        } catch (ActivityNotFoundException exception) {
+            preferences.edit().remove(KEY_PENDING_PAYMENT_ALERT_SETUP).apply();
+            new AlertDialog.Builder(this)
+                    .setTitle("Notification access")
+                    .setMessage("Open Android Settings, search for Notification access, and enable NextBell.")
+                    .setPositiveButton("OK", null)
+                    .show();
         }
-    }
-
-    private void importRecentBankAlerts() {
-        if (!SmsTransactionService.hasReadPermission(this)) {
-            Toast.makeText(this, "Inbox access is needed only to scan recent bank alerts.",
-                    Toast.LENGTH_LONG).show();
-            refreshMoneyAndSettings();
-            return;
-        }
-        SmsTransactionService.setEnabled(preferences, true);
-        android.widget.ProgressBar progress = new android.widget.ProgressBar(this);
-        LinearLayout container = new LinearLayout(this);
-        container.setGravity(Gravity.CENTER_VERTICAL);
-        container.setPadding(dp(20), dp(16), dp(20), dp(16));
-        container.addView(progress, new LinearLayout.LayoutParams(dp(30), dp(30)));
-        TextView message = text("Checking recent messages on this phone…", 11, TEXT);
-        message.setPadding(dp(14), 0, 0, 0);
-        container.addView(message);
-        AlertDialog dialog = new AlertDialog.Builder(this)
-                .setTitle("Importing bank alerts")
-                .setView(container)
-                .setCancelable(false)
-                .create();
-        dialog.show();
-        Thread worker = new Thread(() -> {
-            int imported = SmsTransactionService.importRecentInbox(this, preferences);
-            runOnUiThread(() -> {
-                dialog.dismiss();
-                ExpenseDailyAlertReceiver.maybeNotifyNow(this);
-                refreshMoneyAndSettings();
-                Toast.makeText(this, imported == 0
-                                ? "No new bank transactions found in the last 30 days."
-                                : imported + (imported == 1 ? " transaction added." : " transactions added."),
-                        Toast.LENGTH_LONG).show();
-            });
-        }, "nextbell-bank-alert-import");
-        worker.start();
     }
 
     private void refreshMoneyAndSettings() {
@@ -5189,35 +5166,6 @@ public class MainActivity extends Activity {
             if ("settings".equals(selectedScreen)) {
                 buildSettingsScreen();
                 updateBottomNav();
-            }
-            return;
-        }
-
-        if (requestCode == REQUEST_SMS_ACCESS) {
-            boolean receiveGranted = SmsTransactionService.hasReceivePermission(this);
-            boolean readGranted = SmsTransactionService.hasReadPermission(this);
-            if (receiveGranted) {
-                SmsTransactionService.setEnabled(preferences, true);
-                if (scanSmsAfterPermission && readGranted) {
-                    scanSmsAfterPermission = false;
-                    importRecentBankAlerts();
-                } else {
-                    scanSmsAfterPermission = false;
-                    if ("expenses".equals(selectedScreen)) {
-                        new AlertDialog.Builder(this)
-                                .setTitle("Bank alerts are on")
-                                .setMessage("Only new bank transaction alerts will be watched. Existing messages are not scanned unless you choose that separately.")
-                                .setPositiveButton("Done", null)
-                                .show();
-                    }
-                    refreshMoneyAndSettings();
-                }
-            } else {
-                scanSmsAfterPermission = false;
-                SmsTransactionService.setEnabled(preferences, false);
-                Toast.makeText(this, "Automatic bank alerts stay off until SMS access is allowed.",
-                        Toast.LENGTH_LONG).show();
-                refreshMoneyAndSettings();
             }
             return;
         }

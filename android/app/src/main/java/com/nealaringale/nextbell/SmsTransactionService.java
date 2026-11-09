@@ -18,6 +18,11 @@ import java.util.Set;
 public final class SmsTransactionService {
     public static final String PREFS_NAME = "nextbell_profile";
     public static final String KEY_ENABLED = "sms_transaction_tracking_enabled";
+    public static final String KEY_LAST_NOTIFICATION_AT = "payment_alert_last_seen_at";
+    public static final String KEY_LAST_NOTIFICATION_PACKAGE = "payment_alert_last_package";
+    public static final String KEY_LAST_NOTIFICATION_RESULT = "payment_alert_last_result";
+    public static final String KEY_NOTIFICATION_IMPORTED_COUNT = "payment_alert_imported_count";
+    public static final String KEY_NOTIFICATION_SEEN_COUNT = "payment_alert_seen_count";
     private static final int HISTORY_DAYS = 30;
     private static final int MAX_SCAN_MESSAGES = 2_000;
     private static final ZoneId INDIA = ZoneId.of("Asia/Kolkata");
@@ -51,9 +56,50 @@ public final class SmsTransactionService {
                                          String body, LocalDate receivedDate) {
         SmsTransactionParser.ParsedTransaction parsed =
                 SmsTransactionParser.parse(sender, body, receivedDate);
+        return saveParsedTransaction(preferences, parsed);
+    }
+
+    /** Records one supported notification and adds a matching transaction only once. */
+    public static synchronized boolean processNotification(
+            SharedPreferences preferences, String packageName, String title,
+            String body, LocalDate receivedDate
+    ) {
+        SmsTransactionParser.ParsedTransaction parsed =
+                SmsTransactionParser.parseNotification(packageName, title, body, receivedDate);
+        if (parsed == null) {
+            preferences.edit().putString(KEY_LAST_NOTIFICATION_RESULT, "Not a transaction alert").apply();
+            return false;
+        }
+        if (parsed.fingerprint.isEmpty()
+                || ExpenseStore.hasFingerprint(preferences, parsed.fingerprint)) {
+            preferences.edit().putString(KEY_LAST_NOTIFICATION_RESULT, "Duplicate ignored").apply();
+            return false;
+        }
+        ExpenseStore.upsert(preferences, toExpense(preferences, parsed,
+                ExpenseStore.nextId(preferences)));
+        preferences.edit()
+                .putString(KEY_LAST_NOTIFICATION_RESULT, "Transaction added")
+                .putLong(KEY_NOTIFICATION_IMPORTED_COUNT,
+                        preferences.getLong(KEY_NOTIFICATION_IMPORTED_COUNT, 0L) + 1L)
+                .apply();
+        return true;
+    }
+
+    public static void recordNotificationSeen(SharedPreferences preferences, String packageName) {
+        preferences.edit()
+                .putLong(KEY_LAST_NOTIFICATION_AT, System.currentTimeMillis())
+                .putString(KEY_LAST_NOTIFICATION_PACKAGE, packageName == null ? "" : packageName)
+                .putLong(KEY_NOTIFICATION_SEEN_COUNT,
+                        preferences.getLong(KEY_NOTIFICATION_SEEN_COUNT, 0L) + 1L)
+                .putString(KEY_LAST_NOTIFICATION_RESULT, "Checking alert")
+                .apply();
+    }
+
+    private static boolean saveParsedTransaction(
+            SharedPreferences preferences, SmsTransactionParser.ParsedTransaction parsed
+    ) {
         if (parsed == null || parsed.fingerprint.isEmpty()
                 || ExpenseStore.hasFingerprint(preferences, parsed.fingerprint)) return false;
-
         ExpenseStore.upsert(preferences, toExpense(preferences, parsed,
                 ExpenseStore.nextId(preferences)));
         return true;
