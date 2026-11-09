@@ -61,6 +61,7 @@ public final class SmsTransactionReceiver extends BroadcastReceiver {
 
         long receivedAt = timestamp == Long.MAX_VALUE ? System.currentTimeMillis() : timestamp;
         LocalDate receivedDate = Instant.ofEpochMilli(receivedAt).atZone(INDIA).toLocalDate();
+        final String messageSender = sender;
         String messageBody = body.toString();
         PendingResult pending = goAsync();
 
@@ -75,7 +76,7 @@ public final class SmsTransactionReceiver extends BroadcastReceiver {
                     if (SmsTransactionService.isEnabled(currentPreferences)
                             && SmsTransactionService.hasReceivePermission(appContext)) {
                         boolean imported = SmsTransactionService.processMessage(
-                                currentPreferences, sender, messageBody, receivedDate
+                                currentPreferences, messageSender, messageBody, receivedDate
                         );
                         if (imported) ExpenseDailyAlertReceiver.maybeNotifyNow(appContext);
                     }
