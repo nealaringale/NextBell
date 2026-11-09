@@ -16,6 +16,9 @@ public class ExpenseStoreTest {
         assertEquals(123L, ExpenseStore.parseAmountToPaise("1.23"));
         assertEquals(124L, ExpenseStore.parseAmountToPaise("1.235"));
         assertEquals(0L, ExpenseStore.parseAmountToPaise(" 0 "));
+        assertEquals(120_000L, ExpenseStore.parseAmountToPaise("₹1,200"));
+        assertEquals(15_000L, ExpenseStore.parseAmountToPaise("Rs. 150"));
+        assertEquals(15_050L, ExpenseStore.parseAmountToPaise("INR 150.50"));
         assertInvalidAmount("-1.00");
         assertInvalidAmount("not money");
         assertInvalidAmount("999999999999999999999999999999999");
