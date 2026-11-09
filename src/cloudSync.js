@@ -238,8 +238,10 @@ export class NextBellCloudSync {
   initializeFromCloud(remoteRecords) {
     const local = this.getLocalState() || {};
     const merged = {
-      profile: local.persisted?.profile ? local.profile : null,
-      settings: local.persisted?.settings ? local.settings : null,
+      // Profile/settings are safe to seed from the current defaults when the
+      // cloud account is empty; the seeded demo collections are handled separately.
+      profile: local.profile || null,
+      settings: local.settings || null,
       expenses: local.persisted?.expenses ? [...(local.expenses || [])] : [],
       attendance: local.persisted?.attendance ? [...(local.attendance || [])] : [],
       tasks: local.persisted?.tasks ? [...(local.tasks || [])] : [],
