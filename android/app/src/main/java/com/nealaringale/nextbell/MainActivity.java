@@ -223,7 +223,8 @@ public class MainActivity extends Activity {
                     public void onRemoteDataChanged() {
                         themeIndex = clampTheme(preferences.getInt(KEY_THEME, themeIndex));
                         applyTheme();
-                        if ("week".equals(selectedScreen)) buildWeekScreen();
+                        if ("home".equals(selectedScreen)) buildHomeScreen();
+                        else if ("week".equals(selectedScreen)) buildWeekScreen();
                         else if ("study".equals(selectedScreen)) buildStudyScreen();
                         else refreshMoneyAndSettings();
                     }
@@ -1414,7 +1415,8 @@ public class MainActivity extends Activity {
                     StudentPlannerStore.Item updated = new StudentPlannerStore.Item(
                             id, type, cleanTitle, course.getText().toString(),
                             details.getText().toString(), dueDate[0],
-                            existing != null && existing.completed
+                            existing != null && existing.completed,
+                            existing == null ? "MEDIUM" : existing.priority
                     );
                     StudentPlannerStore.upsert(preferences, updated);
                     StudentPlannerScheduler.schedule(this, updated);
@@ -3578,7 +3580,7 @@ public class MainActivity extends Activity {
             new AlertDialog.Builder(this)
                     .setTitle("NextBell Cloud Sync")
                     .setMessage("Signed in as " + currentUser.getEmail()
-                            + "\\n\\nExpenses, attendance, planner tasks and profile settings sync with the website.")
+                            + "\n\nExpenses, attendance, planner tasks and profile settings sync with the website.")
                     .setNegativeButton("Close", null)
                     .setPositiveButton("Sign out", (dialog, which) -> {
                         firebaseSyncManager.signOut();
