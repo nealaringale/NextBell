@@ -160,24 +160,6 @@ public final class TransactionNotificationListener extends NotificationListenerS
                 }
             }
         }
-        if (android.os.Build.VERSION.SDK_INT >= 24) {
-            try {
-                Notification.MessagingStyle style =
-                        Notification.MessagingStyle.extractMessagingStyleFromNotification(notification);
-                if (style != null) {
-                    for (Notification.MessagingStyle.Message message : style.getMessages()) {
-                        append(body, message.getText());
-                    }
-                    if (android.os.Build.VERSION.SDK_INT >= 26) {
-                        for (Notification.MessagingStyle.Message message : style.getHistoricMessages()) {
-                            append(body, message.getText());
-                        }
-                    }
-                }
-            } catch (RuntimeException ignored) {
-                // Fall back to text extras collected above.
-            }
-        }
         String value = body.toString().trim();
         return value.length() > 2_000 ? value.substring(0, 2_000) : value;
     }
