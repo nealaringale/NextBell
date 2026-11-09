@@ -71,6 +71,10 @@ public final class SmsTransactionParser {
                     + "(?=\\s+(?:on|ref|upi|txn|transaction|avl|available|balance|"
                     + "a/c|ac|using|via|rrn|utr)\\b|[,.;]|$)"
     );
+    private static final Pattern DEBIT_PAYEE_CREDITED = Pattern.compile(
+            "(?i)\\bon\\s+\\d{1,2}[-/ ][A-Za-z]{3,9}[-/ ]\\d{2,4}\\s*[,;:]\\s*"
+                    + "([A-Za-z][A-Za-z0-9 &'._-]{1,58}?)\\s+credited\\b"
+    );
 
     public static final String DEBIT = "DEBIT";
     public static final String CREDIT = "CREDIT";
@@ -107,6 +111,16 @@ public final class SmsTransactionParser {
         return parseInternal(sender, body, receivedDate, false);
     }
 
+    /** Content-based incoming SMS parser; does not rely on sender-ID formats. */
+    public static ParsedTransaction parseIncomingSms(
+            String originatingAddress, String body, LocalDate receivedDate
+    ) {
+        if (body == null || body.trim().isEmpty() || receivedDate == null
+                || !TransactionNotificationAccess.isLikelyFinancialNotification(
+                        originatingAddress, "", body)) return null;
+        return parseInternal("PAYMENT_EVENT", body, receivedDate, true);
+    }
+
     /** Parses a transaction preview only when it came from a supported messaging/payment app. */
     public static ParsedTransaction parseNotification(String packageName, String title,
                                                        String body, LocalDate receivedDate) {
@@ -115,10 +129,9 @@ public final class SmsTransactionParser {
         if ((cleanTitle.isEmpty() && cleanBody.isEmpty()) || receivedDate == null
                 || !TransactionNotificationAccess.isLikelyFinancialNotification(
                         packageName, cleanTitle, cleanBody)) return null;
-        String sender = "PAYMENT_NOTIFICATION";
-        String message = cleanTitle.isEmpty() ? cleanBody
-                : cleanBody.isEmpty() ? cleanTitle : cleanTitle + ". " + cleanBody;
-        ParsedTransaction parsed = parseInternal(sender, message, receivedDate, true);
+        // Share a canonical fingerprint with direct SMS so the same event isn't double-added.
+        String message = cleanBody.isEmpty() ? cleanTitle : cleanBody;
+        ParsedTransaction parsed = parseInternal("PAYMENT_EVENT", message, receivedDate, true);
         if (parsed == null) return null;
 
         String merchant = parsed.merchant;
@@ -355,6 +368,10 @@ public final class SmsTransactionParser {
     }
 
     private static String extractMerchant(String body, String direction) {
+        if (DEBIT.equals(direction) && DEBIT_TERMS.matcher(body).find()) {
+            Matcher payee = DEBIT_PAYEE_CREDITED.matcher(body);
+            if (payee.find()) return cleanCounterparty(payee.group(1));
+        }
         Pattern sourcePattern = CREDIT.equals(direction) ? CREDIT_COUNTERPARTY : DEBIT_MERCHANT;
         Matcher matcher = sourcePattern.matcher(body);
         if (!matcher.find()) return "";
@@ -365,6 +382,18 @@ public final class SmsTransactionParser {
         if (value.length() > 40
                 || value.matches("(?i)your account|the account|account|bank account|"
                 + "account|a/c|upi|payment|transaction|successful|successfully")
+                || value.matches("(?i)(?:rs\\.?|inr|₹).*")) return "";
+        if (value.contains("@")) value = value.substring(0, value.indexOf('@'));
+        return cleanCounterparty(value);
+    }
+
+    private static String cleanCounterparty(String raw) {
+        if (raw == null) return "";
+        String value = raw.replaceAll("(?i)\\b(?:a/c|ac|account|vpa|upi id|reference|ref no|rrn|utr)\\b.*$", "")
+                .replaceAll("[.\\s]+$", "").trim();
+        value = value.replaceAll("(?i)^(?:your|my|the)\\s+", "").trim();
+        if (value.length() > 40
+                || value.matches("(?i)your account|the account|account|bank account|a/c|upi|payment|transaction|successful|successfully")
                 || value.matches("(?i)(?:rs\\.?|inr|₹).*")) return "";
         if (value.contains("@")) value = value.substring(0, value.indexOf('@'));
         return value.replaceAll("[^A-Za-z0-9&' ._-]", "").trim();
