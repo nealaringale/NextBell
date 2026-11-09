@@ -9,6 +9,29 @@
   </head>
   <body>
     <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <script>
+      if (window.location.protocol === 'file:') {
+        window.addEventListener('DOMContentLoaded', () => {
+          const root = document.getElementById('root');
+          if (root) {
+            root.innerHTML = `
+              <div style="font-family:system-ui,-apple-system,sans-serif;padding:32px;max-width:560px;margin:40px auto;background:#161922;color:#f0f2f7;border-radius:12px;border:1px solid #2a2e3d;line-height:1.6;">
+                <h2 style="margin-top:0;color:#f87171;">⚠️ Development Server Required</h2>
+                <p>You opened <code>index.html</code> directly via the <code>file://</code> protocol.</p>
+                <p>This is a <strong>Vite + React</strong> application with JSX modules (<code>main.jsx</code>), which browsers cannot execute directly from the filesystem without a dev server.</p>
+                <p><strong>To run NextBell:</strong></p>
+                <ol style="padding-left:20px;">
+                  <li>Open terminal in this project folder</li>
+                  <li>Run <code>npm run dev</code></li>
+                  <li>Open the local address shown (e.g. <code>http://localhost:5173</code>)</li>
+                </ol>
+              </div>
+            `;
+          }
+        });
+      }
+    </script>
+    <script type="module" src="./src/main.jsx"></script>
   </body>
 </html>
