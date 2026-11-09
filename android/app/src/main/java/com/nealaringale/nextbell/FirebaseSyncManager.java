@@ -42,6 +42,7 @@ public final class FirebaseSyncManager implements SharedPreferences.OnSharedPref
         void onRemoteDataChanged();
     }
 
+    private static final String KEY_CLOUD_OWNER_UID = "firebase_sync_owner_uid";
     private static final String[] COLLECTIONS = {
             "expenses", "attendance", "tasks", "recurringExpenses"
     };
@@ -138,6 +139,13 @@ public final class FirebaseSyncManager implements SharedPreferences.OnSharedPref
     }
 
     private void startSync(String uid) {
+        String previousOwner = preferences.getString(KEY_CLOUD_OWNER_UID, "");
+        if (!previousOwner.isEmpty() && !previousOwner.equals(uid)) {
+            clearSyncedLocalState();
+            setStatus("Switched Firebase account · loading its data");
+        }
+        preferences.edit().putString(KEY_CLOUD_OWNER_UID, uid).apply();
+
         activeUid = uid;
         initialized = false;
         knownRecords.clear();
@@ -166,6 +174,29 @@ public final class FirebaseSyncManager implements SharedPreferences.OnSharedPref
                         applyRemoteChanges(snapshot);
                     }
                 });
+    }
+
+    /** Prevents a different Firebase account from inheriting the previous account's local data. */
+    private void clearSyncedLocalState() {
+        SharedPreferences.Editor editor = preferences.edit();
+        for (String key : PREF_KEYS.values()) editor.putString(key, "[]");
+
+        editor.remove("name")
+                .remove("roll_number")
+                .remove("firebase_profile_extras_v1")
+                .remove("firebase_settings_extras_v1")
+                .putInt("theme", 0)
+                .putInt("attendance_target_percent", 75)
+                .putLong("expense_daily_limit", 0L)
+                .putLong("expense_weekly_allowance", 0L)
+                .putLong("expense_alert_threshold", 5000L)
+                .putBoolean("expense_alert_enabled", true)
+                .putString("expense_merchant_categories", "{}");
+
+        for (String key : new ArrayList<>(preferences.getAll().keySet())) {
+            if (key.startsWith("expense_budget_")) editor.remove(key);
+        }
+        editor.commit();
     }
 
     private void stopSync() {
