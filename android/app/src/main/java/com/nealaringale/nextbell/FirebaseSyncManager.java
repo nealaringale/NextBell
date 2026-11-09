@@ -363,11 +363,16 @@ public final class FirebaseSyncManager implements SharedPreferences.OnSharedPref
     private void applyProfile(JSONObject profile) {
         applyingRemote = true;
         try {
+            JSONObject extras = new JSONObject(profile.toString());
+            extras.remove("name");
+            extras.remove("rollNo");
+            extras.remove("roll_number");
             SharedPreferences.Editor editor = preferences.edit();
             String name = profile.optString("name", "");
             if (!name.trim().isEmpty()) editor.putString("name", name);
             int roll = profile.optInt("rollNo", profile.optInt("roll_number", 0));
             if (roll > 0 && roll <= 120) editor.putInt("roll_number", roll);
+            editor.putString("firebase_profile_extras_v1", extras.toString());
             editor.commit();
         } finally {
             applyingRemote = false;
@@ -389,6 +394,16 @@ public final class FirebaseSyncManager implements SharedPreferences.OnSharedPref
                 editor.putLong("expense_daily_limit",
                         Math.max(0L, settings.optLong("dailyLimitPaise", 0L)));
             }
+            if (settings.has("weeklyAllowancePaise")) {
+                editor.putLong("expense_weekly_allowance",
+                        Math.max(0L, settings.optLong("weeklyAllowancePaise", 0L)));
+            }
+            JSONObject extras = new JSONObject(settings.toString());
+            extras.remove("themeIndex");
+            extras.remove("attendanceTarget");
+            extras.remove("dailyLimitPaise");
+            extras.remove("weeklyAllowancePaise");
+            editor.putString("firebase_settings_extras_v1", extras.toString());
             editor.commit();
         } finally {
             applyingRemote = false;
@@ -396,7 +411,12 @@ public final class FirebaseSyncManager implements SharedPreferences.OnSharedPref
     }
 
     private JSONObject localProfile() {
-        JSONObject value = new JSONObject();
+        JSONObject value;
+        try {
+            value = new JSONObject(preferences.getString("firebase_profile_extras_v1", "{}"));
+        } catch (Exception ignored) {
+            value = new JSONObject();
+        }
         try {
             value.put("name", preferences.getString("name", ""));
             value.put("rollNo", preferences.getInt("roll_number", 34));
@@ -405,11 +425,17 @@ public final class FirebaseSyncManager implements SharedPreferences.OnSharedPref
     }
 
     private JSONObject localSettings() {
-        JSONObject value = new JSONObject();
+        JSONObject value;
+        try {
+            value = new JSONObject(preferences.getString("firebase_settings_extras_v1", "{}"));
+        } catch (Exception ignored) {
+            value = new JSONObject();
+        }
         try {
             value.put("themeIndex", preferences.getInt("theme", 0));
             value.put("attendanceTarget", preferences.getInt("attendance_target_percent", 75));
             value.put("dailyLimitPaise", preferences.getLong("expense_daily_limit", 0L));
+            value.put("weeklyAllowancePaise", preferences.getLong("expense_weekly_allowance", 0L));
         } catch (Exception ignored) {}
         return value;
     }
