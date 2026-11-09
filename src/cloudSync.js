@@ -217,10 +217,11 @@ export class NextBellCloudSync {
 
     remote.forEach((record) => {
       const prior = this.known.get(record.documentId);
+      // Firestore's delivered document is authoritative. Do not compare device
+      // clocks: two devices can have skewed clocks or queued offline writes.
       const changed = !prior
-        || record.updatedAtMs > prior.updatedAtMs
-        || (record.updatedAtMs === prior.updatedAtMs
-          && (record.deleted !== prior.deleted || record.payloadJson !== prior.payloadJson));
+        || record.deleted !== prior.deleted
+        || record.payloadJson !== prior.payloadJson;
       this.known.set(record.documentId, record);
       if (!changed) return;
       if (record.collection === 'profile' || record.collection === 'settings') {
