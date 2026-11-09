@@ -15,6 +15,14 @@ import {
   CAMPUS_LOCATIONS
 } from './data.js';
 import { createBackupJson, downloadBackupFile, parseBackupFile } from './backupUtils.js';
+import {
+  createCloudAccount,
+  getFirebaseServices,
+  isFirebaseConfigured,
+  NextBellCloudSync,
+  signInCloudAccount,
+  signOutCloudAccount,
+} from './cloudSync.js';
 
 function parseMinutes(timeStr) {
   if (!timeStr) return 0;
@@ -65,6 +73,16 @@ function getTodayDateStringIST() {
 }
 
 export default function App() {
+  const persistedLocalDataRef = useRef({
+    profile: localStorage.getItem('nextbell_profile') !== null,
+    theme: localStorage.getItem('nextbell_theme') !== null,
+    attendance: localStorage.getItem('nextbell_attendance') !== null,
+    attendanceTarget: localStorage.getItem('nextbell_attendance_target') !== null,
+    tasks: localStorage.getItem('nextbell_tasks') !== null,
+    expenses: localStorage.getItem('nextbell_expenses') !== null,
+    dailyLimit: localStorage.getItem('nextbell_daily_limit') !== null,
+  });
+
   // --- Persistent State ---
   const [profile, setProfile] = useState(() => {
     try {
@@ -129,6 +147,41 @@ export default function App() {
     }
   });
 
+  const handleCloudSignIn = async (createAccount = false) => {
+    if (!cloudEmail.trim() || !cloudPassword) {
+      showToast('Enter your email and password first.');
+      return;
+    }
+    setCloudBusy(true);
+    try {
+      if (createAccount) await createCloudAccount(cloudEmail, cloudPassword);
+      else await signInCloudAccount(cloudEmail, cloudPassword);
+      setCloudPassword('');
+      showToast(createAccount ? 'NextBell cloud account created.' : 'Signed in to NextBell.');
+    } catch (error) {
+      const messages = {
+        'auth/email-already-in-use': 'This email already has a NextBell account. Sign in instead.',
+        'auth/invalid-email': 'Enter a valid email address.',
+        'auth/weak-password': 'Use a password with at least 6 characters.',
+        'auth/invalid-credential': 'Email or password is incorrect.',
+        'auth/network-request-failed': 'Could not reach Firebase. Check your internet connection.',
+        'auth/operation-not-allowed': 'Enable Email/Password sign-in in Firebase Authentication.',
+      };
+      showToast(messages[error?.code] || error?.message || 'Could not connect to Firebase.');
+    } finally {
+      setCloudBusy(false);
+    }
+  };
+
+  const handleCloudSignOut = async () => {
+    try {
+      await signOutCloudAccount();
+      showToast('Signed out. Your local data remains on this device.');
+    } catch (error) {
+      showToast(error?.message || 'Could not sign out.');
+    }
+  };
+
   // --- UI Navigation State ---
   const [activeTab, setActiveTab] = useState('Today');
   const todayName = getTodayDayNameIST();
@@ -138,6 +191,16 @@ export default function App() {
   const [weekBatchFilter, setWeekBatchFilter] = useState('ALL');
   const [taskFilter, setTaskFilter] = useState('ALL');
   const [toastMessage, setToastMessage] = useState(null);
+  const [cloudUser, setCloudUser] = useState(null);
+  const [cloudStatus, setCloudStatus] = useState('Not connected');
+  const [cloudEmail, setCloudEmail] = useState('');
+  const [cloudPassword, setCloudPassword] = useState('');
+  const [cloudBusy, setCloudBusy] = useState(false);
+  const cloudSyncRef = useRef(null);
+  const latestCloudStateRef = useRef(null);
+  latestCloudStateRef.current = {
+    profile, themeIndex, attendance, attendanceTarget, tasks, expenses, dailyLimitPaise,
+  };
 
   // --- Dialog References ---
   const profileDialogRef = useRef(null);
@@ -198,6 +261,115 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('nextbell_daily_limit', String(dailyLimitPaise));
   }, [dailyLimitPaise]);
+
+  // One Firebase account is shared by the website and Android app.
+  useEffect(() => {
+    const client = getFirebaseServices();
+    if (!client) {
+      setCloudStatus(isFirebaseConfigured()
+        ? 'Firebase SDK could not load. Check your network and reload.'
+        : 'Firebase setup required');
+      return undefined;
+    }
+
+    const unsubscribeAuth = client.auth.onAuthStateChanged((user) => {
+      cloudSyncRef.current?.stop();
+      cloudSyncRef.current = null;
+      setCloudUser(user || null);
+
+      if (!user) {
+        setCloudStatus('Not connected');
+        return;
+      }
+
+      setCloudStatus('Connecting to your NextBell data…');
+      const sync = new NextBellCloudSync({
+        uid: user.uid,
+        getLocalState: () => ({
+          ...latestCloudStateRef.current,
+          persisted: persistedLocalDataRef.current,
+        }),
+        onStatus: setCloudStatus,
+        onInitialState: (state) => {
+          if (state.profile) setProfile(state.profile);
+          setAttendance(Array.isArray(state.attendance) ? state.attendance : []);
+          setTasks(Array.isArray(state.tasks) ? state.tasks : []);
+          setExpenses(Array.isArray(state.expenses) ? state.expenses : []);
+          if (state.settings) {
+            if (Number.isFinite(Number(state.settings.themeIndex))) {
+              setThemeIndex(Number(state.settings.themeIndex));
+            }
+            if (Number.isFinite(Number(state.settings.attendanceTarget))) {
+              setAttendanceTarget(Number(state.settings.attendanceTarget));
+            }
+            if (Number.isFinite(Number(state.settings.dailyLimitPaise))) {
+              setDailyLimitPaise(Number(state.settings.dailyLimitPaise));
+            }
+          }
+        },
+        onRemoteRecord: (collection, id, payload, deleted) => {
+          const updateArray = (previous, keyName) => {
+            const list = Array.isArray(previous) ? previous : [];
+            const next = list.filter((item) => String(item?.[keyName]) !== String(id));
+            if (!deleted && payload) next.unshift(payload);
+            return next;
+          };
+
+          if (collection === 'expenses') {
+            setExpenses((previous) => updateArray(previous, 'id'));
+          } else if (collection === 'attendance') {
+            setAttendance((previous) => updateArray(previous, 'key'));
+          } else if (collection === 'tasks') {
+            setTasks((previous) => updateArray(previous, 'id'));
+          } else if (collection === 'profile' && !deleted && payload) {
+            setProfile(payload);
+          } else if (collection === 'settings' && !deleted && payload) {
+            if (Number.isFinite(Number(payload.themeIndex))) setThemeIndex(Number(payload.themeIndex));
+            if (Number.isFinite(Number(payload.attendanceTarget))) {
+              setAttendanceTarget(Number(payload.attendanceTarget));
+            }
+            if (Number.isFinite(Number(payload.dailyLimitPaise))) {
+              setDailyLimitPaise(Number(payload.dailyLimitPaise));
+            }
+          }
+        },
+      });
+      cloudSyncRef.current = sync;
+      sync.start();
+    });
+
+    return () => {
+      unsubscribeAuth();
+      cloudSyncRef.current?.stop();
+      cloudSyncRef.current = null;
+    };
+  }, []);
+
+  // Each record is synced independently. Firestore's offline queue retries
+  // writes when the browser reconnects; a snapshot updates the other device.
+  useEffect(() => {
+    cloudSyncRef.current?.pushCollection('expenses', expenses);
+  }, [expenses]);
+
+  useEffect(() => {
+    cloudSyncRef.current?.pushCollection('attendance', attendance);
+  }, [attendance]);
+
+  useEffect(() => {
+    cloudSyncRef.current?.pushCollection('tasks', tasks);
+  }, [tasks]);
+
+  useEffect(() => {
+    cloudSyncRef.current?.pushProfile(profile);
+  }, [profile]);
+
+  useEffect(() => {
+    cloudSyncRef.current?.pushSettings({
+      themeIndex,
+      attendanceTarget,
+      dailyLimitPaise,
+    });
+  }, [themeIndex, attendanceTarget, dailyLimitPaise]);
 
   // Live Clock & Minutes Tick
   useEffect(() => {
@@ -1201,6 +1373,71 @@ export default function App() {
                   <span>Calculated Batch: <b>{studentBatch}</b></span>
                   <span>Tutorial Wing: <b>{profile.rollNo <= 35 ? 'Roll 1–35 (Room 205)' : 'Roll 36+ (Room 201)'}</b></span>
                 </div>
+              </div>
+            </div>
+
+            <div className="settings-section">
+              <h3>Cloud Sync · Android + Website</h3>
+              <div className="settings-card cloud-sync-card">
+                <div className="settings-row">
+                  <div>
+                    <strong>{cloudUser ? cloudUser.email : 'One NextBell account everywhere'}</strong>
+                    <p>{cloudStatus}</p>
+                  </div>
+                  {cloudUser && (
+                    <button className="btn-secondary" onClick={handleCloudSignOut} disabled={cloudBusy}>
+                      Sign out
+                    </button>
+                  )}
+                </div>
+
+                {!cloudUser && (
+                  <>
+                    {!isFirebaseConfigured() && (
+                      <p className="cloud-sync-warning">
+                        Firebase is not configured yet. Add the Web app values to
+                        <code> src/firebaseConfig.js </code> and enable Email/Password in Firebase Authentication.
+                      </p>
+                    )}
+                    <div className="form-row cloud-auth-fields">
+                      <label className="form-group">
+                        <span>Email</span>
+                        <input
+                          type="email"
+                          autoComplete="email"
+                          placeholder="you@example.com"
+                          value={cloudEmail}
+                          onChange={(event) => setCloudEmail(event.target.value)}
+                        />
+                      </label>
+                      <label className="form-group">
+                        <span>Password</span>
+                        <input
+                          type="password"
+                          autoComplete="current-password"
+                          placeholder="At least 6 characters"
+                          value={cloudPassword}
+                          onChange={(event) => setCloudPassword(event.target.value)}
+                        />
+                      </label>
+                    </div>
+                    <div className="backup-actions">
+                      <button className="btn-primary" disabled={cloudBusy || !isFirebaseConfigured()}
+                        onClick={() => handleCloudSignIn(false)}>
+                        {cloudBusy ? 'Connecting…' : 'Sign in'}
+                      </button>
+                      <button className="btn-secondary" disabled={cloudBusy || !isFirebaseConfigured()}
+                        onClick={() => handleCloudSignIn(true)}>
+                        Create account
+                      </button>
+                    </div>
+                  </>
+                )}
+                <p className="cloud-sync-footnote">
+                  Use the same email and password in NextBell Android. Expenses, attendance,
+                  planner tasks and profile/settings sync automatically; offline edits queue until
+                  the device reconnects.
+                </p>
               </div>
             </div>
 
