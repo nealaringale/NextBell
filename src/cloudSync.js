@@ -51,7 +51,7 @@ export async function signOutCloudAccount() {
   await client.auth.signOut();
 }
 
-const ARRAY_COLLECTIONS = ['expenses', 'attendance', 'tasks'];
+const ARRAY_COLLECTIONS = ['expenses', 'attendance', 'tasks', 'recurringExpenses'];
 
 function recordId(collection, item) {
   const id = collection === 'attendance' ? item?.key : item?.id;
@@ -243,6 +243,7 @@ export class NextBellCloudSync {
       expenses: local.persisted?.expenses ? [...(local.expenses || [])] : [],
       attendance: local.persisted?.attendance ? [...(local.attendance || [])] : [],
       tasks: local.persisted?.tasks ? [...(local.tasks || [])] : [],
+      recurringExpenses: [],
     };
     const remoteByCollection = new Map();
 
