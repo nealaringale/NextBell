@@ -1,8 +1,8 @@
-name: Build NextBell Android
+name: Build NextBell and Admin Android Apps
 
 on:
   push:
-    branches: ["main"]
+    branches: ["main", "feature/announcements"]
   pull_request:
     branches: ["main"]
   workflow_dispatch:
@@ -11,7 +11,7 @@ permissions:
   contents: read
 
 jobs:
-  build-apk:
+  build-apks:
     runs-on: ubuntu-latest
 
     steps:
@@ -34,13 +34,45 @@ jobs:
         with:
           gradle-version: "8.9"
 
-      - name: Build debug APK
-        working-directory: android
-        run: gradle --no-daemon assembleDebug
+      - name: Prepare stable NextBell signing when configured
+        env:
+          NEXTBELL_KEYSTORE_BASE64: ${{ secrets.NEXTBELL_KEYSTORE_BASE64 }}
+          NEXTBELL_KEYSTORE_PASSWORD: ${{ secrets.NEXTBELL_KEYSTORE_PASSWORD }}
+          NEXTBELL_KEY_ALIAS: ${{ secrets.NEXTBELL_KEY_ALIAS }}
+          NEXTBELL_KEY_PASSWORD: ${{ secrets.NEXTBELL_KEY_PASSWORD }}
+        run: |
+          if [ -n "${NEXTBELL_KEYSTORE_BASE64:-}" ]; then
+            if [ -z "${NEXTBELL_KEYSTORE_PASSWORD:-}" ] || [ -z "${NEXTBELL_KEY_ALIAS:-}" ] || [ -z "${NEXTBELL_KEY_PASSWORD:-}" ]; then
+              echo "::error::NextBell signing is only partially configured. Check the four documented repository secrets."
+              exit 1
+            fi
+            keystore="$GITHUB_WORKSPACE/android/app/nextbell-upload.jks"
+            printf '%s' "$NEXTBELL_KEYSTORE_BASE64" | base64 --decode > "$keystore"
+            chmod 600 "$keystore"
+            echo "NEXTBELL_KEYSTORE_PATH=$keystore" >> "$GITHUB_ENV"
+            echo "Stable NextBell signing is configured."
+          else
+            echo "::notice::No stable NextBell signing key is configured; this CI build will use its temporary debug key."
+          fi
 
-      - name: Upload APK
+      - name: Test and build both Android apps
+        working-directory: android
+        env:
+          NEXTBELL_KEYSTORE_PASSWORD: ${{ secrets.NEXTBELL_KEYSTORE_PASSWORD }}
+          NEXTBELL_KEY_ALIAS: ${{ secrets.NEXTBELL_KEY_ALIAS }}
+          NEXTBELL_KEY_PASSWORD: ${{ secrets.NEXTBELL_KEY_PASSWORD }}
+        run: gradle --no-daemon :app:testDebugUnitTest :app:lintDebug assembleDebug
+
+      - name: Upload NextBell student APK
         uses: actions/upload-artifact@v4
         with:
-          name: NextBell-debug-apk
+          name: NextBell-student-debug-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+
+      - name: Upload NextBell Admin APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: NextBell-admin-debug-apk
+          path: android/admin/build/outputs/apk/debug/admin-debug.apk
           if-no-files-found: error

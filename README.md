@@ -1,64 +1,53 @@
-# NextBell 🔔
+# NextBell
 
-**NextBell is a native Android timetable app for college students.**
+NextBell is a local-first Android student planner for FE Division B. A student's roll number selects batch and tutorial entries from the published timetable. It now includes attendance records and target-based bunk estimates, assignment/exam/task reminders, a next-class home-screen widget, daily and weekly money controls, recurring-expense suggestions, and optional on-device bank SMS parsing.
 
-The current MVP is built as an Android application and uses the student's division, batch, and roll number to show the most relevant class schedule.
+## Product and data model
 
-## Android MVP
+- **Android app:** Java, Android SDK 35, minimum Android 8.0 (API 26), target SDK 35. Screens are native views hosted in `MainActivity`; timetable, attendance, planner, finance, notification, SMS parsing, and backup logic live in Java classes.
+- **Timetable:** bundled official FE Division B timetable, W.E.F. 16 September 2026, Revision 00. Schedule data is available offline; batch filtering is based on the student's roll number.
+- **Study planning:** attendance marks, assignment/exam/task items, and due dates are stored locally. Bunk estimates use only sessions the student has recorded. Deadline reminders are approximate Android alarms and require notifications to be enabled.
+- **Profile, study data, and money:** stored in the app's private `SharedPreferences`; there is no server, account system, or network permission. System cloud backup and device-to-device transfer are excluded. The user can export a readable JSON backup to a file they choose. Anyone who receives that file can read it.
+- **Money entry:** always supports manual entry. Optional SMS tracking requires explicit Android permissions and user opt-in. The app parses incoming alerts and, only after a separate choice, scans up to 30 days of inbox messages locally. It stores derived transaction fields and a one-way duplicate fingerprint, never message text or unrelated messages. A small curated merchant rule list and user-learned category corrections are used; this is not a 3,000-merchant database, and unknown matches fall back to keyword rules or `Other`.
+- **Distribution note:** Google Play classifies SMS access as sensitive and requires policy review/approval for an SMS money-management use case. The project has not been submitted for that review. See [Google Play's SMS permission policy](https://support.google.com/googleplay/android-developer/answer/10208820).
+- **Admin companion:** a separate local draft tool. It does not publish timetable changes to student devices.
+- **Browser prototype:** `src/` is an older Vite demo with fixture data; it is not the Android app or the download website and should not be treated as the live timetable source.
 
-- Native Android app
-- Today view with current/next class
-- Live minutes remaining
-- Weekly day switching
-- Batch-aware practical/tutorial labels
-- Class room and teacher details
-- Day statistics and free-period count
-- Dark UI designed for quick glances
+## Build and verify Android
 
-## Build the APK with GitHub Actions
+Install JDK 17, Android SDK Platform 35, Android Build Tools 35.0.0, and Gradle 8.9 or newer. From `android/`, run:
 
-Every push to `main` triggers:
+```sh
+gradle --no-daemon :app:testDebugUnitTest :app:lintDebug assembleDebug
+```
+
+The student APK is written to:
 
 ```text
-GitHub Push
-    ↓
-GitHub Actions
-    ↓
-Android SDK + Java 17
-    ↓
-Gradle assembleDebug
-    ↓
-NextBell-debug-apk
+android/app/build/outputs/apk/debug/app-debug.apk
 ```
 
-Open the **Actions** tab, select **Build NextBell Android**, and download the `NextBell-debug-apk` artifact from a successful run.
+`feature/announcements` runs the same Android unit tests, lint, and debug APK build in GitHub Actions. It also uploads the student and admin APKs as workflow artifacts. The public Pages publishing workflow is manual; pushing a feature branch does not publish the site.
 
-## Local Android build
+### Stable signing for Android updates
 
-You need Android Studio/SDK and Gradle 8.9+.
+The student APK can use a persistent keystore when these four repository Actions secrets are configured: `NEXTBELL_KEYSTORE_BASE64`, `NEXTBELL_KEYSTORE_PASSWORD`, `NEXTBELL_KEY_ALIAS`, and `NEXTBELL_KEY_PASSWORD`. See [.github/STABLE_SIGNING_SETUP.md](.github/STABLE_SIGNING_SETUP.md). If they are absent, CI falls back to its temporary debug key, and a later APK may not be installable as an in-place update. Export a NextBell backup before removing an incompatible installation.
 
-```bash
-cd android
-gradle assembleDebug
+## Build the browser prototype
+
+With Node.js installed, run:
+
+```sh
+npm install
+npm run build
 ```
 
-The APK is generated at:
+## Install on a connected Android device
 
-`android/app/build/outputs/apk/debug/app-debug.apk`
+After enabling USB debugging and accepting the device's computer prompt, check the serial with `adb devices -l`. Install an update with:
 
-## Timetable data
+```sh
+adb install -r android/app/build/outputs/apk/debug/app-debug.apk
+```
 
-The demo timetable is currently stored in:
-
-`android/app/src/main/java/com/nealaringale/nextbell/TimetableData.java`
-
-Replace the sample classes with the real NMIET schedule as you collect it.
-
-## Roadmap
-
-1. Replace demo timetable with the real NMIET timetable.
-2. Add a first-run profile setup screen.
-3. Store profile + attendance locally.
-4. Add notifications for upcoming classes.
-5. Add Supabase for shared class updates and admin edits.
-6. Produce a signed release APK/AAB for wider distribution.
+Android only accepts an in-place update when the app ID and signing certificate match. If installation reports a signature conflict, first export the profile and spending from **Settings → Backup & Restore**. Reinstalling by removing the old app can erase its local data.

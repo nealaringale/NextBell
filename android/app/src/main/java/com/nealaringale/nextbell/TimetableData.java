@@ -3,7 +3,9 @@ package com.nealaringale.nextbell;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 // Source: official FE Div B timetable, W.E.F. 16/09/2026, Revision 00.
 public final class TimetableData {
@@ -67,7 +69,18 @@ public final class TimetableData {
         }
     }
 
+    private static final Map<String, List<ClassItem>> ALL_ENTRIES = loadAllEntries();
+    private static final Map<String, List<ClassItem>> ROLL_DAY_CACHE = new HashMap<>();
+
     private TimetableData() {}
+
+    private static Map<String, List<ClassItem>> loadAllEntries() {
+        Map<String, List<ClassItem>> entries = new HashMap<>();
+        for (String day : DAYS) {
+            entries.put(day, Collections.unmodifiableList(loadEntries(day)));
+        }
+        return Collections.unmodifiableMap(entries);
+    }
 
     public static String batchForRoll(int rollNumber) {
         if (rollNumber >= 1 && rollNumber <= 25) return "B1";
@@ -90,6 +103,12 @@ public final class TimetableData {
     }
 
     public static List<ClassItem> forRollAndDay(int rollNumber, String day) {
+        String cacheKey = rollNumber + "_" + day;
+        synchronized (ROLL_DAY_CACHE) {
+            List<ClassItem> cached = ROLL_DAY_CACHE.get(cacheKey);
+            if (cached != null) return cached;
+        }
+
         String batch = batchForRoll(rollNumber);
         List<ClassItem> all = allEntries(day);
         List<ClassItem> result = new ArrayList<>();
@@ -101,7 +120,13 @@ public final class TimetableData {
         }
 
         Collections.sort(result, (a, b) -> a.start.compareTo(b.start));
-        return result;
+        List<ClassItem> immutableResult = Collections.unmodifiableList(result);
+        synchronized (ROLL_DAY_CACHE) {
+            List<ClassItem> existing = ROLL_DAY_CACHE.get(cacheKey);
+            if (existing != null) return existing;
+            ROLL_DAY_CACHE.put(cacheKey, immutableResult);
+        }
+        return immutableResult;
     }
 
     private static boolean appliesToStudent(ClassItem item, int rollNumber, String batch) {
@@ -119,6 +144,11 @@ public final class TimetableData {
     }
 
     private static List<ClassItem> allEntries(String day) {
+        List<ClassItem> entries = ALL_ENTRIES.get(day);
+        return entries == null ? Collections.emptyList() : entries;
+    }
+
+    private static List<ClassItem> loadEntries(String day) {
         switch (day) {
             case "Monday":
                 return Arrays.asList(
