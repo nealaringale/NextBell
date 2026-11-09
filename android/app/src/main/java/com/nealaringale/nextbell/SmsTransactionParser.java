@@ -97,8 +97,10 @@ public final class SmsTransactionParser {
                                                        String body, LocalDate receivedDate) {
         if (!TransactionNotificationAccess.isSupportedPackage(packageName)
                 || body == null || body.trim().isEmpty() || receivedDate == null) return null;
-        String sender = packageName + "|" + (title == null ? "" : title.trim());
-        return parseInternal(sender, body, receivedDate, true);
+        String cleanTitle = title == null ? "" : title.trim();
+        String sender = packageName + "|" + cleanTitle;
+        String message = cleanTitle.isEmpty() ? body : cleanTitle + ". " + body;
+        return parseInternal(sender, message, receivedDate, true);
     }
 
     private static ParsedTransaction parseInternal(String sender, String body,

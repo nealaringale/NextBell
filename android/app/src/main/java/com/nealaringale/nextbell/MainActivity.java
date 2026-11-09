@@ -5108,7 +5108,11 @@ public class MainActivity extends Activity {
     }
 
     private void openPaymentNotificationSettings() {
-        preferences.edit().putBoolean(KEY_PENDING_PAYMENT_ALERT_SETUP, true).apply();
+        if (!TransactionNotificationAccess.hasAccess(this)) {
+            preferences.edit().putBoolean(KEY_PENDING_PAYMENT_ALERT_SETUP, true).apply();
+        } else {
+            preferences.edit().remove(KEY_PENDING_PAYMENT_ALERT_SETUP).apply();
+        }
         try {
             startActivity(TransactionNotificationAccess.settingsIntent());
         } catch (ActivityNotFoundException exception) {

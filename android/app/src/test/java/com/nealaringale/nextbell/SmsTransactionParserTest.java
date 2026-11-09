@@ -47,6 +47,21 @@ public class SmsTransactionParserTest {
     }
 
     @Test
+    public void parsesIncomingCreditFromPaymentNotification() {
+        SmsTransactionParser.ParsedTransaction parsed = SmsTransactionParser.parseNotification(
+                "com.google.android.apps.messaging",
+                "Bank credit alert",
+                "You received INR 500.00 from Rahul",
+                RECEIVED
+        );
+
+        assertNotNull(parsed);
+        assertEquals(50_000L, parsed.amountPaise);
+        assertEquals(SmsTransactionParser.CREDIT, parsed.direction);
+        assertEquals("Income & Refunds", parsed.category);
+    }
+
+    @Test
     public void parsesDebitMerchantDateAndAvailableBalance() {
         SmsTransactionParser.ParsedTransaction parsed = SmsTransactionParser.parse(
                 "VM-HDFCBK",
