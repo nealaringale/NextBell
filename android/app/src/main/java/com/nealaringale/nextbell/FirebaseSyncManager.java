@@ -368,7 +368,12 @@ public final class FirebaseSyncManager implements SharedPreferences.OnSharedPref
     private void applyProfile(JSONObject profile) {
         applyingRemote = true;
         try {
-            JSONObject extras = new JSONObject(profile.toString());
+            JSONObject extras;
+            try {
+                extras = new JSONObject(profile.toString());
+            } catch (org.json.JSONException ignored) {
+                extras = new JSONObject();
+            }
             extras.remove("name");
             extras.remove("rollNo");
             extras.remove("roll_number");
@@ -426,7 +431,12 @@ public final class FirebaseSyncManager implements SharedPreferences.OnSharedPref
             if (merchantCategories != null) {
                 editor.putString("expense_merchant_categories", merchantCategories.toString());
             }
-            JSONObject extras = new JSONObject(settings.toString());
+            JSONObject extras;
+            try {
+                extras = new JSONObject(settings.toString());
+            } catch (org.json.JSONException ignored) {
+                extras = new JSONObject();
+            }
             extras.remove("themeIndex");
             extras.remove("attendanceTarget");
             extras.remove("dailyLimitPaise");
