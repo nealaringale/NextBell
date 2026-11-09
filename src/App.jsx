@@ -84,6 +84,7 @@ export default function App() {
     settings: localStorage.getItem('nextbell_theme') !== null
       || localStorage.getItem('nextbell_attendance_target') !== null
       || localStorage.getItem('nextbell_daily_limit') !== null,
+    recurringExpenses: localStorage.getItem('nextbell_recurring_expenses') !== null,
   });
 
   // --- Persistent State ---
@@ -138,6 +139,17 @@ export default function App() {
       return saved ? JSON.parse(saved) : INITIAL_EXPENSES;
     } catch {
       return INITIAL_EXPENSES;
+    }
+  });
+
+  // Recurring rules are currently managed in the Android app, but the website
+  // keeps the records and syncs them so a second device cannot erase them.
+  const [recurringExpenses, setRecurringExpenses] = useState(() => {
+    try {
+      const saved = localStorage.getItem('nextbell_recurring_expenses');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
     }
   });
 
@@ -203,7 +215,7 @@ export default function App() {
   const cloudSettingsExtrasRef = useRef({});
   const latestCloudStateRef = useRef(null);
   latestCloudStateRef.current = {
-    profile, themeIndex, attendance, attendanceTarget, tasks, expenses, dailyLimitPaise,
+    profile, themeIndex, attendance, attendanceTarget, tasks, expenses, recurringExpenses, dailyLimitPaise,
     settings: { themeIndex, attendanceTarget, dailyLimitPaise },
   };
 
@@ -264,6 +276,10 @@ export default function App() {
   }, [expenses]);
 
   useEffect(() => {
+    localStorage.setItem('nextbell_recurring_expenses', JSON.stringify(recurringExpenses));
+  }, [recurringExpenses]);
+
+  useEffect(() => {
     localStorage.setItem('nextbell_daily_limit', String(dailyLimitPaise));
   }, [dailyLimitPaise]);
 
@@ -300,6 +316,7 @@ export default function App() {
           setAttendance(Array.isArray(state.attendance) ? state.attendance : []);
           setTasks(Array.isArray(state.tasks) ? state.tasks : []);
           setExpenses(Array.isArray(state.expenses) ? state.expenses : []);
+          setRecurringExpenses(Array.isArray(state.recurringExpenses) ? state.recurringExpenses : []);
           if (state.settings) {
             const { themeIndex: remoteTheme, attendanceTarget: remoteTarget,
               dailyLimitPaise: remoteLimit, ...extras } = state.settings;
@@ -323,6 +340,8 @@ export default function App() {
             setAttendance((previous) => updateArray(previous, 'key'));
           } else if (collection === 'tasks') {
             setTasks((previous) => updateArray(previous, 'id'));
+          } else if (collection === 'recurringExpenses') {
+            setRecurringExpenses((previous) => updateArray(previous, 'id'));
           } else if (collection === 'profile' && !deleted && payload) {
             setProfile(payload);
           } else if (collection === 'settings' && !deleted && payload) {
@@ -359,6 +378,10 @@ export default function App() {
   useEffect(() => {
     cloudSyncRef.current?.pushCollection('tasks', tasks);
   }, [tasks]);
+
+  useEffect(() => {
+    cloudSyncRef.current?.pushCollection('recurringExpenses', recurringExpenses);
+  }, [recurringExpenses]);
 
   useEffect(() => {
     cloudSyncRef.current?.pushProfile(profile);
