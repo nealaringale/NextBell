@@ -68,10 +68,10 @@ public final class SmsTransactionReceiver extends BroadcastReceiver {
 
         try {
             WORKER.execute(() -> {
+                SharedPreferences currentPreferences = appContext.getSharedPreferences(
+                        SmsTransactionService.PREFS_NAME, Context.MODE_PRIVATE
+                );
                 try {
-                    SharedPreferences currentPreferences = appContext.getSharedPreferences(
-                            SmsTransactionService.PREFS_NAME, Context.MODE_PRIVATE
-                    );
                     // Re-check opt-in and permission in case the user disabled tracking
                     // while this broadcast was waiting in the worker queue.
                     if (SmsTransactionService.isEnabled(currentPreferences)
