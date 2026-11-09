@@ -22,6 +22,20 @@ public class SmsTransactionParserTest {
     }
 
     @Test
+    public void parsesTruecallerForwardedIciciBankAlert() {
+        SmsTransactionParser.ParsedTransaction parsed = SmsTransactionParser.parseNotification(
+                "com.truecaller",
+                "ICICI Bank",
+                "ICICI Bank Acct XX702 debited for Rs 1.00.",
+                RECEIVED
+        );
+
+        assertNotNull(parsed);
+        assertEquals(100L, parsed.amountPaise);
+        assertEquals(SmsTransactionParser.DEBIT, parsed.direction);
+    }
+
+    @Test
     public void parsesBankSmsNotificationWithoutSmsPermission() {
         SmsTransactionParser.ParsedTransaction parsed = SmsTransactionParser.parseNotification(
                 "com.google.android.apps.messaging",

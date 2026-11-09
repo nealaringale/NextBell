@@ -14,6 +14,7 @@ import java.util.Set;
 public final class TransactionNotificationAccess {
     private static final Set<String> SUPPORTED_PACKAGES = new HashSet<>(Arrays.asList(
             "com.google.android.apps.messaging",
+            "com.truecaller",
             "com.android.messaging",
             "com.samsung.android.messaging",
             "com.miui.mms",
@@ -88,6 +89,7 @@ public final class TransactionNotificationAccess {
         if (packageName == null) return false;
         String value = packageName.trim().toLowerCase(Locale.ENGLISH);
         return value.equals("com.google.android.apps.messaging")
+                || value.equals("com.truecaller")
                 || value.equals("com.android.messaging")
                 || value.equals("com.samsung.android.messaging")
                 || value.equals("com.miui.mms")
