@@ -81,6 +81,9 @@ export default function App() {
     tasks: localStorage.getItem('nextbell_tasks') !== null,
     expenses: localStorage.getItem('nextbell_expenses') !== null,
     dailyLimit: localStorage.getItem('nextbell_daily_limit') !== null,
+    settings: localStorage.getItem('nextbell_theme') !== null
+      || localStorage.getItem('nextbell_attendance_target') !== null
+      || localStorage.getItem('nextbell_daily_limit') !== null,
   });
 
   // --- Persistent State ---
@@ -201,6 +204,7 @@ export default function App() {
   const latestCloudStateRef = useRef(null);
   latestCloudStateRef.current = {
     profile, themeIndex, attendance, attendanceTarget, tasks, expenses, dailyLimitPaise,
+    settings: { themeIndex, attendanceTarget, dailyLimitPaise },
   };
 
   // --- Dialog References ---
