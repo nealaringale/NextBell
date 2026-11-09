@@ -12,6 +12,16 @@ public class SmsTransactionParserTest {
     private static final LocalDate RECEIVED = LocalDate.of(2026, 11, 7);
 
     @Test
+    public void ignoresOrdinaryPersonalMessagesFromSmsApps() {
+        assertNull(SmsTransactionParser.parseNotification(
+                "com.google.android.apps.messaging",
+                "A friend",
+                "I paid Rs. 100 for lunch, I will tell you later",
+                RECEIVED
+        ));
+    }
+
+    @Test
     public void parsesBankSmsNotificationWithoutSmsPermission() {
         SmsTransactionParser.ParsedTransaction parsed = SmsTransactionParser.parseNotification(
                 "com.google.android.apps.messaging",

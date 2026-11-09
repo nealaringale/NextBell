@@ -1,6 +1,7 @@
 package com.nealaringale.nextbell;
 
 import android.app.Notification;
+import android.content.ComponentName;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.os.Parcelable;
@@ -34,6 +35,15 @@ public final class TransactionNotificationListener extends NotificationListenerS
         } catch (RuntimeException ignored) {
             // Notification access can be revoked while Android is reconnecting the listener.
         }
+    }
+
+    @Override
+    public void onListenerDisconnected() {
+        super.onListenerDisconnected();
+        // Android documents this as the supported recovery path after disconnection.
+        NotificationListenerService.requestRebind(
+                new ComponentName(this, TransactionNotificationListener.class)
+        );
     }
 
     @Override
@@ -95,6 +105,11 @@ public final class TransactionNotificationListener extends NotificationListenerS
         append(body, extras.getCharSequence(Notification.EXTRA_TEXT));
         append(body, extras.getCharSequence(Notification.EXTRA_SUB_TEXT));
         append(body, extras.getCharSequence(Notification.EXTRA_SUMMARY_TEXT));
+
+        CharSequence[] textLines = extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES);
+        if (textLines != null) {
+            for (CharSequence line : textLines) append(body, line);
+        }
 
         Parcelable[] messages = extras.getParcelableArray(Notification.EXTRA_MESSAGES);
         if (messages != null) {

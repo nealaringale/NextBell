@@ -97,6 +97,8 @@ public final class SmsTransactionParser {
                                                        String body, LocalDate receivedDate) {
         if (!TransactionNotificationAccess.isSupportedPackage(packageName)
                 || body == null || body.trim().isEmpty() || receivedDate == null) return null;
+        if (TransactionNotificationAccess.isMessagingPackage(packageName)
+                && !TransactionNotificationAccess.isLikelyFinancialSms(title, body)) return null;
         String cleanTitle = title == null ? "" : title.trim();
         String sender = packageName + "|" + cleanTitle;
         String message = cleanTitle.isEmpty() ? body : cleanTitle + ". " + body;
