@@ -1,6 +1,7 @@
 package com.nealaringale.nextbell;
 
 import android.Manifest;
+import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.DatePickerDialog;
@@ -217,6 +218,7 @@ public class MainActivity extends Activity {
     }
 
     @Override
+    @SuppressLint("UnspecifiedRegisterReceiverFlag")
     protected void onStart() {
         super.onStart();
         if (!paymentAlertReceiverRegistered) {
