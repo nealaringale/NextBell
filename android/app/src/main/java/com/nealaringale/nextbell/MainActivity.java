@@ -221,7 +221,11 @@ public class MainActivity extends Activity {
 
                     @Override
                     public void onRemoteDataChanged() {
-                        refreshMoneyAndSettings();
+                        themeIndex = clampTheme(preferences.getInt(KEY_THEME, themeIndex));
+                        applyTheme();
+                        if ("week".equals(selectedScreen)) buildWeekScreen();
+                        else if ("study".equals(selectedScreen)) buildStudyScreen();
+                        else refreshMoneyAndSettings();
                     }
                 });
         firebaseSyncManager.attach();
