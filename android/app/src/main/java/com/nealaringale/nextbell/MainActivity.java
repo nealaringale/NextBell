@@ -73,6 +73,8 @@ public class MainActivity extends Activity {
     private static final String KEY_PENDING_PAYMENT_ALERT_SETUP = "pending_payment_alert_setup";
     private static final int REQUEST_EXPORT_BACKUP = 8101;
     private static final int REQUEST_IMPORT_BACKUP = 8102;
+    private static final int REQUEST_SMS_TRACKING = 8103;
+    private static final int REQUEST_SMS_HISTORY = 8104;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final DateTimeFormatter timeFormatter =
@@ -1490,15 +1492,18 @@ public class MainActivity extends Activity {
 
         boolean paymentAccess = TransactionNotificationAccess.hasAccess(this);
         boolean paymentTracking = SmsTransactionService.isEnabled(preferences);
+        boolean smsAccess = SmsTransactionService.hasReceivePermission(this);
+        boolean listenerConnected = preferences.getBoolean(
+                SmsTransactionService.KEY_LISTENER_CONNECTED, false
+        );
+        boolean paymentConnected = paymentTracking && (smsAccess || (paymentAccess && listenerConnected));
         TextView syncStatus = text(
-                paymentAccess && paymentTracking ? "CONNECTED"
-                        : paymentAccess ? "READY" : "NOT CONNECTED",
-                8,
-                paymentAccess && paymentTracking ? ACCENT : SUBTLE
+                paymentConnected ? "CONNECTED" : smsAccess ? "READY" : "SETUP NEEDED",
+                8, paymentConnected ? ACCENT : SUBTLE
         );
         autoStatus.addView(syncStatus);
 
-        TextView syncButton = actionButton(paymentAccess ? (paymentTracking ? "MANAGE" : "ENABLE") : "CONNECT", false);
+        TextView syncButton = actionButton(smsAccess ? "MANAGE" : "ENABLE SMS", false);
         LinearLayout.LayoutParams syncButtonParams =
                 new LinearLayout.LayoutParams(dp(84), dp(34));
         syncButtonParams.setMargins(dp(9), 0, 0, 0);
@@ -5082,88 +5087,127 @@ public class MainActivity extends Activity {
     }
 
     private void showPaymentAlertTrackingManager() {
-        boolean access = TransactionNotificationAccess.hasAccess(this);
-        boolean enabled = SmsTransactionService.isEnabled(preferences);
-        boolean active = access && enabled;
+        boolean notificationAccess = TransactionNotificationAccess.hasAccess(this);
+        boolean smsPermission = SmsTransactionService.hasReceivePermission(this);
+        boolean readPermission = SmsTransactionService.hasReadPermission(this);
+        boolean trackingEnabled = SmsTransactionService.isEnabled(preferences);
+        boolean listenerConnected = preferences.getBoolean(
+                SmsTransactionService.KEY_LISTENER_CONNECTED, false
+        );
 
-        long lastSeenAt = preferences.getLong(
-                SmsTransactionService.KEY_LAST_NOTIFICATION_AT, 0L
+        long callbackCount = preferences.getLong(SmsTransactionService.KEY_NOTIFICATION_CALLBACK_COUNT, 0L);
+        String callbackPackage = preferences.getString(SmsTransactionService.KEY_LAST_CALLBACK_PACKAGE, "");
+        String callbackResult = preferences.getString(
+                SmsTransactionService.KEY_LAST_CALLBACK_RESULT, "No notification callback received yet"
         );
-        String lastSeen = lastSeenAt <= 0L ? "Never"
-                : java.time.Instant.ofEpochMilli(lastSeenAt).atZone(zone)
-                        .format(DateTimeFormatter.ofPattern("dd MMM, hh:mm a", Locale.ENGLISH));
-        String lastPackage = preferences.getString(
-                SmsTransactionService.KEY_LAST_NOTIFICATION_PACKAGE, ""
+        long smsReceived = preferences.getLong(SmsTransactionService.KEY_SMS_RECEIVED_COUNT, 0L);
+        long smsImported = preferences.getLong(SmsTransactionService.KEY_SMS_IMPORTED_COUNT, 0L);
+        String smsResult = preferences.getString(
+                SmsTransactionService.KEY_LAST_SMS_RESULT, "No incoming SMS processed yet"
         );
-        String lastResult = preferences.getString(
-                SmsTransactionService.KEY_LAST_NOTIFICATION_RESULT, "No alert processed yet"
-        );
-        long importedCount = preferences.getLong(
-                SmsTransactionService.KEY_NOTIFICATION_IMPORTED_COUNT, 0L
-        );
-        long seenCount = preferences.getLong(
-                SmsTransactionService.KEY_NOTIFICATION_SEEN_COUNT, 0L
-        );
-        long lastAmount = preferences.getLong(
-                SmsTransactionService.KEY_LAST_NOTIFICATION_AMOUNT, 0L
-        );
-        String lastDirection = preferences.getString(
-                SmsTransactionService.KEY_LAST_NOTIFICATION_DIRECTION, ""
-        );
-        String lastMerchant = preferences.getString(
-                SmsTransactionService.KEY_LAST_NOTIFICATION_MERCHANT, ""
-        );
-        String lastCategory = preferences.getString(
-                SmsTransactionService.KEY_LAST_NOTIFICATION_CATEGORY, ""
-        );
-        String lastParsed = lastAmount > 0L
-                ? "\nLast parsed: " + formatRupees(lastAmount)
+        long imported = preferences.getLong(SmsTransactionService.KEY_NOTIFICATION_IMPORTED_COUNT, 0L);
+        long candidates = preferences.getLong(SmsTransactionService.KEY_NOTIFICATION_SEEN_COUNT, 0L);
+        long lastAmount = preferences.getLong(SmsTransactionService.KEY_LAST_NOTIFICATION_AMOUNT, 0L);
+        String lastDirection = preferences.getString(SmsTransactionService.KEY_LAST_NOTIFICATION_DIRECTION, "");
+        String lastMerchant = preferences.getString(SmsTransactionService.KEY_LAST_NOTIFICATION_MERCHANT, "");
+        String lastCategory = preferences.getString(SmsTransactionService.KEY_LAST_NOTIFICATION_CATEGORY, "");
+
+        String parsedText = lastAmount > 0L
+                ? "\\nLast notification parsed: " + formatRupees(lastAmount)
                         + (lastDirection.isEmpty() ? "" : " · " + lastDirection)
                         + (lastMerchant.isEmpty() ? "" : " · " + lastMerchant)
                         + (lastCategory.isEmpty() ? "" : " · " + lastCategory)
-                : "\nLast parsed: No amount extracted";
+                : "\\nLast notification parsed: none";
 
-        String diagnostics = "Notification access: " + (access ? "GRANTED" : "NOT GRANTED")
-                + "\nTracking: " + (active ? "ON" : enabled ? "WAITING FOR ACCESS" : "OFF")
-                + "\nSupported-app notifications seen: " + seenCount
-                + "\nTransactions added: " + importedCount
-                + "\nLast alert: " + lastSeen
-                + (lastPackage.isEmpty() ? "" : " (" + lastPackage + ")")
-                + lastParsed
-                + "\nLast result: " + lastResult;
+        String diagnostics = "SMS receive permission: " + (smsPermission ? "GRANTED" : "NOT GRANTED")
+                + "\\nSMS inbox permission: " + (readPermission ? "GRANTED" : "NOT GRANTED")
+                + "\\nSMS broadcasts received: " + smsReceived
+                + "\\nTransactions imported from SMS: " + smsImported
+                + "\\nLast SMS result: " + smsResult
+                + "\\n\\nNotification access setting: " + (notificationAccess ? "GRANTED" : "OFF")
+                + "\\nNotification listener service: " + (listenerConnected ? "CONNECTED" : "NOT CONNECTED")
+                + "\\nNotification callbacks received: " + callbackCount
+                + (callbackPackage.isEmpty() ? "" : " (" + callbackPackage + ")")
+                + "\\nFinancial notifications processed: " + candidates
+                + "\\nNotification transactions added: " + imported
+                + parsedText
+                + "\\nLast notification callback: " + callbackResult
+                + "\\nTracking switch: " + (trackingEnabled ? "ON" : "OFF");
 
-        String disclosure = "NextBell checks notification previews across apps for bank, card, wallet "
-                + "and UPI money movements after you explicitly enable Android notification access. Matching "
-                + "transaction details are saved on this phone; notification text is not retained "
-                + "or uploaded. This does not scan old SMS messages. Your bank or messaging app "
-                + "must show transaction details in its notifications, and notifications hidden "
-                + "by Android cannot be read.\n\n"
+        String disclosure = "Enable direct SMS tracking for bank messages. It receives the SMS "
+                + "broadcast even when the messaging app does not publish a notification. NextBell "
+                + "parses transaction-like messages locally and stores only amount, direction, date, "
+                + "merchant/category and a duplicate fingerprint. Raw message text is not saved or uploaded. "
+                + "Old SMS import is separate and optional. Notification access remains a fallback for UPI apps.\\n\\n"
                 + diagnostics;
 
-        AlertDialog.Builder builder = new AlertDialog.Builder(this)
-                .setTitle(active ? "Payment alerts connected" : "Automatic payment tracking")
+        new AlertDialog.Builder(this)
+                .setTitle("Automatic payment tracking")
                 .setMessage(disclosure)
-                .setNegativeButton(enabled ? "Turn off" : "Close", (dialog, which) -> {
-                    if (enabled) {
+                .setNegativeButton(trackingEnabled ? "Turn off" : "Close", (dialog, which) -> {
+                    if (trackingEnabled) {
                         SmsTransactionService.setEnabled(preferences, false);
                         refreshMoneyAndSettings();
-                        Toast.makeText(this, "Automatic payment tracking is off.",
-                                Toast.LENGTH_LONG).show();
+                        Toast.makeText(this, "Automatic payment tracking is off.", Toast.LENGTH_LONG).show();
                     }
                 })
-                .setPositiveButton(access ? (enabled ? "Done" : "Enable tracking")
-                                : "Open notification settings", (dialog, which) -> {
-                    if (access) {
-                        SmsTransactionService.setEnabled(preferences, true);
-                        refreshMoneyAndSettings();
-                        Toast.makeText(this, "Payment alert tracking is enabled.",
-                                Toast.LENGTH_LONG).show();
-                    } else {
+                .setPositiveButton(smsPermission ? "SMS permission granted" : "Enable SMS tracking",
+                        (dialog, which) -> enableDirectSmsTracking())
+                .setNeutralButton("More options", (dialog, which) -> showPaymentTrackingMoreOptions())
+                .show();
+    }
+
+    private void enableDirectSmsTracking() {
+        if (SmsTransactionService.hasReceivePermission(this)) {
+            SmsTransactionService.setEnabled(preferences, true);
+            refreshMoneyAndSettings();
+            Toast.makeText(this, "Direct bank SMS tracking is enabled.", Toast.LENGTH_LONG).show();
+        } else {
+            requestPermissions(new String[]{Manifest.permission.RECEIVE_SMS}, REQUEST_SMS_TRACKING);
+        }
+    }
+
+    private void showPaymentTrackingMoreOptions() {
+        String[] options = {
+                "Import recent bank SMS (last 30 days)",
+                "Manage notification access",
+                "Reconnect notification listener"
+        };
+        new AlertDialog.Builder(this)
+                .setTitle("Payment tracking options")
+                .setItems(options, (dialog, which) -> {
+                    if (which == 0) importRecentSmsHistory();
+                    else {
                         openPaymentNotificationSettings();
+                        if (which == 2) Toast.makeText(this,
+                                "Turn NextBell notification access off and on to reconnect it.",
+                                Toast.LENGTH_LONG).show();
                     }
                 })
-                .setNeutralButton("Manage access", (dialog, which) -> openPaymentNotificationSettings());
-        builder.show();
+                .setNegativeButton("Close", null)
+                .show();
+    }
+
+    private void importRecentSmsHistory() {
+        if (!SmsTransactionService.hasReadPermission(this)) {
+            requestPermissions(new String[]{Manifest.permission.READ_SMS}, REQUEST_SMS_HISTORY);
+        } else {
+            performRecentSmsImport();
+        }
+    }
+
+    private void performRecentSmsImport() {
+        Toast.makeText(this, "Scanning recent messages locally…", Toast.LENGTH_SHORT).show();
+        new Thread(() -> {
+            int count = SmsTransactionService.importRecentInbox(this, preferences);
+            handler.post(() -> {
+                Toast.makeText(this, count > 0 ? "Imported " + count + " transactions."
+                        : "No supported transaction SMS found.", Toast.LENGTH_LONG).show();
+                if ("expenses".equals(selectedScreen)) buildExpensesScreen();
+                if ("settings".equals(selectedScreen)) buildSettingsScreen();
+                updateBottomNav();
+            });
+        }, "NextBell-SMS-history").start();
     }
 
     private void openPaymentNotificationSettings() {
@@ -5235,7 +5279,26 @@ public class MainActivity extends Activity {
             }
             return;
         }
-
+        if (requestCode == REQUEST_SMS_TRACKING) {
+            if (SmsTransactionService.hasReceivePermission(this)) {
+                SmsTransactionService.setEnabled(preferences, true);
+                Toast.makeText(this, "Direct bank SMS tracking is enabled.", Toast.LENGTH_LONG).show();
+            } else {
+                new AlertDialog.Builder(this)
+                        .setTitle("Android blocked SMS access")
+                        .setMessage("This private NextBell build needs RECEIVE_SMS allowlisted by its installer. "
+                                + "Install it from your laptop using the ADB command in the project README, "
+                                + "then grant SMS access here. Tapping a downloaded APK may not allow this restricted permission.")
+                        .setPositiveButton("OK", null).show();
+            }
+            refreshMoneyAndSettings();
+            return;
+        }
+        if (requestCode == REQUEST_SMS_HISTORY) {
+            if (SmsTransactionService.hasReadPermission(this)) performRecentSmsImport();
+            else Toast.makeText(this, "SMS inbox access was not granted.", Toast.LENGTH_LONG).show();
+            return;
+        }
     }
 
     private void startBackupExport() {
