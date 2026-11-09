@@ -325,6 +325,41 @@ export default function App() {
         return;
       }
 
+      const previousOwner = localStorage.getItem('nextbell_cloud_owner_uid') || '';
+      if (previousOwner && previousOwner !== user.uid) {
+        // Never migrate a previous user's financial/student data into another account.
+        const emptyProfile = {
+          ...DEFAULT_PROFILE, name: '', college: '', year: '', division: '',
+          rollNo: 0, themeIndex: 0,
+        };
+        setProfile(emptyProfile);
+        setThemeIndex(0);
+        setAttendance([]);
+        setAttendanceTarget(75);
+        setTasks([]);
+        setExpenses([]);
+        setRecurringExpenses([]);
+        setDailyLimitPaise(50000);
+        cloudSettingsExtrasRef.current = {};
+        persistedLocalDataRef.current = {
+          profile: false, theme: false, attendance: false, attendanceTarget: false,
+          tasks: false, expenses: false, dailyLimit: false, settings: false,
+          recurringExpenses: false,
+        };
+        latestCloudStateRef.current = {
+          profile: emptyProfile, themeIndex: 0, attendance: [],
+          attendanceTarget: 75, tasks: [], expenses: [], recurringExpenses: [],
+          dailyLimitPaise: 50000,
+          settings: { themeIndex: 0, attendanceTarget: 75, dailyLimitPaise: 50000 },
+        };
+        [
+          'nextbell_profile', 'nextbell_theme', 'nextbell_attendance',
+          'nextbell_attendance_target', 'nextbell_tasks', 'nextbell_expenses',
+          'nextbell_recurring_expenses', 'nextbell_daily_limit',
+        ].forEach((key) => localStorage.removeItem(key));
+      }
+      localStorage.setItem('nextbell_cloud_owner_uid', user.uid);
+
       setCloudStatus('Connecting to your NextBell data…');
       const sync = new NextBellCloudSync({
         uid: user.uid,
