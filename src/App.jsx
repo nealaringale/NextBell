@@ -86,6 +86,10 @@ export default function App() {
       || localStorage.getItem('nextbell_daily_limit') !== null,
     recurringExpenses: localStorage.getItem('nextbell_recurring_expenses') !== null,
   });
+  const firstPersistenceEffectsRef = useRef({
+    profile: true, theme: true, attendance: true, attendanceTarget: true,
+    tasks: true, expenses: true, dailyLimit: true, recurringExpenses: true,
+  });
 
   // --- Persistent State ---
   const [profile, setProfile] = useState(() => {
@@ -251,36 +255,52 @@ export default function App() {
   // Save to LocalStorage
   useEffect(() => {
     localStorage.setItem('nextbell_profile', JSON.stringify(profile));
+    if (firstPersistenceEffectsRef.current.profile) firstPersistenceEffectsRef.current.profile = false;
+    else persistedLocalDataRef.current.profile = true;
   }, [profile]);
 
   useEffect(() => {
     localStorage.setItem('nextbell_theme', String(themeIndex));
+    if (firstPersistenceEffectsRef.current.theme) firstPersistenceEffectsRef.current.theme = false;
+    else persistedLocalDataRef.current.settings = true;
     const activeTheme = THEMES[themeIndex] || THEMES[0];
     document.documentElement.setAttribute('data-theme', activeTheme.id);
   }, [themeIndex]);
 
   useEffect(() => {
     localStorage.setItem('nextbell_attendance', JSON.stringify(attendance));
+    if (firstPersistenceEffectsRef.current.attendance) firstPersistenceEffectsRef.current.attendance = false;
+    else persistedLocalDataRef.current.attendance = true;
   }, [attendance]);
 
   useEffect(() => {
     localStorage.setItem('nextbell_attendance_target', String(attendanceTarget));
+    if (firstPersistenceEffectsRef.current.attendanceTarget) firstPersistenceEffectsRef.current.attendanceTarget = false;
+    else persistedLocalDataRef.current.settings = true;
   }, [attendanceTarget]);
 
   useEffect(() => {
     localStorage.setItem('nextbell_tasks', JSON.stringify(tasks));
+    if (firstPersistenceEffectsRef.current.tasks) firstPersistenceEffectsRef.current.tasks = false;
+    else persistedLocalDataRef.current.tasks = true;
   }, [tasks]);
 
   useEffect(() => {
     localStorage.setItem('nextbell_expenses', JSON.stringify(expenses));
+    if (firstPersistenceEffectsRef.current.expenses) firstPersistenceEffectsRef.current.expenses = false;
+    else persistedLocalDataRef.current.expenses = true;
   }, [expenses]);
 
   useEffect(() => {
     localStorage.setItem('nextbell_recurring_expenses', JSON.stringify(recurringExpenses));
+    if (firstPersistenceEffectsRef.current.recurringExpenses) firstPersistenceEffectsRef.current.recurringExpenses = false;
+    else persistedLocalDataRef.current.recurringExpenses = true;
   }, [recurringExpenses]);
 
   useEffect(() => {
     localStorage.setItem('nextbell_daily_limit', String(dailyLimitPaise));
+    if (firstPersistenceEffectsRef.current.dailyLimit) firstPersistenceEffectsRef.current.dailyLimit = false;
+    else persistedLocalDataRef.current.settings = true;
   }, [dailyLimitPaise]);
 
   // One Firebase account is shared by the website and Android app.
