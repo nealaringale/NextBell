@@ -130,7 +130,10 @@ public final class TransactionNotificationAccess {
                 + (body == null ? "" : body)).toLowerCase(Locale.ENGLISH);
         if (text.trim().isEmpty()) return false;
 
-        boolean hasAmount = text.matches("(?s).*(?:₹|\\binr\\b|\\brs\\.?)\\s*[-−]?\\s*[0-9][0-9,]*(?:\\.[0-9]{1,2})?.*");
+        boolean hasAmount = text.matches("(?s).*(?:₹|\\binr\\b|\\brs\\.?)\\s*[-−]?\\s*[0-9][0-9,]*(?:\\.[0-9]{1,2})?.*")
+                || text.matches("(?s).*(?:\\bdebited\\b|\\bcredited\\b|\\bdeducted\\b|"
+                + "\\bwithdrawn\\b|\\bcharged\\b)\\s+(?:by|of|for|with)\\s+"
+                + "[0-9][0-9,]*(?:\\.[0-9]{1,2})?.*");
         if (!hasAmount) return false;
 
         boolean accountOrRailContext = containsAny(text,
@@ -192,7 +195,13 @@ public final class TransactionNotificationAccess {
         if (!SmsTransactionService.isEnabled(preferences)) {
             return "Access is granted · enable tracking to start importing supported payment alerts.";
         }
-        return "Connected · checking financial transaction previews across notification sources on this phone.";
+        if (SmsTransactionService.hasReceivePermission(context)) {
+            return "Direct SMS tracking active · notifications are an additional source.";
+        }
+        if (preferences.getBoolean(SmsTransactionService.KEY_LISTENER_CONNECTED, false)) {
+            return "Notification listener connected · enable SMS access for reliable bank-message capture.";
+        }
+        return "Notification permission granted in Settings, but listener is not connected. Reopen Notification access or enable SMS tracking.";
     }
 
     public static Intent settingsIntent() {
