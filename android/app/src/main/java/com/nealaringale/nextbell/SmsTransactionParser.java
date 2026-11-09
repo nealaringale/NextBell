@@ -12,38 +12,49 @@ import java.util.regex.Pattern;
 /** Parses a narrow set of bank transaction alerts without retaining the message text. */
 public final class SmsTransactionParser {
     private static final Pattern AMOUNT = Pattern.compile(
-            "(?i)(?:₹|\\bINR\\b|\\bRs\\.?\\s*)\\s*([0-9][0-9,]*(?:\\.[0-9]{1,2})?)"
+            "(?i)(?:₹|\\\\bINR\\\\b|\\\\bRs\\\\.?\\\\s*)\\\\s*([0-9][0-9,]*(?:\\\\.[0-9]{1,2})?)"
     );
     private static final Pattern BALANCE = Pattern.compile(
-            "(?i)(?:available|avl\\.?|closing|current)\\s+(?:balance|bal\\.?)"
-                    + "(?:\\s+(?:is|of))?\\s*[:=\\-]?\\s*(?:₹|INR|Rs\\.?\\s*)?"
-                    + "\\s*([0-9][0-9,]*(?:\\.[0-9]{1,2})?)"
+            "(?i)(?:(?:available|avl\\\\.?|closing|current|ledger|account|acct|a/c)\\\\s+)?"
+                    + "(?:balance|bal\\\\.?)(?:\\\\s+(?:is|of))?\\\\s*[:=\\\\-]?\\\\s*"
+                    + "(?:₹|INR|Rs\\\\.?\\\\s*)?\\\\s*([0-9][0-9,]*(?:\\\\.[0-9]{1,2})?)"
     );
     private static final Pattern BARE_TRANSACTION_AMOUNT = Pattern.compile(
-            "(?i)\\b(?:debited|credited|deducted|withdrawn)\\s+(?:by|of)\\s+"
-                    + "([0-9][0-9,]*(?:\\.[0-9]{1,2})?)\\b"
+            "(?i)\\\\b(?:debited|credited|deducted|withdrawn)\\\\s+(?:by|of)\\\\s+"
+                    + "([0-9][0-9,]*(?:\\\\.[0-9]{1,2})?)\\\\b"
     );
     private static final Pattern EXPLICIT_DATE = Pattern.compile(
-            "(?i)(?:on|dated|txn(?:\\s+date)?)\\s*[:\\-]?\\s*"
-                    + "(\\d{1,2})[/-](\\d{1,2})[/-](\\d{2,4})"
+            "(?i)(?:on|dated|txn(?:\\\\s+date)?)\\\\s*[:\\\\-]?\\\\s*"
+                    + "(\\\\d{1,2})[-/ ]([A-Za-z]{3,9}|\\\\d{1,2})[-/ ](\\\\d{2,4})"
     );
-    private static final Pattern REFUND = Pattern.compile(
-            "(?i)refund|reversal|reversed|cashback|credited|credit to|received|deposit|paid back"
+    // "credited to VPA" describes the UPI payee, not money credited to the sender's account.
+    private static final Pattern CREDIT_TERMS = Pattern.compile(
+            "(?i)\\\\b(?:refund(?:ed)?|reversal|reversed|cashback|credit\\\\s+received|"
+                    + "payment\\\\s+received|(?:amount|funds|money)\\\\s+credited|"
+                    + "credit(?:ed)?\\\\s+(?:(?:to|into)\\\\s+)?(?:(?:your|my|the)\\\\s+)?(?:account|a/c)|"
+                    + "(?:(?:your|my|the)\\\\s+)?account\\\\s+(?:has\\\\s+been\\\\s+)?credited|"
+                    + "received\\\\s+(?:into|in)\\\\s+(?:(?:your|my|the)\\\\s+)?(?:account|a/c)|"
+                    + "deposit(?:ed)?\\\\s+(?:into|to)\\\\s+(?:(?:your|my|the)\\\\s+)?(?:account|a/c))\\\\b"
     );
     private static final Pattern DEBIT_TERMS = Pattern.compile(
-            "(?i)debited|deducted|withdrawn|withdrawal|spent|purchase|payment|paid|sent|transfer to"
+            "(?i)\\\\b(?:debited|debit|deducted|withdrawn|withdrawal|spent|purchase|sent|"
+                    + "paid\\\\s+to|transfer\\\\s+to|transferred\\\\s+to)\\\\b"
     );
     private static final Pattern RAIL_SUCCESS = Pattern.compile(
             "(?i)(?:upi|atm|pos|neft|imps|rtgs|card|nach|ach).{0,90}"
                     + "(?:successful|successfully|completed|processed|paid)"
     );
     private static final Pattern FAILED = Pattern.compile(
-            "(?i)\\b(?:failed|failure|declined|unsuccessful|rejected|pending|not processed)\\b"
+            "(?i)\\\\b(?:failed|failure|declined|unsuccessful|rejected|pending|not processed)\\\\b"
+    );
+    private static final Pattern TRANSACTION_CONTEXT = Pattern.compile(
+            "(?i)\\\\b(?:debited|debit|deducted|withdrawn|withdrawal|spent|purchase|payment|"
+                    + "transfer|transferred|sent|received|credited|refund|cashback|deposit|txn|transaction)\\\\b"
     );
     private static final Pattern MERCHANT = Pattern.compile(
-            "(?i)\\b(?:at|to|merchant|towards)\\s+(.{2,56}?)"
-                    + "(?=\\s+(?:on|ref|upi|txn|transaction|avl|available|balance|"
-                    + "a/c|ac|from|using|via)\\b|[,.;]|$)"
+            "(?i)\\\\b(?:at|to|merchant|towards)\\\\s+(.{2,56}?)"
+                    + "(?=\\\\s+(?:on|ref|upi|txn|transaction|avl|available|balance|"
+                    + "a/c|ac|from|using|via)\\\\b|[,.;]|$)"
     );
 
     public static final String DEBIT = "DEBIT";
@@ -80,44 +91,37 @@ public final class SmsTransactionParser {
     public static ParsedTransaction parse(String sender, String body, LocalDate receivedDate) {
         if (!isBankLikeSender(sender) || body == null || body.trim().isEmpty()
                 || receivedDate == null) return null;
-        String normalized = body.replace('\u00a0', ' ').replaceAll("\\s+", " ").trim();
-        if (FAILED.matcher(normalized).find() || normalized.matches("(?i).*\\bnot\\s+debited\\b.*")) {
+
+        String normalized = body.replace('\\u00a0', ' ')
+                .replaceAll("\\\\s+", " ")
+                .trim();
+        if (FAILED.matcher(normalized).find()
+                || normalized.matches("(?i).*\\\\bnot\\\\s+(?:debited|credited)\\\\b.*")) {
             return null;
         }
 
-        Matcher amountMatcher = AMOUNT.matcher(normalized);
-        boolean hasCurrencyAmount = amountMatcher.find();
-        Matcher bareAmountMatcher = BARE_TRANSACTION_AMOUNT.matcher(normalized);
-        boolean hasBareAmount = bareAmountMatcher.find();
-        if (!hasCurrencyAmount && !hasBareAmount) return null;
-        String amountText = hasBareAmount
-                && (!hasCurrencyAmount || bareAmountMatcher.start() < amountMatcher.start())
-                ? bareAmountMatcher.group(1) : amountMatcher.group(1);
-
-        boolean isCredit = REFUND.matcher(normalized).find();
-        boolean isDebit = DEBIT_TERMS.matcher(normalized).find()
-                || RAIL_SUCCESS.matcher(normalized).find();
-        if (!isCredit && !isDebit) return null;
-
-        long amountPaise;
-        try {
-            amountPaise = toPaise(amountText);
-        } catch (RuntimeException invalidAmount) {
-            return null;
-        }
+        long amountPaise = extractTransactionAmountPaise(normalized);
         if (amountPaise <= 0L) return null;
 
-        long balancePaise = -1L;
-        Matcher balanceMatcher = BALANCE.matcher(normalized);
-        if (balanceMatcher.find()) {
-            try {
-                balancePaise = toPaise(balanceMatcher.group(1));
-            } catch (RuntimeException ignored) {
-                balancePaise = -1L;
-            }
+        boolean explicitDebit = DEBIT_TERMS.matcher(normalized).find();
+        boolean accountCredit = CREDIT_TERMS.matcher(normalized).find();
+        boolean successfulRail = RAIL_SUCCESS.matcher(normalized).find();
+
+        // Explicit debit wording wins over recipient-side phrases such as
+        // "credited to VPA". A rail success message is a debit only when no
+        // account-credit wording was found.
+        String direction;
+        if (explicitDebit) {
+            direction = DEBIT;
+        } else if (accountCredit) {
+            direction = CREDIT;
+        } else if (successfulRail) {
+            direction = DEBIT;
+        } else {
+            return null;
         }
 
-        String direction = isCredit ? CREDIT : DEBIT;
+        long balancePaise = extractAvailableBalancePaise(normalized);
         String paymentMode = paymentMode(normalized);
         String merchant = MerchantCatalog.match(normalized);
         if (merchant.isEmpty()) merchant = extractMerchant(normalized);
@@ -128,6 +132,90 @@ public final class SmsTransactionParser {
         return new ParsedTransaction(amountPaise, balancePaise,
                 transactionDate(normalized, receivedDate), direction, merchant,
                 category, paymentMode, confidence, fingerprint);
+    }
+
+    /**
+     * Chooses the money movement amount, not the first currency value in the SMS.
+     * Explicit balance fields are excluded before transaction-context scoring.
+     */
+    private static long extractTransactionAmountPaise(String body) {
+        Matcher amountMatcher = AMOUNT.matcher(body);
+        String bestAmount = null;
+        int bestScore = Integer.MIN_VALUE;
+
+        while (amountMatcher.find()) {
+            if (insideBalanceField(body, amountMatcher.start(), amountMatcher.end())) continue;
+
+            String context = sentenceContext(body, amountMatcher.start(), amountMatcher.end());
+            boolean hasTransactionContext = TRANSACTION_CONTEXT.matcher(context).find();
+            if (!hasTransactionContext && BALANCE.matcher(context).find()) continue;
+
+            int score = hasTransactionContext ? 10 : 0;
+            if (DEBIT_TERMS.matcher(context).find() || CREDIT_TERMS.matcher(context).find()) {
+                score += 4;
+            }
+            if (score > bestScore) {
+                bestScore = score;
+                bestAmount = amountMatcher.group(1);
+            }
+        }
+
+        if (bestAmount != null) {
+            try {
+                return toPaise(bestAmount);
+            } catch (RuntimeException ignored) {
+                return 0L;
+            }
+        }
+
+        Matcher bare = BARE_TRANSACTION_AMOUNT.matcher(body);
+        if (bare.find()) {
+            try {
+                return toPaise(bare.group(1));
+            } catch (RuntimeException ignored) {
+                return 0L;
+            }
+        }
+        return 0L;
+    }
+
+    private static boolean insideBalanceField(String body, int start, int end) {
+        Matcher balance = BALANCE.matcher(body);
+        while (balance.find()) {
+            if (start >= balance.start() && end <= balance.end()) return true;
+        }
+        return false;
+    }
+
+    private static String sentenceContext(String body, int start, int end) {
+        int left = 0;
+        for (int i = start - 1; i >= 0; i--) {
+            char c = body.charAt(i);
+            if (c == '.' || c == ';' || c == '|' || c == '\\n' || c == '\\r') {
+                left = i + 1;
+                break;
+            }
+        }
+
+        int right = body.length();
+        for (int i = end; i < body.length(); i++) {
+            char c = body.charAt(i);
+            if (c == '.' || c == ';' || c == '|' || c == '\\n' || c == '\\r') {
+                right = i;
+                break;
+            }
+        }
+        return body.substring(left, right);
+    }
+
+    private static long extractAvailableBalancePaise(String body) {
+        Matcher matcher = BALANCE.matcher(body);
+        if (!matcher.find()) return -1L;
+        try {
+            return toPaise(matcher.group(1));
+        } catch (RuntimeException ignored) {
+            return -1L;
+        }
     }
 
     private static boolean isBankLikeSender(String sender) {
@@ -145,7 +233,13 @@ public final class SmsTransactionParser {
         if (!matcher.find()) return fallback;
         try {
             int day = Integer.parseInt(matcher.group(1));
-            int month = Integer.parseInt(matcher.group(2));
+            String monthText = matcher.group(2);
+            int month = monthText.matches("\\d{1,2}")
+                    ? Integer.parseInt(monthText)
+                    : java.time.Month.from(
+                            java.time.format.DateTimeFormatter.ofPattern("MMM", Locale.ENGLISH)
+                                    .parse(monthText)
+                    ).getValue();
             int year = Integer.parseInt(matcher.group(3));
             if (year < 100) year += 2000;
             return LocalDate.of(year, month, day);
