@@ -118,6 +118,56 @@ public final class TransactionNotificationAccess {
                 || value.contains("au0101");
     }
 
+    /**
+     * Content-first filter: app package names are hints, never a requirement.
+     * It inspects only enough in-memory preview text to decide whether this looks
+     * like an actual money movement; unrelated notifications are discarded.
+     */
+    public static boolean isLikelyFinancialNotification(
+            String packageName, String title, String body
+    ) {
+        String text = ((title == null ? "" : title) + " "
+                + (body == null ? "" : body)).toLowerCase(Locale.ENGLISH);
+        if (text.trim().isEmpty()) return false;
+
+        boolean hasAmount = text.matches("(?s).*(?:₹|\\binr\\b|\\brs\\.?)\\s*[-−]?\\s*[0-9][0-9,]*(?:\\.[0-9]{1,2})?.*");
+        if (!hasAmount) return false;
+
+        boolean accountOrRailContext = containsAny(text,
+                "bank", "a/c", "account", "upi", "imps", "neft", "rtgs",
+                "pos", "atm", "debit card", "credit card", "wallet",
+                "transaction id", "transaction", "txn", "avl bal",
+                "available balance", "ledger balance", "card ending",
+                "card xx", "vpa", "ifsc");
+        // Generic chat such as "I spent Rs 100" is not enough on its own.
+        boolean explicitBankMovement = text.matches("(?s).*(?:\\bdebited\\b|\\bdeducted\\b|"
+                + "\\bwithdrawn\\b|\\bwithdrawal\\b|\\bcredited\\b|"
+                + "\\brefunded\\b|\\bcashback\\b|\\brefund\\b).*");
+        boolean completedPayTo = text.matches("(?s).*(?:paid|sent|transferred|payment|purchase)"
+                + ".{0,40}\\b(?:to|at)\\b.{2,64}(?:success|completed|successfully|upi|"
+                + "payment|transaction).*");
+        boolean knownFinancialApp = isRecognizedFinancePackage(
+                packageName == null ? "" : packageName.toLowerCase(Locale.ENGLISH)
+        );
+        boolean signedBankPreview = text.matches("(?s).*(?:bank|icici|hdfc|sbi|axis|kotak|"
+                + "idfc|federal|canara|pnb|union bank|yes bank).*(?:[-−]\\s*(?:₹|inr|rs\\.?)).*")
+                || text.matches("(?s).*(?:[-−]\\s*(?:₹|inr|rs\\.?)).*(?:bank|icici|hdfc|"
+                + "sbi|axis|kotak|idfc|federal|canara|pnb|union bank|yes bank).*");
+
+        return accountOrRailContext || explicitBankMovement || completedPayTo
+                || (knownFinancialApp && (explicitBankMovement
+                || text.contains("paid") || text.contains("received")
+                || text.contains("transfer") || text.contains("payment")))
+                || signedBankPreview;
+    }
+
+    private static boolean containsAny(String value, String... cues) {
+        for (String cue : cues) {
+            if (value.contains(cue)) return true;
+        }
+        return false;
+    }
+
     /** Keeps ordinary personal SMS out of the finance parser. */
     public static boolean isLikelyFinancialSms(String title, String body) {
         String value = ((title == null ? "" : title) + " "
@@ -142,7 +192,7 @@ public final class TransactionNotificationAccess {
         if (!SmsTransactionService.isEnabled(preferences)) {
             return "Access is granted · enable tracking to start importing supported payment alerts.";
         }
-        return "Connected · monitoring supported messaging, bank and UPI notifications on this phone.";
+        return "Connected · checking financial transaction previews across notification sources on this phone.";
     }
 
     public static Intent settingsIntent() {

@@ -5132,8 +5132,8 @@ public class MainActivity extends Activity {
                 + lastParsed
                 + "\nLast result: " + lastResult;
 
-        String disclosure = "NextBell watches notification previews from supported messaging, bank "
-                + "and UPI apps after you explicitly enable Android notification access. Matching "
+        String disclosure = "NextBell checks notification previews across apps for bank, card, wallet "
+                + "and UPI money movements after you explicitly enable Android notification access. Matching "
                 + "transaction details are saved on this phone; notification text is not retained "
                 + "or uploaded. This does not scan old SMS messages. Your bank or messaging app "
                 + "must show transaction details in its notifications, and notifications hidden "

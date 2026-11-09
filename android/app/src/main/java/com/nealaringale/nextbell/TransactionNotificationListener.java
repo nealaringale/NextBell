@@ -16,7 +16,7 @@ import java.time.ZoneId;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-/** Captures supported payment/messaging notification previews after explicit user access. */
+/** Captures financial transaction previews from notification sources after explicit user access. */
 public final class TransactionNotificationListener extends NotificationListenerService {
     private static final ZoneId INDIA = ZoneId.of("Asia/Kolkata");
     private static final ExecutorService WORKER = Executors.newSingleThreadExecutor(task -> {
@@ -55,8 +55,7 @@ public final class TransactionNotificationListener extends NotificationListenerS
     private void handleNotification(StatusBarNotification sbn) {
         if (sbn == null || sbn.getNotification() == null) return;
         String packageName = sbn.getPackageName();
-        if (!TransactionNotificationAccess.isSupportedPackage(packageName)
-                || getPackageName().equals(packageName)) return;
+        if (getPackageName().equals(packageName)) return;
 
         SharedPreferences preferences = getSharedPreferences(
                 SmsTransactionService.PREFS_NAME, MODE_PRIVATE
@@ -70,7 +69,8 @@ public final class TransactionNotificationListener extends NotificationListenerS
 
         String title = value(extras.getCharSequence(Notification.EXTRA_TITLE));
         String body = collectBody(extras);
-        if (body.isEmpty()) return;
+        if (body.isEmpty() || !TransactionNotificationAccess.isLikelyFinancialNotification(
+                packageName, title, body)) return;
 
         SmsTransactionService.recordNotificationSeen(preferences, packageName);
         long postedAt = sbn.getPostTime() > 0L ? sbn.getPostTime() : System.currentTimeMillis();
@@ -114,6 +114,7 @@ public final class TransactionNotificationListener extends NotificationListenerS
         append(body, extras.getCharSequence(Notification.EXTRA_SUMMARY_TEXT));
         append(body, extras.getCharSequence(Notification.EXTRA_INFO_TEXT));
         append(body, extras.getCharSequence(Notification.EXTRA_TITLE_BIG));
+        append(body, extras.getCharSequence(Notification.EXTRA_CONVERSATION_TITLE));
 
         CharSequence[] textLines = extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES);
         if (textLines != null) {

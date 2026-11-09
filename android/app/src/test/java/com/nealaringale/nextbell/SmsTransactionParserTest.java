@@ -12,6 +12,78 @@ public class SmsTransactionParserTest {
     private static final LocalDate RECEIVED = LocalDate.of(2026, 11, 7);
 
     @Test
+    public void parsesBankDebitFromAnUnlistedNotificationPackage() {
+        SmsTransactionParser.ParsedTransaction parsed = SmsTransactionParser.parseNotification(
+                "com.vendor.smsclient",
+                "ICICI Bank",
+                "Your A/c XX702 has been debited by INR 1,250.00 at Local Cafe.",
+                RECEIVED
+        );
+
+        assertNotNull(parsed);
+        assertEquals(125_000L, parsed.amountPaise);
+        assertEquals(SmsTransactionParser.DEBIT, parsed.direction);
+        assertEquals("Cafe", parsed.merchant);
+        assertEquals("Food & Drinks", parsed.category);
+    }
+
+    @Test
+    public void parsesGenericPaymentNotificationFromUnknownAppPackage() {
+        SmsTransactionParser.ParsedTransaction parsed = SmsTransactionParser.parseNotification(
+                "com.example.notification.wrapper",
+                "Payment successful",
+                "You paid Rs 89.00 to Cafe using UPI successfully.",
+                RECEIVED
+        );
+
+        assertNotNull(parsed);
+        assertEquals(8_900L, parsed.amountPaise);
+        assertEquals(SmsTransactionParser.DEBIT, parsed.direction);
+        assertEquals("Cafe", parsed.merchant);
+    }
+
+    @Test
+    public void parsesCardSpendNotificationWithSpentOnMerchantWording() {
+        SmsTransactionParser.ParsedTransaction parsed = SmsTransactionParser.parseNotification(
+                "com.unknown.card.alerts",
+                "Card transaction",
+                "INR 456.75 spent on Amazon using your card.",
+                RECEIVED
+        );
+
+        assertNotNull(parsed);
+        assertEquals(45_675L, parsed.amountPaise);
+        assertEquals(SmsTransactionParser.DEBIT, parsed.direction);
+        assertEquals("Amazon", parsed.merchant);
+        assertEquals("Shopping", parsed.category);
+    }
+
+    @Test
+    public void parsesIncomingCreditFromUnknownNotificationSource() {
+        SmsTransactionParser.ParsedTransaction parsed = SmsTransactionParser.parseNotification(
+                "com.unknown.sms.wrapper",
+                "Bank credit",
+                "INR 2,000.00 credited to your account from Rahul.",
+                RECEIVED
+        );
+
+        assertNotNull(parsed);
+        assertEquals(200_000L, parsed.amountPaise);
+        assertEquals(SmsTransactionParser.CREDIT, parsed.direction);
+        assertEquals("Rahul", parsed.merchant);
+    }
+
+    @Test
+    public void rejectsUnrelatedPersonalPaidMessageFromUnknownApp() {
+        assertNull(SmsTransactionParser.parseNotification(
+                "com.unknown.sms.wrapper",
+                "Message from friend",
+                "I paid Rs 100 for lunch today.",
+                RECEIVED
+        ));
+    }
+
+    @Test
     public void parsesTruecallerSignedAmountPreviewWhenSmsBodyIsHidden() {
         SmsTransactionParser.ParsedTransaction parsed = SmsTransactionParser.parseNotification(
                 "com.truecaller",

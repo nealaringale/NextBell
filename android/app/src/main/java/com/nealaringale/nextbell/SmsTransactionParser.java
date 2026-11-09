@@ -26,8 +26,9 @@ public final class SmsTransactionParser {
                     + "(?:₹|INR|Rs\\.?\\s*)?\\s*([0-9][0-9,]*(?:\\.[0-9]{1,2})?)"
     );
     private static final Pattern BARE_TRANSACTION_AMOUNT = Pattern.compile(
-            "(?i)\\b(?:debited|credited|deducted|withdrawn)\\s+(?:by|of)\\s+"
-                    + "([0-9][0-9,]*(?:\\.[0-9]{1,2})?)\\b"
+            "(?i)\\b(?:debited|credited|deducted|withdrawn|spent|charged)\\s+"
+                    + "(?:by|of|with|for|amount(?:\\s+of)?)\\s+"
+                    + "(?:₹|INR|Rs\\.?\\s*)?\\s*([0-9][0-9,]*(?:\\.[0-9]{1,2})?)\\b"
     );
     private static final Pattern EXPLICIT_DATE = Pattern.compile(
             "(?i)(?:on|dated|txn(?:\\s+date)?)\\s*[:\\-]?\\s*"
@@ -36,14 +37,15 @@ public final class SmsTransactionParser {
     // "credited to VPA" describes the UPI payee, not money credited to the sender's account.
     private static final Pattern CREDIT_TERMS = Pattern.compile(
             "(?i)\\b(?:refund(?:ed)?|reversal|reversed|cashback|credit\\s+received|"
-                    + "payment\\s+received|you\\s+received|(?:amount|funds|money)\\s+credited|"
+                    + "payment\\s+received|you\\s+received|received\\s+from|"
+                    + "(?:amount|funds|money)\\s+credited|credited\\s+with|"
                     + "credit(?:ed)?\\s+(?:(?:to|into)\\s+)?(?:(?:your|my|the)\\s+)?(?:account|a/c)|"
                     + "(?:(?:your|my|the)\\s+)?account\\s+(?:has\\s+been\\s+)?credited|"
                     + "received\\s+(?:into|in)\\s+(?:(?:your|my|the)\\s+)?(?:account|a/c)|"
                     + "deposit(?:ed)?\\s+(?:into|to)\\s+(?:(?:your|my|the)\\s+)?(?:account|a/c))\\b"
     );
     private static final Pattern DEBIT_TERMS = Pattern.compile(
-            "(?i)\\b(?:debited|deducted|withdrawn|withdrawal|spent|purchase|sent|"
+            "(?i)\\b(?:debited|debit|deducted|withdrawn|withdrawal|spent|purchase|purchased|sent|charged|"
                     + "paid|transfer\\s+to|transferred\\s+to)\\b"
     );
     private static final Pattern RAIL_SUCCESS = Pattern.compile(
@@ -54,13 +56,20 @@ public final class SmsTransactionParser {
             "(?i)\\b(?:failed|failure|declined|unsuccessful|rejected|pending|not processed)\\b"
     );
     private static final Pattern TRANSACTION_CONTEXT = Pattern.compile(
-            "(?i)\\b(?:debited|debit|deducted|withdrawn|withdrawal|spent|purchase|payment|"
+            "(?i)\\b(?:debited|debit|deducted|withdrawn|withdrawal|spent|purchase|purchased|paid|charged|payment|"
                     + "transfer|transferred|sent|received|credited|refund|cashback|deposit|txn|transaction)\\b"
     );
-    private static final Pattern MERCHANT = Pattern.compile(
-            "(?i)\\b(?:at|to|merchant|towards)\\s+(.{2,56}?)"
+    private static final Pattern DEBIT_MERCHANT = Pattern.compile(
+            "(?i)\\b(?:(?:paid|sent|transferred|transfer|payment|purchase)\\b.{0,40}?\\bto\\b|"
+                    + "(?:merchant(?:\\s+name)?|towards|at|spent\\s+at|spent\\s+on|"
+                    + "purchase\\s+at|to))\\s+(.{2,64}?)"
                     + "(?=\\s+(?:on|ref|upi|txn|transaction|avl|available|balance|"
-                    + "a/c|ac|from|using|via)\\b|[,.;]|$)"
+                    + "a/c|ac|from|using|via|through|success|completed|for|rrn|utr)\\b|[,.;]|$)"
+    );
+    private static final Pattern CREDIT_COUNTERPARTY = Pattern.compile(
+            "(?i)\\b(?:received\\s+from|credited\\s+by|from)\\s+(.{2,64}?)"
+                    + "(?=\\s+(?:on|ref|upi|txn|transaction|avl|available|balance|"
+                    + "a/c|ac|using|via|rrn|utr)\\b|[,.;]|$)"
     );
 
     public static final String DEBIT = "DEBIT";
@@ -101,45 +110,45 @@ public final class SmsTransactionParser {
     /** Parses a transaction preview only when it came from a supported messaging/payment app. */
     public static ParsedTransaction parseNotification(String packageName, String title,
                                                        String body, LocalDate receivedDate) {
-        if (!TransactionNotificationAccess.isSupportedPackage(packageName)
-                || body == null || body.trim().isEmpty() || receivedDate == null) return null;
-        if (TransactionNotificationAccess.isMessagingPackage(packageName)
-                && !TransactionNotificationAccess.isLikelyFinancialSms(title, body)) return null;
+        if (body == null || body.trim().isEmpty() || receivedDate == null
+                || !TransactionNotificationAccess.isLikelyFinancialNotification(
+                        packageName, title, body)) return null;
         String cleanTitle = title == null ? "" : title.trim();
-        String sender = packageName + "|" + cleanTitle;
+        String sender = "PAYMENT_NOTIFICATION";
         String message = cleanTitle.isEmpty() ? body : cleanTitle + ". " + body;
         ParsedTransaction parsed = parseInternal(sender, message, receivedDate, true);
         if (parsed == null) return null;
 
-        // Never mistake the bank name for the merchant. If the notification omits
-        // the payee, keep the debit with an honest unknown-merchant label.
-        if (parsed.merchant.isEmpty()) {
-            return new ParsedTransaction(parsed.amountPaise, parsed.availableBalancePaise,
-                    parsed.date, parsed.direction, "Unidentified merchant",
-                    parsed.category, parsed.paymentMode, 0.60f, parsed.fingerprint);
-        }
-        return parsed;
+        String merchant = parsed.merchant;
+        if (merchant.isEmpty()) merchant = "Unidentified merchant";
+        return new ParsedTransaction(parsed.amountPaise, parsed.availableBalancePaise,
+                parsed.date, parsed.direction, merchant, parsed.category,
+                parsed.paymentMode, parsed.confidence, parsed.fingerprint);
     }
 
     /** Returns a safe, non-sensitive explanation for why a notification was not imported. */
     public static String notificationFailureReason(String packageName, String title,
                                                    String body, LocalDate receivedDate) {
-        if (!TransactionNotificationAccess.isSupportedPackage(packageName)) {
-            return "Unsupported notification source";
-        }
         if (body == null || body.trim().isEmpty() || receivedDate == null) {
             return "Notification preview contains no readable message text";
-        }
-        if (TransactionNotificationAccess.isMessagingPackage(packageName)
-                && !TransactionNotificationAccess.isLikelyFinancialSms(title, body)) {
-            return "No bank or payment keywords in the message preview";
         }
         String cleanTitle = title == null ? "" : title.trim();
         String message = (cleanTitle.isEmpty() ? "" : cleanTitle + ". ") + body;
         if (FAILED.matcher(message).find()) return "Payment is failed, declined or pending";
+
         if (extractSignedDebitAmountPaise(message) <= 0L
                 && extractTransactionAmountPaise(message) <= 0L) {
-            return "Amount not present in the notification preview";
+            String lower = message.toLowerCase(Locale.ENGLISH);
+            boolean bankContext = lower.contains("bank") || lower.contains("account")
+                    || lower.contains("a/c") || lower.contains("upi")
+                    || lower.contains("debited") || lower.contains("credited")
+                    || lower.contains("transaction") || lower.contains("card");
+            return bankContext ? "Amount not present in the notification preview"
+                    : "Preview does not contain enough bank or payment evidence";
+        }
+        if (!TransactionNotificationAccess.isLikelyFinancialNotification(
+                packageName, title, body)) {
+            return "Preview does not contain enough bank or payment evidence";
         }
         boolean hasDirection = DEBIT_TERMS.matcher(message).find()
                 || CREDIT_TERMS.matcher(message).find()
@@ -190,7 +199,7 @@ public final class SmsTransactionParser {
         long balancePaise = extractAvailableBalancePaise(normalized);
         String paymentMode = paymentMode(normalized);
         String merchant = MerchantCatalog.match(normalized);
-        if (merchant.isEmpty()) merchant = extractMerchant(normalized);
+        if (merchant.isEmpty()) merchant = extractMerchant(normalized, direction);
         String category = MerchantCatalog.categoryFor(normalized, merchant, direction);
         String fingerprint = fingerprint(sender, normalized);
         float confidence = merchant.isEmpty() ? 0.72f : 0.92f;
@@ -341,13 +350,20 @@ public final class SmsTransactionParser {
         return "Bank Transfer";
     }
 
-    private static String extractMerchant(String body) {
-        Matcher matcher = MERCHANT.matcher(body);
+    private static String extractMerchant(String body, String direction) {
+        Pattern sourcePattern = CREDIT.equals(direction) ? CREDIT_COUNTERPARTY : DEBIT_MERCHANT;
+        Matcher matcher = sourcePattern.matcher(body);
         if (!matcher.find()) return "";
-        String value = matcher.group(1).replaceAll("(?i)\\b(?:a/c|ac|account)\\b.*$", "")
+        String value = matcher.group(1)
+                .replaceAll("(?i)\\b(?:a/c|ac|account|vpa|upi id|reference|ref no|rrn|utr)\\b.*$", "")
                 .replaceAll("[.\\s]+$", "").trim();
-        if (value.length() > 40 || value.matches("(?i)your account|the account|account")) return "";
-        return value;
+        value = value.replaceAll("(?i)^(?:your|my|the)\\s+", "").trim();
+        if (value.length() > 40
+                || value.matches("(?i)your account|the account|account|bank account|"
+                + "account|a/c|upi|payment|transaction|successful|successfully")
+                || value.matches("(?i)(?:rs\\.?|inr|₹).*")) return "";
+        if (value.contains("@")) value = value.substring(0, value.indexOf('@'));
+        return value.replaceAll("[^A-Za-z0-9&' ._-]", "").trim();
     }
 
     private static String fingerprint(String sender, String normalizedBody) {
