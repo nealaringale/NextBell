@@ -69,8 +69,9 @@ public final class TransactionNotificationListener extends NotificationListenerS
 
         String title = value(extras.getCharSequence(Notification.EXTRA_TITLE));
         String body = collectBody(extras);
-        if (body.isEmpty() || !TransactionNotificationAccess.isLikelyFinancialNotification(
-                packageName, title, body)) return;
+        if ((title.isEmpty() && body.isEmpty())
+                || !TransactionNotificationAccess.isLikelyFinancialNotification(
+                        packageName, title, body)) return;
 
         SmsTransactionService.recordNotificationSeen(preferences, packageName);
         long postedAt = sbn.getPostTime() > 0L ? sbn.getPostTime() : System.currentTimeMillis();
