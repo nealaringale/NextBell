@@ -12,6 +12,46 @@ public class SmsTransactionParserTest {
     private static final LocalDate RECEIVED = LocalDate.of(2026, 11, 7);
 
     @Test
+    public void parsesTruecallerSignedAmountPreviewWhenSmsBodyIsHidden() {
+        SmsTransactionParser.ParsedTransaction parsed = SmsTransactionParser.parseNotification(
+                "com.truecaller",
+                "ICICI Bank",
+                "- Rs1.00",
+                RECEIVED
+        );
+
+        assertNotNull(parsed);
+        assertEquals(100L, parsed.amountPaise);
+        assertEquals(SmsTransactionParser.DEBIT, parsed.direction);
+        assertEquals("Unidentified merchant", parsed.merchant);
+        assertEquals("Other", parsed.category);
+    }
+
+    @Test
+    public void extractsMerchantWhenTruecallerShowsFullUpiText() {
+        SmsTransactionParser.ParsedTransaction parsed = SmsTransactionParser.parseNotification(
+                "com.truecaller",
+                "ICICI Bank",
+                "ICICI Bank account debited by Rs 240.00 for UPI payment to Swiggy",
+                RECEIVED
+        );
+
+        assertNotNull(parsed);
+        assertEquals(24_000L, parsed.amountPaise);
+        assertEquals(SmsTransactionParser.DEBIT, parsed.direction);
+        assertEquals("Swiggy", parsed.merchant);
+        assertEquals("Food & Drinks", parsed.category);
+    }
+
+    @Test
+    public void explainsNotificationWithoutVisibleAmountOrDirection() {
+        assertEquals("Amount not present in the notification preview",
+                SmsTransactionParser.notificationFailureReason(
+                        "com.truecaller", "ICICI Bank", "Bank alert received", RECEIVED
+                ));
+    }
+
+    @Test
     public void ignoresOrdinaryPersonalMessagesFromSmsApps() {
         assertNull(SmsTransactionParser.parseNotification(
                 "com.google.android.apps.messaging",

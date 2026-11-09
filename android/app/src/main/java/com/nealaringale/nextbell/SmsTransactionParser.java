@@ -14,6 +14,12 @@ public final class SmsTransactionParser {
     private static final Pattern AMOUNT = Pattern.compile(
             "(?i)(?:₹|\\bINR\\b|\\bRs\\.?\\s*)\\s*([0-9][0-9,]*(?:\\.[0-9]{1,2})?)"
     );
+    // Truecaller and some bank notification templates render the amount as "- Rs1.00"
+    // and omit the underlying SMS text from the standard notification extras.
+    private static final Pattern SIGNED_DEBIT_AMOUNT = Pattern.compile(
+            "(?i)(?:^|[\\s(])[-−]\\s*(?:₹|\\bINR\\b|\\bRs\\.?\\s*)\\s*"
+                    + "([0-9][0-9,]*(?:\\.[0-9]{1,2})?)"
+    );
     private static final Pattern BALANCE = Pattern.compile(
             "(?i)(?:(?:available|avl\\.?|closing|current|ledger|account|acct|a/c)\\s+)?"
                     + "(?:balance|bal\\.?)(?:\\s+(?:is|of))?\\s*[:=\\-]?\\s*"
@@ -102,7 +108,45 @@ public final class SmsTransactionParser {
         String cleanTitle = title == null ? "" : title.trim();
         String sender = packageName + "|" + cleanTitle;
         String message = cleanTitle.isEmpty() ? body : cleanTitle + ". " + body;
-        return parseInternal(sender, message, receivedDate, true);
+        ParsedTransaction parsed = parseInternal(sender, message, receivedDate, true);
+        if (parsed == null) return null;
+
+        // Never mistake the bank name for the merchant. If the notification omits
+        // the payee, keep the debit with an honest unknown-merchant label.
+        if (parsed.merchant.isEmpty()) {
+            return new ParsedTransaction(parsed.amountPaise, parsed.availableBalancePaise,
+                    parsed.date, parsed.direction, "Unidentified merchant",
+                    parsed.category, parsed.paymentMode, 0.60f, parsed.fingerprint);
+        }
+        return parsed;
+    }
+
+    /** Returns a safe, non-sensitive explanation for why a notification was not imported. */
+    public static String notificationFailureReason(String packageName, String title,
+                                                   String body, LocalDate receivedDate) {
+        if (!TransactionNotificationAccess.isSupportedPackage(packageName)) {
+            return "Unsupported notification source";
+        }
+        if (body == null || body.trim().isEmpty() || receivedDate == null) {
+            return "Notification preview contains no readable message text";
+        }
+        if (TransactionNotificationAccess.isMessagingPackage(packageName)
+                && !TransactionNotificationAccess.isLikelyFinancialSms(title, body)) {
+            return "No bank or payment keywords in the message preview";
+        }
+        String cleanTitle = title == null ? "" : title.trim();
+        String message = (cleanTitle.isEmpty() ? "" : cleanTitle + ". ") + body;
+        if (FAILED.matcher(message).find()) return "Payment is failed, declined or pending";
+        if (extractSignedDebitAmountPaise(message) <= 0L
+                && extractTransactionAmountPaise(message) <= 0L) {
+            return "Amount not present in the notification preview";
+        }
+        boolean hasDirection = DEBIT_TERMS.matcher(message).find()
+                || CREDIT_TERMS.matcher(message).find()
+                || RAIL_SUCCESS.matcher(message).find()
+                || extractSignedDebitAmountPaise(message) > 0L;
+        if (!hasDirection) return "Amount found, but debit or credit type is missing";
+        return "Transaction text could not be converted";
     }
 
     private static ParsedTransaction parseInternal(String sender, String body,
@@ -119,10 +163,13 @@ public final class SmsTransactionParser {
             return null;
         }
 
-        long amountPaise = extractTransactionAmountPaise(normalized);
+        long signedDebitAmountPaise = extractSignedDebitAmountPaise(normalized);
+        long amountPaise = signedDebitAmountPaise > 0L
+                ? signedDebitAmountPaise : extractTransactionAmountPaise(normalized);
         if (amountPaise <= 0L) return null;
 
-        boolean explicitDebit = DEBIT_TERMS.matcher(normalized).find();
+        boolean explicitDebit = signedDebitAmountPaise > 0L
+                || DEBIT_TERMS.matcher(normalized).find();
         boolean accountCredit = CREDIT_TERMS.matcher(normalized).find();
         boolean successfulRail = RAIL_SUCCESS.matcher(normalized).find();
 
@@ -157,6 +204,16 @@ public final class SmsTransactionParser {
      * Chooses the money movement amount, not the first currency value in the SMS.
      * Explicit balance fields are excluded before transaction-context scoring.
      */
+    private static long extractSignedDebitAmountPaise(String body) {
+        Matcher matcher = SIGNED_DEBIT_AMOUNT.matcher(body);
+        if (!matcher.find()) return 0L;
+        try {
+            return toPaise(matcher.group(1));
+        } catch (RuntimeException ignored) {
+            return 0L;
+        }
+    }
+
     private static long extractTransactionAmountPaise(String body) {
         Matcher amountMatcher = AMOUNT.matcher(body);
         String bestAmount = null;

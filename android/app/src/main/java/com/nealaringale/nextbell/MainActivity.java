@@ -1,6 +1,7 @@
 package com.nealaringale.nextbell;
 
 import android.Manifest;
+import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.DatePickerDialog;
@@ -8,6 +9,8 @@ import android.app.Dialog;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.content.Intent;
+import android.content.IntentFilter;
+import android.content.BroadcastReceiver;
 import android.content.SharedPreferences;
 import android.content.ActivityNotFoundException;
 import android.content.pm.PackageManager;
@@ -136,6 +139,19 @@ public class MainActivity extends Activity {
     private String selectedScreen = "home";
     private Runnable refreshRunnable;
     private boolean openedNotificationSettings;
+    private boolean paymentAlertReceiverRegistered;
+    private final BroadcastReceiver paymentAlertReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if ("expenses".equals(selectedScreen)) {
+                buildExpensesScreen();
+                updateBottomNav();
+            } else if ("settings".equals(selectedScreen)) {
+                buildSettingsScreen();
+                updateBottomNav();
+            }
+        }
+    };
     private android.animation.ObjectAnimator heroPulseAnimator;
     private String lastHeroState = "";
 
@@ -199,6 +215,30 @@ public class MainActivity extends Activity {
             weekSelectedDay = todayNameOrMonday();
             openApp();
         }
+    }
+
+    @Override
+    @SuppressLint("UnspecifiedRegisterReceiverFlag")
+    protected void onStart() {
+        super.onStart();
+        if (!paymentAlertReceiverRegistered) {
+            IntentFilter filter = new IntentFilter(SmsTransactionService.ACTION_NOTIFICATION_PROCESSED);
+            if (Build.VERSION.SDK_INT >= 33) {
+                registerReceiver(paymentAlertReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
+            } else {
+                registerReceiver(paymentAlertReceiver, filter);
+            }
+            paymentAlertReceiverRegistered = true;
+        }
+    }
+
+    @Override
+    protected void onStop() {
+        if (paymentAlertReceiverRegistered) {
+            unregisterReceiver(paymentAlertReceiver);
+            paymentAlertReceiverRegistered = false;
+        }
+        super.onStop();
     }
 
     @Override
@@ -5064,6 +5104,24 @@ public class MainActivity extends Activity {
         long seenCount = preferences.getLong(
                 SmsTransactionService.KEY_NOTIFICATION_SEEN_COUNT, 0L
         );
+        long lastAmount = preferences.getLong(
+                SmsTransactionService.KEY_LAST_NOTIFICATION_AMOUNT, 0L
+        );
+        String lastDirection = preferences.getString(
+                SmsTransactionService.KEY_LAST_NOTIFICATION_DIRECTION, ""
+        );
+        String lastMerchant = preferences.getString(
+                SmsTransactionService.KEY_LAST_NOTIFICATION_MERCHANT, ""
+        );
+        String lastCategory = preferences.getString(
+                SmsTransactionService.KEY_LAST_NOTIFICATION_CATEGORY, ""
+        );
+        String lastParsed = lastAmount > 0L
+                ? "\nLast parsed: " + formatRupees(lastAmount)
+                        + (lastDirection.isEmpty() ? "" : " · " + lastDirection)
+                        + (lastMerchant.isEmpty() ? "" : " · " + lastMerchant)
+                        + (lastCategory.isEmpty() ? "" : " · " + lastCategory)
+                : "\nLast parsed: No amount extracted";
 
         String diagnostics = "Notification access: " + (access ? "GRANTED" : "NOT GRANTED")
                 + "\nTracking: " + (active ? "ON" : enabled ? "WAITING FOR ACCESS" : "OFF")
@@ -5071,6 +5129,7 @@ public class MainActivity extends Activity {
                 + "\nTransactions added: " + importedCount
                 + "\nLast alert: " + lastSeen
                 + (lastPackage.isEmpty() ? "" : " (" + lastPackage + ")")
+                + lastParsed
                 + "\nLast result: " + lastResult;
 
         String disclosure = "NextBell watches notification previews from supported messaging, bank "

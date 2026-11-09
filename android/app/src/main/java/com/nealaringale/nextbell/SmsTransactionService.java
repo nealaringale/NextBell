@@ -23,6 +23,12 @@ public final class SmsTransactionService {
     public static final String KEY_LAST_NOTIFICATION_RESULT = "payment_alert_last_result";
     public static final String KEY_NOTIFICATION_IMPORTED_COUNT = "payment_alert_imported_count";
     public static final String KEY_NOTIFICATION_SEEN_COUNT = "payment_alert_seen_count";
+    public static final String KEY_LAST_NOTIFICATION_AMOUNT = "payment_alert_last_amount_paise";
+    public static final String KEY_LAST_NOTIFICATION_DIRECTION = "payment_alert_last_direction";
+    public static final String KEY_LAST_NOTIFICATION_MERCHANT = "payment_alert_last_merchant";
+    public static final String KEY_LAST_NOTIFICATION_CATEGORY = "payment_alert_last_category";
+    public static final String ACTION_NOTIFICATION_PROCESSED =
+            "com.nealaringale.nextbell.ACTION_PAYMENT_ALERT_PROCESSED";
     private static final int HISTORY_DAYS = 30;
     private static final int MAX_SCAN_MESSAGES = 2_000;
     private static final ZoneId INDIA = ZoneId.of("Asia/Kolkata");
@@ -67,20 +73,54 @@ public final class SmsTransactionService {
         SmsTransactionParser.ParsedTransaction parsed =
                 SmsTransactionParser.parseNotification(packageName, title, body, receivedDate);
         if (parsed == null) {
-            preferences.edit().putString(KEY_LAST_NOTIFICATION_RESULT, "Not a transaction alert").apply();
+            String reason = SmsTransactionParser.notificationFailureReason(
+                    packageName, title, body, receivedDate
+            );
+            preferences.edit()
+                    .putString(KEY_LAST_NOTIFICATION_RESULT, reason)
+                    .putLong(KEY_LAST_NOTIFICATION_AMOUNT, 0L)
+                    .putString(KEY_LAST_NOTIFICATION_DIRECTION, "")
+                    .putString(KEY_LAST_NOTIFICATION_MERCHANT, "")
+                    .putString(KEY_LAST_NOTIFICATION_CATEGORY, "")
+                    .apply();
             return false;
         }
         if (parsed.fingerprint.isEmpty()
                 || ExpenseStore.hasFingerprint(preferences, parsed.fingerprint)) {
-            preferences.edit().putString(KEY_LAST_NOTIFICATION_RESULT, "Duplicate ignored").apply();
+            preferences.edit()
+                    .putString(KEY_LAST_NOTIFICATION_RESULT, "Duplicate ignored")
+                    .putLong(KEY_LAST_NOTIFICATION_AMOUNT, parsed.amountPaise)
+                    .putString(KEY_LAST_NOTIFICATION_DIRECTION, parsed.direction)
+                    .putString(KEY_LAST_NOTIFICATION_MERCHANT, parsed.merchant)
+                    .putString(KEY_LAST_NOTIFICATION_CATEGORY, parsed.category)
+                    .apply();
             return false;
         }
-        ExpenseStore.upsert(preferences, toExpense(preferences, parsed,
-                ExpenseStore.nextId(preferences)));
+
+        ExpenseStore.Expense expense = toExpense(
+                preferences, parsed, ExpenseStore.nextId(preferences), "NOTIFICATION"
+        );
+        ExpenseStore.upsert(preferences, expense);
+        if (!ExpenseStore.hasFingerprint(preferences, parsed.fingerprint)) {
+            preferences.edit()
+                    .putString(KEY_LAST_NOTIFICATION_RESULT, "Save failed: transaction was not persisted")
+                    .apply();
+            return false;
+        }
+
+        long importedCount = preferences.getLong(KEY_NOTIFICATION_IMPORTED_COUNT, 0L) + 1L;
+        String amountText = java.math.BigDecimal.valueOf(parsed.amountPaise, 2)
+                .stripTrailingZeros().toPlainString();
+        String directionText = SmsTransactionParser.CREDIT.equals(parsed.direction)
+                ? "credit" : "debit";
         preferences.edit()
-                .putString(KEY_LAST_NOTIFICATION_RESULT, "Transaction added")
-                .putLong(KEY_NOTIFICATION_IMPORTED_COUNT,
-                        preferences.getLong(KEY_NOTIFICATION_IMPORTED_COUNT, 0L) + 1L)
+                .putString(KEY_LAST_NOTIFICATION_RESULT,
+                        "Added ₹" + amountText + " " + directionText + " · " + parsed.merchant)
+                .putLong(KEY_NOTIFICATION_IMPORTED_COUNT, importedCount)
+                .putLong(KEY_LAST_NOTIFICATION_AMOUNT, parsed.amountPaise)
+                .putString(KEY_LAST_NOTIFICATION_DIRECTION, parsed.direction)
+                .putString(KEY_LAST_NOTIFICATION_MERCHANT, parsed.merchant)
+                .putString(KEY_LAST_NOTIFICATION_CATEGORY, parsed.category)
                 .apply();
         return true;
     }
@@ -91,7 +131,20 @@ public final class SmsTransactionService {
                 .putString(KEY_LAST_NOTIFICATION_PACKAGE, packageName == null ? "" : packageName)
                 .putLong(KEY_NOTIFICATION_SEEN_COUNT,
                         preferences.getLong(KEY_NOTIFICATION_SEEN_COUNT, 0L) + 1L)
-                .putString(KEY_LAST_NOTIFICATION_RESULT, "Checking alert")
+                .putString(KEY_LAST_NOTIFICATION_RESULT, "Reading notification preview")
+                .putLong(KEY_LAST_NOTIFICATION_AMOUNT, 0L)
+                .putString(KEY_LAST_NOTIFICATION_DIRECTION, "")
+                .putString(KEY_LAST_NOTIFICATION_MERCHANT, "")
+                .putString(KEY_LAST_NOTIFICATION_CATEGORY, "")
+                .apply();
+    }
+
+    public static void recordNotificationProcessingError(
+            SharedPreferences preferences, RuntimeException error
+    ) {
+        String kind = error == null ? "Unknown error" : error.getClass().getSimpleName();
+        preferences.edit()
+                .putString(KEY_LAST_NOTIFICATION_RESULT, "Processing error: " + kind)
                 .apply();
     }
 
@@ -110,6 +163,15 @@ public final class SmsTransactionService {
             SmsTransactionParser.ParsedTransaction parsed,
             long id
     ) {
+        return toExpense(preferences, parsed, id, "SMS");
+    }
+
+    private static ExpenseStore.Expense toExpense(
+            SharedPreferences preferences,
+            SmsTransactionParser.ParsedTransaction parsed,
+            long id,
+            String source
+    ) {
         String category = parsed.category;
         if (SmsTransactionParser.DEBIT.equals(parsed.direction)) {
             String learned = ExpenseStore.learnedMerchantCategory(preferences, parsed.merchant);
@@ -117,7 +179,7 @@ public final class SmsTransactionService {
         }
         return new ExpenseStore.Expense(
                 id, parsed.amountPaise, parsed.date, category, "", parsed.paymentMode,
-                parsed.merchant, "SMS", parsed.confidence, parsed.fingerprint,
+                parsed.merchant, source, parsed.confidence, parsed.fingerprint,
                 parsed.direction, parsed.availableBalancePaise
         );
     }

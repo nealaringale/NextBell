@@ -2,6 +2,7 @@ package com.nealaringale.nextbell;
 
 import android.app.Notification;
 import android.content.ComponentName;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.os.Parcelable;
@@ -90,8 +91,14 @@ public final class TransactionNotificationListener extends NotificationListenerS
                             current, capturedPackage, capturedTitle, capturedBody, receivedDate
                     );
                     if (imported) ExpenseDailyAlertReceiver.maybeNotifyNow(this);
-                } catch (RuntimeException ignored) {
-                    // A malformed notification must not terminate the listener.
+                } catch (RuntimeException error) {
+                    SmsTransactionService.recordNotificationProcessingError(
+                            getSharedPreferences(SmsTransactionService.PREFS_NAME, MODE_PRIVATE), error
+                    );
+                } finally {
+                    Intent processed = new Intent(SmsTransactionService.ACTION_NOTIFICATION_PROCESSED);
+                    processed.setPackage(getPackageName());
+                    sendBroadcast(processed);
                 }
             });
         } catch (RuntimeException ignored) {
@@ -105,6 +112,8 @@ public final class TransactionNotificationListener extends NotificationListenerS
         append(body, extras.getCharSequence(Notification.EXTRA_TEXT));
         append(body, extras.getCharSequence(Notification.EXTRA_SUB_TEXT));
         append(body, extras.getCharSequence(Notification.EXTRA_SUMMARY_TEXT));
+        append(body, extras.getCharSequence(Notification.EXTRA_INFO_TEXT));
+        append(body, extras.getCharSequence(Notification.EXTRA_TITLE_BIG));
 
         CharSequence[] textLines = extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES);
         if (textLines != null) {
