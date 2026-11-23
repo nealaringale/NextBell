@@ -130,13 +130,31 @@ jobs:
         env:
           NEXTBELL_GOOGLE_SERVICES_JSON_BASE64: ${{ secrets.NEXTBELL_GOOGLE_SERVICES_JSON_BASE64 }}
         run: |
-          if [ -n "${NEXTBELL_GOOGLE_SERVICES_JSON_BASE64:-}" ]; then
-            printf '%s' "$NEXTBELL_GOOGLE_SERVICES_JSON_BASE64" | base64 --decode > android/app/google-services.json
-            python3 -m json.tool android/app/google-services.json > /dev/null
-            echo "Firebase Android client configuration is ready."
-          else
-            echo "::warning::Firebase Android config is not set. This signed AAB will not include Firebase sign-in/cloud sync."
+          set -euo pipefail
+          if [ -z "${NEXTBELL_GOOGLE_SERVICES_JSON_BASE64:-}" ]; then
+            echo "::error::NEXTBELL_GOOGLE_SERVICES_JSON_BASE64 is required for a full-feature Play release. Configure the Android Firebase client for com.nealaringale.nextbell."
+            exit 1
           fi
+
+          printf '%s' "$NEXTBELL_GOOGLE_SERVICES_JSON_BASE64" | base64 --decode > android/app/google-services.json
+          python3 -m json.tool android/app/google-services.json > /dev/null
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          config = json.loads(Path("android/app/google-services.json").read_text(encoding="utf-8"))
+          expected = "com.nealaringale.nextbell"
+          packages = [
+              client.get("client_info", {}).get("android_client_info", {}).get("package_name")
+              for client in config.get("client", [])
+          ]
+          if expected not in packages:
+              raise SystemExit(
+                  f"Firebase config does not contain the required Android package {expected}. "
+                  f"Found: {packages}"
+              )
+          print("Firebase Android client package matches NextBell.")
+          PY
 
       - name: Prepare and validate Play upload keystore
         env:
