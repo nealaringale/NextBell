@@ -49,7 +49,7 @@ Before production rollout, complete all relevant Play Console forms and listing 
 
 The student app intentionally keeps `READ_SMS` and `RECEIVE_SMS` so the existing opt-in bank-alert parsing and optional inbox-import features are not removed.
 
-Google Play's current SMS policy specifically lists **SMS-based money management** (for example, apps that track and manage a budget) as an eligible use case for `READ_SMS`, `RECEIVE_SMS`, and related SMS permissions. This use case is subject to Play review and approval; inclusion in the table is not automatic approval. In Play Console, submit the SMS permissions declaration and select the closest matching SMS-based money management purpose. Explain that the app:
+Google Play's general rule is that SMS permissions are for apps that are actively registered as the default SMS or Assistant handler. Its separate exceptions table lists **SMS-based money management** (for example, apps that track and manage a budget) as a possible exception for `READ_SMS`, `RECEIVE_SMS`, and related SMS permissions. That exception is not automatic: the use must be a critical core app function, there must be no alternative method, and Google Play reviews and approves each declaration. NextBell is primarily a student planner, so Play may decide that SMS-based money management is not core enough; do not assume the exception will be granted. In Play Console, submit the SMS permissions declaration and select the closest matching SMS-based money management use case only if the app genuinely meets those conditions. Explain that the app:
 
 - Parses transaction alerts on-device only after the student explicitly enables tracking.
 - Offers a separate user-initiated 30-day inbox import.
