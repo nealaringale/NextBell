@@ -63,7 +63,8 @@ The workflow validates and decodes this file into the ignored `android/app/googl
 
 After the four signing secrets are present:
 
-1. Open **Actions → Build NextBell Android Apps → Run workflow**.
+1. Merge the Play Store readiness pull request into `main` so the updated workflow exists on the default branch.
+2. Open **Actions → Build NextBell Android Apps → Run workflow**.
 2. Enter the release version name (for example, `0.6.1`).
 3. Leave version code blank to use the workflow's increasing automatic value, or enter a positive value greater than the last version uploaded to Play Console.
 4. Run the workflow and wait for the `release-aab` job to finish successfully.
