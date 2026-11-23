@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="index,follow">
+  <meta name="theme-color" content="#0b0d12">
+  <title>NextBell Privacy Policy</title>
+  <style>
+    :root { color-scheme: light; font-family: system-ui, -apple-system, Segoe UI, sans-serif; }
+    body { margin: 0; background: #f5f7fb; color: #172033; line-height: 1.65; }
+    main { max-width: 820px; margin: 40px auto; padding: 36px; background: #fff; border: 1px solid #e3e8f0; border-radius: 18px; }
+    h1, h2 { line-height: 1.25; }
+    h1 { margin-top: 0; }
+    a { color: #3158bd; }
+    .date { color: #63708a; }
+    .notice { padding: 14px 16px; background: #fff7e6; border-left: 4px solid #d99a20; border-radius: 8px; }
+    @media (max-width: 640px) { main { margin: 0; padding: 24px 18px; border-radius: 0; } }
+  </style>
+</head>
+<body>
+<main>
+  <h1>NextBell Privacy Policy</h1>
+  <p class="date">Last updated: 23 November 2026</p>
+
+  <p>NextBell is a student timetable, attendance, study-planning and personal expense-tracking app. This policy explains what information the Android app processes, how optional permissions work, and what happens when cloud sync is enabled.</p>
+
+  <h2>Information stored on your device</h2>
+  <p>NextBell stores information you enter or create in the app's private device storage. This may include your name, college roll number, timetable preferences, attendance records, study tasks and deadlines, expense and income records, budgets, recurring-expense settings, themes and app preferences. You can export a readable JSON backup to a location you select. Anyone who obtains that exported file may be able to read its contents, so keep it secure.</p>
+
+  <h2>SMS transaction tracking (optional)</h2>
+  <p>If you choose to enable SMS tracking and grant the Android permissions, NextBell can process incoming bank/payment SMS alerts to identify financial transactions. The optional inbox-import feature uses SMS read access only after you initiate the import. The app processes messages on your device, extracts transaction details such as amount, merchant/sender, date and debit/credit direction, and uses duplicate-detection data to avoid adding the same transaction more than once.</p>
+  <p>NextBell does not save or upload the raw SMS message text. Parsed transaction records are stored locally. If you separately configure and enable Cloud Sync, the transaction records and associated finance data you use in NextBell may be synced to your own authenticated Firebase account as described below. SMS access is optional; manual expense entry remains available.</p>
+
+  <h2>Notification access (optional)</h2>
+  <p>If you separately enable Android notification access, NextBell can inspect notification content from other apps to identify transaction alerts for the expense-tracking feature. This access is optional and is used to process likely financial notifications for your requested transaction tracking. NextBell extracts transaction details for local expense records; it does not upload raw notification text. Parsed transaction records may be synced only if you separately enable Cloud Sync.</p>
+
+  <h2>Optional Firebase Cloud Sync</h2>
+  <p>Cloud Sync is optional. When you configure it and sign in with an email and password, NextBell uses Firebase Authentication and Cloud Firestore to sync app records to the account you sign into. The synced data can include expenses and transaction metadata, attendance sessions and targets, planner tasks, profile and settings, and recurring-expense rules. The Android and web clients are intended to use the same Firebase project and account. Cloud-synced records are associated with your Firebase user account; they are not made public by NextBell.</p>
+  <p>If you do not configure and enable Cloud Sync, the app's student records remain in local app storage, apart from services necessary to deliver Android platform functionality. Firebase cloud sync is not required for the timetable or local app features.</p>
+
+  <h2>How information is used</h2>
+  <p>Information is used to provide the timetable, attendance calculations, study reminders, expense tracking, duplicate detection, user-requested backups and optional cross-device sync. NextBell does not use SMS or notification content for advertising or unrelated profiling, and does not sell personal information.</p>
+
+  <h2>Sharing and service providers</h2>
+  <p>When Cloud Sync is enabled, information is processed by Google Firebase services used for authentication and database storage. Android and Google Play services may also process information as part of normal platform operation. NextBell does not share raw SMS or raw notification text with Firebase.</p>
+
+  <h2>Data security and retention</h2>
+  <p>Local app data is held in the app's private storage. Cloud Sync uses Firebase Authentication and owner-scoped Firestore records. Local records remain on the device until you clear app data or uninstall the app. Cloud-synced records may remain in your Firebase account until they are deleted through the available account/data controls or a deletion request is completed. Keep exported backups secure and delete copies you no longer need.</p>
+
+  <h2>Your choices</h2>
+  <ul>
+    <li>You can use manual expense entry without enabling SMS tracking.</li>
+    <li>You can decline SMS permissions and notification access; related automatic import functionality will then be unavailable, while manual expense entry remains available.</li>
+    <li>You can choose whether to configure Cloud Sync.</li>
+    <li>You can control Android notification and SMS permissions from system settings.</li>
+  </ul>
+
+  <h2>Children's privacy</h2>
+  <p>NextBell is intended for college students and is not designed for children under 13.</p>
+
+  <h2>Account and data deletion</h2>
+  <p>If you created a NextBell Cloud Sync account, you can request deletion of the Firebase Authentication account and associated NextBell Firestore records. Use the <a href="./delete-account.html">NextBell account and data deletion page</a> or the in-app Settings → About &amp; Feedback → Request account &amp; cloud-data deletion link. Signing out only disconnects a device; it does not delete the cloud account or synced records.</p>
+  <p>Deleting the cloud account does not automatically erase local-only records on devices where NextBell is installed or JSON backup files you exported. Clear the app's storage or uninstall NextBell to remove its local app data, and delete exported backup copies separately.</p>
+
+  <h2>Changes to this policy</h2>
+  <p>This policy may be updated when NextBell's features, data practices or legal requirements change. The latest version will be published at this URL with its updated date.</p>
+
+  <h2>Contact</h2>
+  <p>Privacy contact: <a href="mailto:nealaringale@gmail.com">nealaringale@gmail.com</a></p>
+</main>
+</body>
+</html>

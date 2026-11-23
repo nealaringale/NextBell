@@ -1,16 +1,79 @@
-# Stable NextBell Android signing
+# NextBell Android upload signing
 
-The CI workflows can sign the student APK with a stable keystore so one CI build can update an earlier one without removing the app.
+Google Play requires every uploaded Android App Bundle to be signed. NextBell's release workflow uses a persistent **upload key**. Google Play App Signing then manages the app-signing key for distribution.
 
-In the repository's **Settings → Secrets and variables → Actions**, configure all four secrets:
+## Important before creating a key
 
-- `NEXTBELL_KEYSTORE_BASE64`: base64-encoded contents of the existing keystore.
-- `NEXTBELL_KEYSTORE_PASSWORD`: keystore password.
-- `NEXTBELL_KEY_ALIAS`: key alias.
-- `NEXTBELL_KEY_PASSWORD`: key password.
+- If NextBell has already been uploaded to Play Console, reuse the same upload keystore currently registered there. Do not generate a replacement casually; an upload-key reset must be requested through Play Console.
+- If this is the first Play release, create one upload keystore and keep two secure offline backups.
+- Never commit the `.jks` file, passwords, or Base64 contents to GitHub. The repository already ignores `android/app/nextbell-upload.jks`.
 
-The workflow decodes the keystore into an ignored file inside the build checkout and removes it when the runner ends. The key and passwords are never written to the repository. Do not paste them into source files, issues, or logs.
+## Create a new upload key (first Play release only)
 
-If the keystore secret is absent, CI builds with GitHub's temporary debug key. Those APKs can be installed for testing, but later builds may not update them because Android checks the signing certificate. Preserve app data before uninstalling a differently signed build.
+Run this in a secure folder **outside the NextBell Git working tree** with JDK 17 installed. For example, create a private `NextBellSigning` folder under your home directory and run the commands there. Do not put the private `.jks` file inside the repository.
 
-This repository does not create, rotate, or replace signing credentials. Keep a protected backup of the existing keystore before changing its storage.
+```powershell
+keytool -genkeypair -v -keystore nextbell-upload.jks -keyalg RSA -keysize 2048 -validity 10000 -alias nextbell-upload
+```
+
+Choose a strong keystore password and key password and store them securely. Keep the alias exactly as `nextbell-upload`.
+
+Export the public upload certificate for Play Console if requested:
+
+```powershell
+keytool -export -rfc -keystore nextbell-upload.jks -alias nextbell-upload -file nextbell-upload-certificate.pem
+```
+
+The private `.jks` file is the signing key. The `.pem` file is only the public certificate.
+
+## Add GitHub Actions secrets
+
+Open **GitHub → nealaringale/NextBell → Settings → Secrets and variables → Actions** and create:
+
+| Secret | Value |
+|---|---|
+| `NEXTBELL_KEYSTORE_BASE64` | Base64 contents of the `.jks` file |
+| `NEXTBELL_KEYSTORE_PASSWORD` | Keystore password |
+| `NEXTBELL_KEY_ALIAS` | `nextbell-upload` (or your existing key alias) |
+| `NEXTBELL_KEY_PASSWORD` | Key password |
+
+On Windows PowerShell, copy the Base64 value without adding line breaks:
+
+```powershell
+[Convert]::ToBase64String([IO.File]::ReadAllBytes(".\nextbell-upload.jks")) | Set-Clipboard
+```
+
+Paste the clipboard contents into the GitHub secret named `NEXTBELL_KEYSTORE_BASE64`. On macOS/Linux, an equivalent command is:
+
+```sh
+base64 < nextbell-upload.jks | tr -d '\n'
+```
+
+Do not place any password or key material in source files, workflow YAML, issues, logs, or chat messages.
+
+## Required Firebase configuration for the full-feature Play release
+
+To preserve NextBell's existing Firebase email sign-in and Firestore sync in the release AAB, configure this required secret:
+
+- `NEXTBELL_GOOGLE_SERVICES_JSON_BASE64`: Base64 contents of the Android Firebase `google-services.json` for package `com.nealaringale.nextbell`.
+
+The workflow validates and decodes this file into the ignored `android/app/google-services.json` path. The Play release workflow fails if this secret is missing or the JSON does not include package `com.nealaringale.nextbell`. Debug builds may still run without this secret, but a full-feature Play upload requires it.
+
+## Build a Play Store AAB
+
+After the four signing secrets are present:
+
+1. Merge the Play Store readiness pull request into `main` so the updated workflow exists on the default branch.
+2. Open **Actions → Build NextBell Android Apps → Run workflow**.
+2. Enter the release version name (for example, `0.6.1`).
+3. Leave version code blank to use the workflow's increasing automatic value, or enter a positive value greater than the last version uploaded to Play Console.
+4. Run the workflow and wait for the `release-aab` job to finish successfully.
+5. Download the `NextBell-play-release-aab` artifact. The bundle is at `android/app/build/outputs/bundle/release/app-release.aab` inside the build.
+
+Alternatively, push a tag such as `nextbell-v0.6.1`. The tag suffix becomes the version name; the workflow generates the version code.
+
+The Gradle build intentionally fails for `:app:bundleRelease` or `:app:assembleRelease` when the persistent signing credentials are missing. This prevents accidentally treating an unsigned bundle as a Play upload.
+
+## Key preservation
+
+Keep the upload keystore and passwords in a password manager and at least one secure offline backup. Loss of the upload key can delay updates. Google Play App Signing does not mean the upload key can be discarded.

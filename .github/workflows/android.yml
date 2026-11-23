@@ -1,11 +1,22 @@
-name: Build NextBell and Admin Android Apps
+name: Build NextBell Android Apps
 
 on:
   push:
     branches: ["main", "feature/announcements"]
+    tags: ["nextbell-v*"]
   pull_request:
     branches: ["main"]
   workflow_dispatch:
+    inputs:
+      version_name:
+        description: "NextBell release version name (for example 0.6.1)"
+        required: false
+        type: string
+        default: "0.6.0"
+      version_code:
+        description: "Optional positive integer greater than the last Play release. Leave blank to use the automatic CI value."
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -39,12 +50,12 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v4
         with:
-          packages: 'platforms;android-35 build-tools;35.0.0'
+          packages: 'platforms;android-35 platforms;android-36 build-tools;36.0.0'
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: "8.9"
+          gradle-version: "8.13"
 
       - name: Prepare stable NextBell signing when configured
         env:
@@ -67,7 +78,7 @@ jobs:
             echo "::notice::No stable NextBell signing key is configured; this CI build will use its temporary debug key."
           fi
 
-      - name: Test and build both Android apps
+      - name: Test and build both Android debug apps
         working-directory: android
         env:
           NEXTBELL_KEYSTORE_PASSWORD: ${{ secrets.NEXTBELL_KEYSTORE_PASSWORD }}
@@ -88,3 +99,132 @@ jobs:
           name: NextBell-admin-debug-apk
           path: android/admin/build/outputs/apk/debug/admin-debug.apk
           if-no-files-found: error
+
+  release-aab:
+    # Keep release signing separate from everyday debug CI. Manual runs and
+    # nextbell-v* tags create a signed Play upload bundle for the student app.
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/nextbell-v'))
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          packages: 'platforms;android-35 platforms;android-36 build-tools;36.0.0'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.13"
+
+      - name: Configure Firebase Android client when provided
+        env:
+          NEXTBELL_GOOGLE_SERVICES_JSON_BASE64: ${{ secrets.NEXTBELL_GOOGLE_SERVICES_JSON_BASE64 }}
+        run: |
+          set -euo pipefail
+          if [ -z "${NEXTBELL_GOOGLE_SERVICES_JSON_BASE64:-}" ]; then
+            echo "::error::NEXTBELL_GOOGLE_SERVICES_JSON_BASE64 is required for a full-feature Play release. Configure the Android Firebase client for com.nealaringale.nextbell."
+            exit 1
+          fi
+
+          printf '%s' "$NEXTBELL_GOOGLE_SERVICES_JSON_BASE64" | base64 --decode > android/app/google-services.json
+          python3 -m json.tool android/app/google-services.json > /dev/null
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          config = json.loads(Path("android/app/google-services.json").read_text(encoding="utf-8"))
+          expected = "com.nealaringale.nextbell"
+          packages = [
+              client.get("client_info", {}).get("android_client_info", {}).get("package_name")
+              for client in config.get("client", [])
+          ]
+          if expected not in packages:
+              raise SystemExit(
+                  f"Firebase config does not contain the required Android package {expected}. "
+                  f"Found: {packages}"
+              )
+          print("Firebase Android client package matches NextBell.")
+          PY
+
+      - name: Prepare and validate Play upload keystore
+        env:
+          NEXTBELL_KEYSTORE_BASE64: ${{ secrets.NEXTBELL_KEYSTORE_BASE64 }}
+          NEXTBELL_KEYSTORE_PASSWORD: ${{ secrets.NEXTBELL_KEYSTORE_PASSWORD }}
+          NEXTBELL_KEY_ALIAS: ${{ secrets.NEXTBELL_KEY_ALIAS }}
+          NEXTBELL_KEY_PASSWORD: ${{ secrets.NEXTBELL_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "${NEXTBELL_KEYSTORE_BASE64:-}" ] || [ -z "${NEXTBELL_KEYSTORE_PASSWORD:-}" ] || [ -z "${NEXTBELL_KEY_ALIAS:-}" ] || [ -z "${NEXTBELL_KEY_PASSWORD:-}" ]; then
+            echo "::error::A signed Play bundle requires all four NEXTBELL_KEYSTORE_* / NEXTBELL_KEY_* repository secrets. See .github/STABLE_SIGNING_SETUP.md."
+            exit 1
+          fi
+
+          keystore="$GITHUB_WORKSPACE/android/app/nextbell-upload.jks"
+          printf '%s' "$NEXTBELL_KEYSTORE_BASE64" | base64 --decode > "$keystore"
+          chmod 600 "$keystore"
+
+          if ! keytool -list -keystore "$keystore" -storepass "$NEXTBELL_KEYSTORE_PASSWORD" -alias "$NEXTBELL_KEY_ALIAS" >/dev/null 2>&1; then
+            echo "::error::The upload keystore, password, or alias could not be validated."
+            exit 1
+          fi
+
+          echo "NEXTBELL_KEYSTORE_PATH=$keystore" >> "$GITHUB_ENV"
+          echo "Play upload keystore validated."
+
+      - name: Set release version
+        env:
+          INPUT_VERSION_NAME: ${{ github.event.inputs.version_name }}
+          INPUT_VERSION_CODE: ${{ github.event.inputs.version_code }}
+        run: |
+          set -euo pipefail
+
+          if [ "$GITHUB_EVENT_NAME" = "push" ]; then
+            version_name="${GITHUB_REF_NAME#nextbell-v}"
+          else
+            version_name="${INPUT_VERSION_NAME:-0.6.0}"
+          fi
+
+          if [ -z "$version_name" ]; then
+            echo "::error::The release version name cannot be empty."
+            exit 1
+          fi
+
+          if [ -n "${INPUT_VERSION_CODE:-}" ]; then
+            if ! [[ "$INPUT_VERSION_CODE" =~ ^[1-9][0-9]*$ ]] || [ "$INPUT_VERSION_CODE" -gt 2100000000 ]; then
+              echo "::error::Version code must be a positive integer no greater than 2100000000."
+              exit 1
+            fi
+            version_code="$INPUT_VERSION_CODE"
+          else
+            version_code=$((10000 + GITHUB_RUN_NUMBER))
+          fi
+
+          echo "NEXTBELL_VERSION_NAME=$version_name" >> "$GITHUB_ENV"
+          echo "NEXTBELL_VERSION_CODE=$version_code" >> "$GITHUB_ENV"
+          echo "Building NextBell $version_name (versionCode $version_code)."
+
+      - name: Test, lint, and build signed Play bundle
+        working-directory: android
+        env:
+          NEXTBELL_KEYSTORE_PASSWORD: ${{ secrets.NEXTBELL_KEYSTORE_PASSWORD }}
+          NEXTBELL_KEY_ALIAS: ${{ secrets.NEXTBELL_KEY_ALIAS }}
+          NEXTBELL_KEY_PASSWORD: ${{ secrets.NEXTBELL_KEY_PASSWORD }}
+        run: gradle --no-daemon :app:testDebugUnitTest :app:lintRelease :app:bundleRelease
+
+      - name: Upload signed NextBell Play bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: NextBell-play-release-aab
+          path: android/app/build/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
+          retention-days: 30

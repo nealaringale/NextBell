@@ -19,17 +19,43 @@ if (hasStableSigning && !file(stableStorePath).isFile()) {
     throw new GradleException("The configured NextBell signing file is missing.")
 }
 
+// Never produce a Play release artifact without the persistent upload key.
+// Debug builds remain available without signing secrets for local development.
+def releaseArtifactRequested = gradle.startParameter.taskNames.any { taskName ->
+    def normalized = taskName.toLowerCase()
+    normalized.contains("bundlerelease") || normalized.contains("assemblerelease")
+}
+if (releaseArtifactRequested && !hasStableSigning) {
+    throw new GradleException(
+            "A signed NextBell release is required. Configure NEXTBELL_KEYSTORE_PATH, " +
+            "NEXTBELL_KEYSTORE_PASSWORD, NEXTBELL_KEY_ALIAS and NEXTBELL_KEY_PASSWORD."
+    )
+}
+
 android {
     namespace "com.nealaringale.nextbell"
-    compileSdk 35
+    compileSdk 36
 
     defaultConfig {
         applicationId "com.nealaringale.nextbell"
         minSdk 26
-        targetSdk 35
+        targetSdk 36
+
+        def requestedVersionCode = System.getenv("NEXTBELL_VERSION_CODE")
         def ciRun = System.getenv("GITHUB_RUN_NUMBER")
-        versionCode = ciRun == null ? 5 : 1000 + ciRun.toInteger()
-        versionName "0.6.0"
+        def fallbackVersionCode = ciRun == null ? 6 : 10000 + ciRun.toInteger()
+        def resolvedVersionCode = requestedVersionCode != null && !requestedVersionCode.trim().isEmpty()
+                ? requestedVersionCode.toInteger()
+                : fallbackVersionCode
+        if (resolvedVersionCode < 1) {
+            throw new GradleException("NEXTBELL_VERSION_CODE must be a positive integer.")
+        }
+        versionCode resolvedVersionCode
+
+        def requestedVersionName = System.getenv("NEXTBELL_VERSION_NAME")
+        versionName = requestedVersionName == null || requestedVersionName.trim().isEmpty()
+                ? "0.6.0"
+                : requestedVersionName.trim()
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -71,6 +97,9 @@ android {
 }
 
 dependencies {
+    // Backward-compatible predictive/system back handling for API 26 through API 36.
+    implementation "androidx.activity:activity:1.13.0"
+
     implementation platform("com.google.firebase:firebase-bom:35.1.0")
     implementation "com.google.firebase:firebase-auth"
     implementation "com.google.firebase:firebase-firestore"

@@ -2,7 +2,8 @@ package com.nealaringale.nextbell;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
-import android.app.Activity;
+import androidx.activity.ComponentActivity;
+import androidx.activity.OnBackPressedCallback;
 import android.app.AlertDialog;
 import android.app.DatePickerDialog;
 import android.app.Dialog;
@@ -64,7 +65,7 @@ import java.util.Map;
 import java.text.NumberFormat;
 import java.util.Locale;
 
-public class MainActivity extends Activity {
+public class MainActivity extends ComponentActivity {
     private static final String PREFS_NAME = "nextbell_profile";
     private static final String KEY_NAME = "name";
     private static final String KEY_ROLL_NUMBER = "roll_number";
@@ -208,6 +209,17 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
+        getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
+            @Override
+            public void handleOnBackPressed() {
+                if (!"home".equals(selectedScreen)) {
+                    navigate("home");
+                } else {
+                    finish();
+                }
+            }
+        });
+
         preferences = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
         firebaseSyncManager = new FirebaseSyncManager(this, preferences,
                 new FirebaseSyncManager.StatusListener() {
@@ -300,15 +312,6 @@ public class MainActivity extends Activity {
         super.onDestroy();
         if (refreshRunnable != null) handler.removeCallbacks(refreshRunnable);
         stopHeroPulse();
-    }
-
-    @Override
-    public void onBackPressed() {
-        if (!"home".equals(selectedScreen)) {
-            navigate("home");
-            return;
-        }
-        super.onBackPressed();
     }
 
     private int clampTheme(int value) {
@@ -3580,8 +3583,9 @@ public class MainActivity extends Activity {
             new AlertDialog.Builder(this)
                     .setTitle("NextBell Cloud Sync")
                     .setMessage("Signed in as " + currentUser.getEmail()
-                            + "\n\nExpenses, attendance, planner tasks and profile settings sync with the website.")
+                            + "\n\nExpenses (including parsed transaction details), attendance, planner tasks and profile settings sync with the website.")
                     .setNegativeButton("Close", null)
+                    .setNeutralButton("Delete account & cloud data", (dialog, which) -> openAccountDeletionPage())
                     .setPositiveButton("Sign out", (dialog, which) -> {
                         firebaseSyncManager.signOut();
                         Toast.makeText(this, "Signed out. Local data remains on this phone.",
@@ -3881,7 +3885,7 @@ public class MainActivity extends Activity {
         TextView autoDescription = text(
                 TransactionNotificationAccess.hasAccess(this)
                         && SmsTransactionService.isEnabled(preferences)
-                        ? "Connected. Supported bank and UPI notification alerts are parsed locally; raw notification text is not saved."
+                        ? "Connected. Bank/UPI alerts are parsed locally; raw notification text is not saved. Parsed details sync only with optional Cloud Sync."
                         : (TransactionNotificationAccess.hasAccess(this)
                         ? "Access is ready but tracking is paused. Tap to enable automatic payment alerts."
                         : "Connect notification access to detect supported bank and UPI alerts automatically."),
@@ -4009,7 +4013,23 @@ public class MainActivity extends Activity {
             openCall();
         });
 
-        TextView footer = text("Your profile and spending stay on this phone.", 8, SUBTLE);
+        TextView privacyPolicyLink = text("Privacy policy", 10, ACCENT);
+        privacyPolicyLink.setPadding(0, dp(10), 0, dp(4));
+        privacyPolicyLink.setOnClickListener(v -> {
+            tap(v);
+            openPrivacyPolicy();
+        });
+        aboutCard.addView(privacyPolicyLink);
+
+        TextView deleteAccountLink = text("Request account & cloud-data deletion", 10, ACCENT);
+        deleteAccountLink.setPadding(0, dp(8), 0, dp(4));
+        deleteAccountLink.setOnClickListener(v -> {
+            tap(v);
+            openAccountDeletionPage();
+        });
+        aboutCard.addView(deleteAccountLink);
+
+        TextView footer = text("Local-first by default • Cloud Sync is optional.", 8, SUBTLE);
         footer.setGravity(Gravity.CENTER);
         footer.setPadding(0, dp(10), 0, 0);
         aboutCard.addView(footer);
@@ -5297,6 +5317,7 @@ public class MainActivity extends Activity {
                 + "broadcast even when the messaging app does not publish a notification. NextBell "
                 + "parses transaction-like messages locally and stores only amount, direction, date, "
                 + "merchant/category and a duplicate fingerprint. Raw message text is not saved or uploaded. "
+                + "If Cloud Sync is enabled, parsed expense details sync to your own Firebase account. "
                 + "Old SMS import is separate and optional. Notification access remains a fallback for UPI apps.\\n\\n"
                 + diagnostics;
 
@@ -5348,11 +5369,20 @@ public class MainActivity extends Activity {
     }
 
     private void importRecentSmsHistory() {
-        if (!SmsTransactionService.hasReadPermission(this)) {
-            requestPermissions(new String[]{Manifest.permission.READ_SMS}, REQUEST_SMS_HISTORY);
-        } else {
-            performRecentSmsImport();
-        }
+        new AlertDialog.Builder(this)
+                .setTitle("Import recent bank messages")
+                .setMessage("If you continue, NextBell will scan SMS inbox messages from the last 30 days on this device to identify supported bank/payment transactions. Message text is processed locally and is not saved or uploaded. Only parsed transaction details and a duplicate fingerprint are retained. If you separately enable Cloud Sync, parsed expense records sync to your own Firebase account. This scan is optional and starts only when you confirm; manual expense entry remains available.")
+                .setNegativeButton("Cancel", null)
+                .setPositiveButton("Continue", (dialog, which) -> {
+                    if (!SmsTransactionService.hasReadPermission(this)) {
+                        requestPermissions(
+                                new String[]{Manifest.permission.READ_SMS}, REQUEST_SMS_HISTORY
+                        );
+                    } else {
+                        performRecentSmsImport();
+                    }
+                })
+                .show();
     }
 
     private void performRecentSmsImport() {
@@ -5370,6 +5400,15 @@ public class MainActivity extends Activity {
     }
 
     private void openPaymentNotificationSettings() {
+        new AlertDialog.Builder(this)
+                .setTitle("Notification access for payment tracking")
+                .setMessage("Granting this Android access lets NextBell receive notification content from other apps while access is enabled. It filters notifications on your device to detect supported bank/UPI transaction alerts and stores only parsed transaction details. Raw notification text is not saved or uploaded. If you enable Cloud Sync, parsed expense records sync to your own Firebase account. Access is optional; manual expense entry stays available.")
+                .setNegativeButton("Not now", null)
+                .setPositiveButton("Continue to settings", (dialog, which) -> launchPaymentNotificationSettings())
+                .show();
+    }
+
+    private void launchPaymentNotificationSettings() {
         if (!TransactionNotificationAccess.hasAccess(this)) {
             preferences.edit().putBoolean(KEY_PENDING_PAYMENT_ALERT_SETUP, true).apply();
         } else {
@@ -5384,6 +5423,22 @@ public class MainActivity extends Activity {
                     .setMessage("Open Android Settings, search for Notification access, and enable NextBell.")
                     .setPositiveButton("OK", null)
                     .show();
+        }
+    }
+
+    private void openPrivacyPolicy() {
+        openNextBellPublicPage("https://nealaringale.github.io/NextBell/privacy-policy.html");
+    }
+
+    private void openAccountDeletionPage() {
+        openNextBellPublicPage("https://nealaringale.github.io/NextBell/delete-account.html");
+    }
+
+    private void openNextBellPublicPage(String url) {
+        try {
+            startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
+        } catch (ActivityNotFoundException exception) {
+            Toast.makeText(this, "No browser is available to open this page.", Toast.LENGTH_LONG).show();
         }
     }
 
