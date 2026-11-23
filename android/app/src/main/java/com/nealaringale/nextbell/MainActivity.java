@@ -5366,11 +5366,20 @@ public class MainActivity extends Activity {
     }
 
     private void importRecentSmsHistory() {
-        if (!SmsTransactionService.hasReadPermission(this)) {
-            requestPermissions(new String[]{Manifest.permission.READ_SMS}, REQUEST_SMS_HISTORY);
-        } else {
-            performRecentSmsImport();
-        }
+        new AlertDialog.Builder(this)
+                .setTitle("Import recent bank messages")
+                .setMessage("If you continue, NextBell will scan SMS inbox messages from the last 30 days on this device to identify supported bank/payment transactions. Message text is processed locally and is not saved or uploaded. Only parsed transaction details and a duplicate fingerprint are retained. If you separately enable Cloud Sync, parsed expense records sync to your own Firebase account. This scan is optional and starts only when you confirm; manual expense entry remains available.")
+                .setNegativeButton("Cancel", null)
+                .setPositiveButton("Continue", (dialog, which) -> {
+                    if (!SmsTransactionService.hasReadPermission(this)) {
+                        requestPermissions(
+                                new String[]{Manifest.permission.READ_SMS}, REQUEST_SMS_HISTORY
+                        );
+                    } else {
+                        performRecentSmsImport();
+                    }
+                })
+                .show();
     }
 
     private void performRecentSmsImport() {
