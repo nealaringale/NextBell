@@ -19,7 +19,7 @@ Follow [STABLE_SIGNING_SETUP.md](STABLE_SIGNING_SETUP.md) and add the four uploa
 - `NEXTBELL_KEY_ALIAS`
 - `NEXTBELL_KEY_PASSWORD`
 
-For the release to retain existing Firebase email sign-in and Firestore sync, also add `NEXTBELL_GOOGLE_SERVICES_JSON_BASE64`. Without it, the app bundle can still build but cloud sync will not be configured in that bundle.
+Add `NEXTBELL_GOOGLE_SERVICES_JSON_BASE64` as a required release secret, containing the Base64-encoded Firebase Android `google-services.json` for package `com.nealaringale.nextbell`. The release workflow validates the package ID and fails rather than generating a feature-incomplete Play bundle when this secret is missing.
 
 ## 2. Build the bundle from GitHub
 
