@@ -25,7 +25,7 @@ For the release to retain existing Firebase email sign-in and Firestore sync, al
 
 1. Open the repository's **Actions** tab.
 2. Select **Build NextBell Android Apps**.
-3. Choose **Run workflow**.
+3. Choose **Run workflow** after this release-readiness branch has been merged into `main` (workflow_dispatch must exist on the default branch).
 4. Enter a version name (for example, `0.6.1`). Leave version code blank to use the workflow-generated value, or provide a positive integer greater than the most recent Play Store version code.
 5. Start the workflow and inspect the `release-aab` job.
 6. Download the `NextBell-play-release-aab` artifact.
@@ -40,9 +40,10 @@ Before production rollout, complete all relevant Play Console forms and listing 
 
 - App access instructions, content rating, target audience, ads declaration, and store listing.
 - Data safety form that accurately describes local processing and the optional Firebase email-auth / Firestore sync.
-- Public privacy policy URL. The repository includes `public/privacy-policy.html`; the Vite/Pages workflow copies it into the deployed site. After the site is deployed, the expected project-page URL is `https://nealaringale.github.io/NextBell/privacy-policy.html`. Verify the live URL in a private browser and replace the contact-email placeholder before submitting.
-- In-app prominent disclosure and affirmative consent for SMS and notification access, shown before the relevant access is requested.
-- Notification-listener access must be explained in context and used only for the transaction-alert feature the user enables.
+- Public privacy policy URL: `https://nealaringale.github.io/NextBell/privacy-policy.html` after the Pages deployment completes. The repository includes `public/privacy-policy.html`; verify the live page before submitting.
+- Public account-deletion URL: `https://nealaringale.github.io/NextBell/delete-account.html`. Enter it in the Play Console account-deletion URL field and verify the live page. It accepts an email request from the Firebase account address and describes the cloud data that will be deleted.
+- The app now links to its privacy policy and account-deletion request from Settings → About & Feedback. The signed-in Cloud Sync dialog also includes the account/cloud-data deletion link. The SMS and notification-access screens show disclosures before sending the user to the relevant Android permissions/settings.
+- Notification-listener access is highly sensitive and is limited to the optional transaction-alert feature the user enables. Parsed expenses sync only when the user separately enables Cloud Sync.
 
 ### SMS permission declaration — do not skip
 
