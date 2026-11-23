@@ -81,9 +81,8 @@ android {
     }
 
     buildTypes {
-        debug {
-            if (hasStableSigning) signingConfig signingConfigs.stable
-        }
+        // Keep debug APKs on Android's normal debug key. The Play upload key
+        // must only sign release artifacts.
         release {
             minifyEnabled false
             if (hasStableSigning) signingConfig signingConfigs.stable
