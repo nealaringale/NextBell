@@ -2,7 +2,8 @@ package com.nealaringale.nextbell;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
-import android.app.Activity;
+import androidx.activity.ComponentActivity;
+import androidx.activity.OnBackPressedCallback;
 import android.app.AlertDialog;
 import android.app.DatePickerDialog;
 import android.app.Dialog;
@@ -64,7 +65,7 @@ import java.util.Map;
 import java.text.NumberFormat;
 import java.util.Locale;
 
-public class MainActivity extends Activity {
+public class MainActivity extends ComponentActivity {
     private static final String PREFS_NAME = "nextbell_profile";
     private static final String KEY_NAME = "name";
     private static final String KEY_ROLL_NUMBER = "roll_number";
@@ -208,6 +209,17 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
+        getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
+            @Override
+            public void handleOnBackPressed() {
+                if (!"home".equals(selectedScreen)) {
+                    navigate("home");
+                } else {
+                    finish();
+                }
+            }
+        });
+
         preferences = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
         firebaseSyncManager = new FirebaseSyncManager(this, preferences,
                 new FirebaseSyncManager.StatusListener() {
@@ -300,15 +312,6 @@ public class MainActivity extends Activity {
         super.onDestroy();
         if (refreshRunnable != null) handler.removeCallbacks(refreshRunnable);
         stopHeroPulse();
-    }
-
-    @Override
-    public void onBackPressed() {
-        if (!"home".equals(selectedScreen)) {
-            navigate("home");
-            return;
-        }
-        super.onBackPressed();
     }
 
     private int clampTheme(int value) {
