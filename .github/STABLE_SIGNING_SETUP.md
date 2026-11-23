@@ -10,7 +10,7 @@ Google Play requires every uploaded Android App Bundle to be signed. NextBell's 
 
 ## Create a new upload key (first Play release only)
 
-Run this in a private local terminal with JDK 17 installed:
+Run this in a secure folder **outside the NextBell Git working tree** with JDK 17 installed. For example, create a private `NextBellSigning` folder under your home directory and run the commands there. Do not put the private `.jks` file inside the repository.
 
 ```powershell
 keytool -genkeypair -v -keystore nextbell-upload.jks -keyalg RSA -keysize 2048 -validity 10000 -alias nextbell-upload
@@ -46,7 +46,7 @@ On Windows PowerShell, copy the Base64 value without adding line breaks:
 Paste the clipboard contents into the GitHub secret named `NEXTBELL_KEYSTORE_BASE64`. On macOS/Linux, an equivalent command is:
 
 ```sh
-base64 -w 0 nextbell-upload.jks
+base64 < nextbell-upload.jks | tr -d '\n'
 ```
 
 Do not place any password or key material in source files, workflow YAML, issues, logs, or chat messages.
