@@ -97,6 +97,9 @@ android {
 }
 
 dependencies {
+    // Backward-compatible predictive/system back handling for API 26 through API 36.
+    implementation "androidx.activity:activity:1.13.0"
+
     implementation platform("com.google.firebase:firebase-bom:35.1.0")
     implementation "com.google.firebase:firebase-auth"
     implementation "com.google.firebase:firebase-firestore"
