@@ -4,20 +4,20 @@ NextBell is a local-first Android student planner for FE Division B. A student's
 
 ## Product and data model
 
-- **Android app:** Java, Android SDK 35, minimum Android 8.0 (API 26), target SDK 35. Screens are native views hosted in `MainActivity`; timetable, attendance, planner, finance, notification, SMS parsing, and backup logic live in Java classes.
+- **Android app:** Java, Android SDK 36 (Android 16), minimum Android 8.0 (API 26), target SDK 36. Screens are native views hosted in `MainActivity`; timetable, attendance, planner, finance, notification, SMS parsing, and backup logic live in Java classes.
 - **Timetable:** bundled official FE Division B timetable, W.E.F. 16 September 2026, Revision 00. Schedule data is available offline; batch filtering is based on the student's roll number.
 - **Study planning:** attendance marks, assignment/exam/task items, and due dates are stored locally. Bunk estimates use only sessions the student has recorded. Deadline reminders are approximate Android alarms and require notifications to be enabled.
 - **Profile, study data, and money:** stored in the app's private `SharedPreferences`; there is no server, account system, or network permission. System cloud backup and device-to-device transfer are excluded. The user can export a readable JSON backup to a file they choose. Anyone who receives that file can read it.
-- **Money entry:** direct SMS ingestion is the primary bank-alert path after the user explicitly enables RECEIVE_SMS. Notification access remains an additional fallback for UPI/wallet alerts. The private debug APK must be installed via ADB so Android's shell installer can allowlist hard-restricted SMS permissions; tapping an APK in a file manager may not allow RECEIVE_SMS/READ_SMS. READ_SMS is requested separately only when the user chooses a 30-day inbox import. Raw message text is not saved or uploaded; only parsed transaction fields and duplicate fingerprints are retained. Google Play distribution requires a separate SMS-permission policy assessment.
+- **Money entry:** direct SMS ingestion is the primary bank-alert path after the user explicitly enables RECEIVE_SMS. Notification access remains an additional fallback for UPI/wallet alerts. The private debug APK must be installed via ADB so Android's shell installer can allowlist hard-restricted SMS permissions; tapping an APK in a file manager may not allow RECEIVE_SMS/READ_SMS. READ_SMS is requested separately only when the user chooses a 30-day inbox import. Raw message text is not saved or uploaded; only parsed transaction fields and duplicate fingerprints are retained. Google Play lists SMS-based money management (including budgeting apps) as an eligible SMS-permission use case, subject to the Play Console declaration and review/approval. Keep the prominent disclosure, consent, privacy policy and Data safety answers aligned with the actual on-device parsing and optional cloud-sync behaviour.
 - **Private debug install (Windows):** enable USB debugging, connect the phone, extract the student APK, then run `adb install -r NextBell-student-debug.apk` from the folder containing the APK. ADB's shell package installer allowlists restricted permissions by default unless told to restrict them; this does not itself grant runtime permissions. Open NextBell → Money → Manage → Enable SMS tracking and grant the Android prompt.
 - **realme/ColorOS background settings:** allow NextBell background activity/auto-launch and remove battery restrictions when available. OEM power controls can stop background listener services even while Notification access still appears granted.
-- **Distribution note:** notification access is highly sensitive and must be transparently disclosed and used only for the user's requested on-device transaction tracking. Google Play separately restricts SMS and Call Log permissions; this private-build approach is not a guarantee of Play policy approval. See [Google Play's SMS permission policy](https://support.google.com/googleplay/android-developer/answer/10208820) and [Android's hard-restricted permission documentation](https://source.android.com/docs/core/permissions/runtime_perms).
+- **Distribution note:** notification access is highly sensitive and must be transparently disclosed and used only for the user's requested transaction tracking. The app retains its opt-in SMS ingestion and inbox-import features; Google Play lists SMS-based money management as an eligible use case, but approval is not automatic and requires a permissions declaration. See the release checklist in [.github/PLAY_STORE_RELEASE.md](.github/PLAY_STORE_RELEASE.md). See [Google Play's SMS permission policy](https://support.google.com/googleplay/android-developer/answer/10208820) and [Android's hard-restricted permission documentation](https://source.android.com/docs/core/permissions/runtime_perms).
 - **Admin companion:** a separate local draft tool. It does not publish timetable changes to student devices.
 - **Browser prototype:** `src/` is an older Vite demo with fixture data; it is not the Android app or the download website and should not be treated as the live timetable source.
 
 ## Build and verify Android
 
-Install JDK 17, Android SDK Platform 35, Android Build Tools 35.0.0, and Gradle 8.9 or newer. From `android/`, run:
+Install JDK 17, Android SDK Platforms 35 and 36, Android Build Tools 36.0.0, and Gradle 8.13. The student app targets API 36; the private Admin companion still compiles against API 35. From `android/`, run:
 
 ```sh
 gradle --no-daemon :app:testDebugUnitTest :app:lintDebug assembleDebug
@@ -29,11 +29,11 @@ The student APK is written to:
 android/app/build/outputs/apk/debug/app-debug.apk
 ```
 
-`feature/announcements` runs the same Android unit tests, lint, and debug APK build in GitHub Actions. It also uploads the student and admin APKs as workflow artifacts. The public Pages publishing workflow is manual; pushing a feature branch does not publish the site.
+GitHub Actions runs Android unit tests, lint, and both debug APK builds on pushes to `main` / `feature/announcements` and on pull requests to `main`. It uploads separate student and Admin debug APK artifacts. Run the same workflow manually (or push a `nextbell-v*` tag) to build a signed student Play Store AAB. See [.github/PLAY_STORE_RELEASE.md](.github/PLAY_STORE_RELEASE.md). The website and privacy-policy page are deployed separately by the Pages workflow when changes reach `main`.
 
 ### Stable signing for Android updates
 
-The student APK can use a persistent keystore when these four repository Actions secrets are configured: `NEXTBELL_KEYSTORE_BASE64`, `NEXTBELL_KEYSTORE_PASSWORD`, `NEXTBELL_KEY_ALIAS`, and `NEXTBELL_KEY_PASSWORD`. See [.github/STABLE_SIGNING_SETUP.md](.github/STABLE_SIGNING_SETUP.md). If they are absent, CI falls back to its temporary debug key, and a later APK may not be installable as an in-place update. Export a NextBell backup before removing an incompatible installation.
+The student app's Play Store AAB must be signed with a persistent upload keystore. Configure these four repository Actions secrets: `NEXTBELL_KEYSTORE_BASE64`, `NEXTBELL_KEYSTORE_PASSWORD`, `NEXTBELL_KEY_ALIAS`, and `NEXTBELL_KEY_PASSWORD`. The release job fails rather than producing an unsigned Play bundle when they are missing. Debug CI may still use its temporary key. See [.github/STABLE_SIGNING_SETUP.md](.github/STABLE_SIGNING_SETUP.md).
 
 ## Build the browser prototype
 
