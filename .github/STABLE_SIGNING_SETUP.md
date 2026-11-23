@@ -24,7 +24,7 @@ Export the public upload certificate for Play Console if requested:
 keytool -export -rfc -keystore nextbell-upload.jks -alias nextbell-upload -file nextbell-upload-certificate.pem
 ```
 
-The private `.jks` file is the signing key. The `.pem` file is only the public certificate.
+The private `.jks` file is the signing key. The `.pem` file is only the public certificate. Android debug APKs continue using Android's default debug key; the upload key is reserved for release bundles.
 
 ## Add GitHub Actions secrets
 
