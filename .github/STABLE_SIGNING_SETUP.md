@@ -51,13 +51,13 @@ base64 -w 0 nextbell-upload.jks
 
 Do not place any password or key material in source files, workflow YAML, issues, logs, or chat messages.
 
-## Optional Firebase configuration
+## Required Firebase configuration for the full-feature Play release
 
-To include NextBell's existing Firebase email sign-in and Firestore sync in the release AAB, also configure:
+To preserve NextBell's existing Firebase email sign-in and Firestore sync in the release AAB, configure this required secret:
 
 - `NEXTBELL_GOOGLE_SERVICES_JSON_BASE64`: Base64 contents of the Android Firebase `google-services.json` for package `com.nealaringale.nextbell`.
 
-The workflow validates and decodes this file into the ignored `android/app/google-services.json` path. If this secret is omitted, the app still builds, but that AAB does not have Firebase Android client configuration and cloud sign-in/sync will not work.
+The workflow validates and decodes this file into the ignored `android/app/google-services.json` path. The Play release workflow fails if this secret is missing or the JSON does not include package `com.nealaringale.nextbell`. Debug builds may still run without this secret, but a full-feature Play upload requires it.
 
 ## Build a Play Store AAB
 
