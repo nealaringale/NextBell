@@ -174,12 +174,31 @@ jobs:
           chmod 600 "$keystore"
 
           if ! keytool -list -keystore "$keystore" -storepass "$NEXTBELL_KEYSTORE_PASSWORD" -alias "$NEXTBELL_KEY_ALIAS" >/dev/null 2>&1; then
-            echo "::error::The upload keystore, password, or alias could not be validated."
+            echo "::error::The upload keystore, store password, or alias could not be validated."
             exit 1
           fi
 
+          # Confirm that the private-key password can actually unlock the
+          # selected alias before Gradle starts bundle signing.
+          key_check="$RUNNER_TEMP/nextbell-key-password-check.p12"
+          if ! keytool -importkeystore \
+              -srckeystore "$keystore" \
+              -srcalias "$NEXTBELL_KEY_ALIAS" \
+              -srcstorepass "$NEXTBELL_KEYSTORE_PASSWORD" \
+              -srckeypass "$NEXTBELL_KEY_PASSWORD" \
+              -destkeystore "$key_check" \
+              -deststoretype PKCS12 \
+              -deststorepass "$NEXTBELL_KEYSTORE_PASSWORD" \
+              -destkeypass "$NEXTBELL_KEYSTORE_PASSWORD" \
+              -destalias "$NEXTBELL_KEY_ALIAS" \
+              -noprompt >/dev/null 2>&1; then
+            echo "::error::The store password and alias are valid, but NEXTBELL_KEY_PASSWORD could not unlock the private key. Correct that repository secret and rerun."
+            exit 1
+          fi
+          rm -f "$key_check"
+
           echo "NEXTBELL_KEYSTORE_PATH=$keystore" >> "$GITHUB_ENV"
-          echo "Play upload keystore validated."
+          echo "Play upload keystore and private key password validated."
 
       - name: Set release version
         env:
