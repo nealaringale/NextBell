@@ -23,6 +23,7 @@ public final class NotificationScheduler {
 
     private static final String PREFS_NAME = "nextbell_profile";
     private static final String KEY_ROLL_NUMBER = "roll_number";
+    private static final String KEY_DIVISION = "division";
     private static final String KEY_SCHEDULED_ALARMS = "scheduled_alarm_ids";
     private static final String KEY_LIVE_ALARMS = "live_status_alarm_ids";
 
@@ -48,6 +49,7 @@ public final class NotificationScheduler {
         }
 
         int roll = preferences.getInt(KEY_ROLL_NUMBER, -1);
+        String division = preferences.getString(KEY_DIVISION, "B");
         if (roll < 1) return;
 
         ensureChannel(context);
@@ -82,7 +84,7 @@ public final class NotificationScheduler {
             );
 
             List<TimetableData.ClassItem> classes =
-                    TimetableData.forRollAndDay(roll, day);
+                    TimetableData.forDivisionRollAndDay(division, roll, day);
 
             for (TimetableData.ClassItem item : classes) {
                 if (!item.isAcademic()) continue;
