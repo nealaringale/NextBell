@@ -80,9 +80,9 @@ public final class FirstYearTimetableData {
         p("A", "Tuesday", "08:20", "10:20", "ELE", "ASB", "Wing C 101", "A-1");
         c("A", "Tuesday", "10:40", "11:40", "LAM", "PK", "201");
         c("A", "Tuesday", "11:40", "12:40", "EG", "SSD", "201");
-        p("A", "Tuesday", "13:30", "14:30", "FPL", "SS", "Wing B 109", "A-3");
-        p("A", "Tuesday", "13:30", "14:30", "EG", "SSD", "Wing C 210", "A-1");
-        p("A", "Tuesday", "13:30", "14:30", "ELE", "ASB", "Wing C 101", "A-2");
+        p("A", "Tuesday", "13:30", "15:30", "FPL", "SS", "Wing B 109", "A-3");
+        p("A", "Tuesday", "13:30", "15:30", "EG", "SSD", "Wing C 210", "A-1");
+        p("A", "Tuesday", "13:30", "15:30", "ELE", "ASB", "Wing C 101", "A-2");
 
         c("A", "Wednesday", "08:20", "09:20", "LAM", "PK", "201");
         c("A", "Wednesday", "09:20", "10:20", "FPL", "SS", "201");
@@ -123,9 +123,9 @@ public final class FirstYearTimetableData {
         p("C", "Tuesday", "08:20", "10:20", "ELE", "JG", "Wing A 206", "C-1");
         c("C", "Tuesday", "10:40", "11:40", "CS", "AB", "202");
         c("C", "Tuesday", "11:40", "12:40", "CS", "AB", "202");
-        p("C", "Tuesday", "13:30", "14:30", "FPL", "TG", "Wing B 109", "C-3");
-        p("C", "Tuesday", "13:30", "14:30", "EG", "ML", "Wing B 005", "C-1");
-        p("C", "Tuesday", "13:30", "14:30", "ELE", "JG", "Wing A 206", "C-2");
+        p("C", "Tuesday", "13:30", "15:30", "FPL", "TG", "Wing B 109", "C-3");
+        p("C", "Tuesday", "13:30", "15:30", "EG", "ML", "Wing B 005", "C-1");
+        p("C", "Tuesday", "13:30", "15:30", "ELE", "JG", "Wing A 206", "C-2");
 
         c("C", "Wednesday", "08:20", "09:20", "ELE", "JG", "209");
         c("C", "Wednesday", "09:20", "10:20", "LAM", "SU", "209");
@@ -179,10 +179,12 @@ public final class FirstYearTimetableData {
         p("D", "Thursday", "08:20", "10:20", "ELE", "JG", "Wing A 206", "D-2");
         c("D", "Thursday", "10:40", "11:40", "CS", "AB", "210");
         c("D", "Thursday", "11:40", "12:40", "CS", "AB", "210");
-        p("D", "Thursday", "13:30", "14:30", "ELE", "JG", "Wing A 206", "D-3");
-        p("D", "Thursday", "13:30", "14:30", "PHY", "MG", "Wing A 019", "D-1");
-        p("D", "Thursday", "13:30", "14:30", "EG", "SD", "Wing B 005", "D-2");
-        p("D", "Thursday", "14:30", "15:30", "LIBRARY", "", "Library", "D-2");
+        p("D", "Thursday", "13:30", "15:30", "ELE", "JG", "Wing A 206", "D-3");
+        p("D", "Thursday", "13:30", "15:30", "PHY", "MG", "Wing A 019", "D-1");
+        p("D", "Thursday", "13:30", "15:30", "EG", "SD", "Wing B 005", "D-2");
+        p("D", "Friday", "13:30", "15:30", "LIBRARY", "", "Library", "D-2");
+        p("D", "Friday", "13:30", "15:30", "FPL", "TG", "Wing B 109", "D-3");
+        p("D", "Friday", "13:30", "15:30", "ELE", "JG", "Wing A 206", "D-1");
 
         c("D", "Friday", "08:20", "09:20", "PHY", "MG", "203");
         c("D", "Friday", "09:20", "10:20", "LAM", "SU", "203");
@@ -210,9 +212,9 @@ public final class FirstYearTimetableData {
         c("E", "Tuesday", "09:20", "10:20", "PHY", "MJ", "204");
         c("E", "Tuesday", "10:40", "11:40", "EG", "SD", "204");
         c("E", "Tuesday", "11:40", "12:40", "LAM", "BG", "204");
-        p("E", "Tuesday", "13:30", "14:30", "FPL", "AB", "Wing B 109", "E-3");
-        p("E", "Tuesday", "13:30", "14:30", "PHY", "MJ", "Wing B 115", "E-1");
-        p("E", "Tuesday", "13:30", "14:30", "LIBRARY", "", "Library", "E-2");
+        p("E", "Tuesday", "13:30", "15:30", "FPL", "AB", "Wing B 109", "E-3");
+        p("E", "Tuesday", "13:30", "15:30", "PHY", "MJ", "Wing B 115", "E-1");
+        p("E", "Tuesday", "13:30", "15:30", "LIBRARY", "", "Library", "E-2");
 
         p("E", "Wednesday", "08:20", "10:20", "LIBRARY", "", "Library", "E-3");
         p("E", "Wednesday", "08:20", "10:20", "EG", "SD", "Wing B 312", "E-1");
@@ -232,9 +234,9 @@ public final class FirstYearTimetableData {
         p("E", "Friday", "10:40", "12:40", "FPL", "AB", "Wing B CC 109", "E-1");
         p("E", "Friday", "10:40", "12:40", "PHY", "MJ", "Wing B 115", "E-2");
         p("E", "Friday", "10:40", "12:40", "ELE", "SS", "Wing A 206", "E-3");
-        p("E", "Friday", "13:30", "14:30", "FPL", "AB", "Wing B 109", "E-2");
-        p("E", "Friday", "13:30", "14:30", "EG", "SD", "Wing C 210", "E-3");
-        p("E", "Friday", "13:30", "14:30", "LIBRARY", "", "Library", "E-1");
+        p("E", "Friday", "13:30", "15:30", "FPL", "AB", "Wing B 109", "E-2");
+        p("E", "Friday", "13:30", "15:30", "EG", "SD", "Wing C 210", "E-3");
+        p("E", "Friday", "13:30", "15:30", "LIBRARY", "", "Library", "E-1");
 
         // -----------------------------------------------------------------
         // DIVISION F — official grid, Revision 00.
@@ -258,9 +260,9 @@ public final class FirstYearTimetableData {
         c("F", "Wednesday", "09:20", "10:20", "LAM", "BG", "204");
         c("F", "Wednesday", "10:40", "11:40", "PHY", "MJ", "204");
         c("F", "Wednesday", "11:40", "12:40", "CS", "AB", "204");
-        p("F", "Wednesday", "13:30", "14:30", "PHY", "MJ", "Wing B 115", "F-3");
-        p("F", "Wednesday", "13:30", "14:30", "EG", "SG", "Wing B 005", "F-1");
-        p("F", "Wednesday", "13:30", "14:30", "ELE", "SS", "Wing A 206", "F-2");
+        p("F", "Wednesday", "13:30", "15:30", "PHY", "MJ", "Wing B 115", "F-3");
+        p("F", "Wednesday", "13:30", "15:30", "EG", "SG", "Wing B 005", "F-1");
+        p("F", "Wednesday", "13:30", "15:30", "ELE", "SS", "Wing A 206", "F-2");
 
         c("F", "Thursday", "08:20", "09:20", "CS", "AB", "202");
         c("F", "Thursday", "09:20", "10:20", "PHY", "MJ", "202");
@@ -273,9 +275,9 @@ public final class FirstYearTimetableData {
         special("F", "Friday", "08:20", "10:20", "LS", "LS-1 / LS-2");
         c("F", "Friday", "10:40", "11:40", "EG", "SG", "201");
         c("F", "Friday", "11:40", "12:40", "LAM", "BG", "201");
-        p("F", "Friday", "13:30", "14:30", "LIBRARY", "", "Library", "F-3");
-        p("F", "Friday", "13:30", "14:30", "PHY", "MJ", "Wing B 115", "F-1");
-        p("F", "Friday", "13:30", "14:30", "EG", "SG", "Wing B 005", "F-2");
+        p("F", "Friday", "13:30", "15:30", "LIBRARY", "", "Library", "F-3");
+        p("F", "Friday", "13:30", "15:30", "PHY", "MJ", "Wing B 115", "F-1");
+        p("F", "Friday", "13:30", "15:30", "EG", "SG", "Wing B 005", "F-2");
 
         // -----------------------------------------------------------------
         // DIVISION G — official grid, Revision 00.
@@ -285,9 +287,9 @@ public final class FirstYearTimetableData {
         p("G", "Monday", "08:20", "10:20", "ELE", "RS", "Wing C 101", "G3");
         c("G", "Monday", "10:40", "11:40", "EG", "SG", "205");
         c("G", "Monday", "11:40", "12:40", "LAM", "VS", "205");
-        p("G", "Monday", "13:30", "14:30", "LIBRARY", "", "Library", "G2");
-        p("G", "Monday", "13:30", "14:30", "PHY", "AR", "Wing A 019", "G3");
-        p("G", "Monday", "13:30", "14:30", "ELE", "RS", "Wing C 101", "G1");
+        p("G", "Monday", "13:30", "15:30", "LIBRARY", "", "Library", "G2");
+        p("G", "Monday", "13:30", "15:30", "PHY", "AR", "Wing A 019", "G3");
+        p("G", "Monday", "13:30", "15:30", "ELE", "RS", "Wing C 101", "G1");
 
         c("G", "Tuesday", "08:20", "09:20", "LAM", "VS", "205");
         c("G", "Tuesday", "09:20", "10:20", "PHY", "AR", "205");
@@ -436,9 +438,9 @@ public final class FirstYearTimetableData {
         p("J", "Thursday", "08:20", "10:20", "EM", "AD", "Wing A 003", "J2");
         c("J", "Thursday", "10:40", "11:40", "FPL", "S8", "205");
         c("J", "Thursday", "11:40", "12:40", "LAM", "KS", "205");
-        p("J", "Thursday", "13:30", "14:30", "WS", "MO", "Wing A", "J2");
-        p("J", "Thursday", "13:30", "14:30", "CHY", "AY", "Wing B 114", "J3");
-        p("J", "Thursday", "13:30", "14:30", "EXE", "NS2", "Wing C 103", "J1");
+        p("J", "Thursday", "13:30", "15:30", "WS", "MO", "Wing A", "J2");
+        p("J", "Thursday", "13:30", "15:30", "CHY", "AY", "Wing B 114", "J3");
+        p("J", "Thursday", "13:30", "15:30", "EXE", "NS2", "Wing C 103", "J1");
 
         c("J", "Friday", "08:20", "09:20", "CS", "BM", "205");
         c("J", "Friday", "09:20", "10:20", "FPL", "S8", "205");
@@ -453,9 +455,9 @@ public final class FirstYearTimetableData {
         c("K", "Monday", "09:20", "10:20", "EM", "SR", "208");
         c("K", "Monday", "10:40", "11:40", "FPL", "AG", "208");
         c("K", "Monday", "11:40", "12:40", "CS", "BM", "208");
-        p("K", "Monday", "13:30", "14:30", "FPL", "AG", "Wing B 109", "K3");
-        p("K", "Monday", "13:30", "14:30", "EM", "SR", "Wing A 003", "K1");
-        p("K", "Monday", "13:30", "14:30", "EXE", "SN", "Wing C 103", "K2");
+        p("K", "Monday", "13:30", "15:30", "FPL", "AG", "Wing B 109", "K3");
+        p("K", "Monday", "13:30", "15:30", "EM", "SR", "Wing A 003", "K1");
+        p("K", "Monday", "13:30", "15:30", "EXE", "SN", "Wing C 103", "K2");
 
         c("K", "Tuesday", "08:20", "09:20", "FPL", "AG", "203");
         c("K", "Tuesday", "09:20", "10:20", "EXE", "SN", "203");
@@ -478,9 +480,9 @@ public final class FirstYearTimetableData {
         c("K", "Thursday", "10:40", "11:40", "LAM", "SE", "208");
         t("K", "Thursday", "11:40", "12:40", "LAM", "SE", "208", "ROLL_1_35");
         libRoll("K", "Thursday", "11:40", "12:40", "208", "ROLL_36_PLUS");
-        p("K", "Thursday", "13:30", "14:30", "FPL", "AG", "Wing B 109", "K2");
-        p("K", "Thursday", "13:30", "14:30", "EM", "SR", "Wing A 003", "K3");
-        p("K", "Thursday", "13:30", "14:30", "WS", "MO", "Wing A", "K1");
+        p("K", "Thursday", "13:30", "15:30", "FPL", "AG", "Wing B 109", "K2");
+        p("K", "Thursday", "13:30", "15:30", "EM", "SR", "Wing A 003", "K3");
+        p("K", "Thursday", "13:30", "15:30", "WS", "MO", "Wing A", "K1");
 
         p("K", "Friday", "08:20", "10:20", "WS", "MO", "Wing A", "K2");
         p("K", "Friday", "08:20", "10:20", "CHY", "AD", "Wing A 017", "K3");
@@ -571,9 +573,9 @@ public final class FirstYearTimetableData {
         c("M", "Thursday", "09:20", "10:20", "EXE", "PH", "206");
         c("M", "Thursday", "10:40", "11:40", "FPL", "YR", "209");
         c("M", "Thursday", "11:40", "12:40", "CHY", "AD", "209");
-        p("M", "Thursday", "13:30", "14:30", "FPL", "YR", "Wing B 109", "M3");
-        p("M", "Thursday", "13:30", "14:30", "CHY", "AD", "Wing A 017", "M2");
-        self("M", "Thursday", "13:30", "14:30", "M1");
+        p("M", "Thursday", "13:30", "15:30", "FPL", "YR", "Wing B 109", "M3");
+        p("M", "Thursday", "13:30", "15:30", "CHY", "AD", "Wing A 017", "M2");
+        self("M", "Thursday", "13:30", "15:30", "M1");
 
         c("M", "Friday", "08:20", "09:20", "EM", "TK", "208");
         c("M", "Friday", "09:20", "10:20", "LAM", "SE", "208");
@@ -610,9 +612,9 @@ public final class FirstYearTimetableData {
         p("N", "Wednesday", "10:40", "12:40", "FPL", "NK", "Wing B 109", "N-2");
         p("N", "Wednesday", "10:40", "12:40", "EM", "TK", "Wing B 005", "N-3");
         p("N", "Wednesday", "10:40", "12:40", "WS", "MO", "Wing A", "N-1");
-        p("N", "Wednesday", "13:30", "14:30", "FPL", "NK", "Wing B 109", "N-1");
-        p("N", "Wednesday", "13:30", "14:30", "CHY", "AD", "Wing A 017", "N-2");
-        self("N", "Wednesday", "13:30", "14:30", "N-3");
+        p("N", "Wednesday", "13:30", "15:30", "FPL", "NK", "Wing B 109", "N-1");
+        p("N", "Wednesday", "13:30", "15:30", "CHY", "AD", "Wing A 017", "N-2");
+        self("N", "Wednesday", "13:30", "15:30", "N-3");
 
         special("N", "Thursday", "08:20", "10:20", "LS", "LS-1 / LS-2");
         p("N", "Thursday", "10:40", "12:40", "FPL", "NK", "Wing B 109", "N-3");
@@ -668,9 +670,9 @@ public final class FirstYearTimetableData {
         t("O", "Friday", "10:40", "11:40", "LAM", "KT", "B-312", "ROLL_1_35");
         libRoll("O", "Friday", "10:40", "11:40", "B-312", "ROLL_36_PLUS");
         c("O", "Friday", "11:40", "12:40", "CHY", "DI", "209");
-        p("O", "Friday", "13:30", "14:30", "EXE", "SS", "Wing C 103", "O-3");
-        p("O", "Friday", "13:30", "14:30", "CHY", "DI", "Wing B 114", "O-1");
-        p("O", "Friday", "13:30", "14:30", "EM", "AJY", "Wing B 005", "O-2");
+        p("O", "Friday", "13:30", "15:30", "EXE", "SS", "Wing C 103", "O-3");
+        p("O", "Friday", "13:30", "15:30", "CHY", "DI", "Wing B 114", "O-1");
+        p("O", "Friday", "13:30", "15:30", "EM", "AJY", "Wing B 005", "O-2");
 
         // -----------------------------------------------------------------
         // DIVISION P — official grid, Revision 00.
@@ -711,9 +713,9 @@ public final class FirstYearTimetableData {
         c("P", "Friday", "09:20", "10:20", "LAM", "KT", "209");
         c("P", "Friday", "10:40", "11:40", "FPL", "S8", "209");
         self("P", "Friday", "11:40", "12:40", "COMMON");
-        p("P", "Friday", "13:30", "14:30", "FPL", "S8", "Wing B 109", "P2");
-        p("P", "Friday", "13:30", "14:30", "EXE", "NS2", "Wing C 101", "P3");
-        p("P", "Friday", "13:30", "14:30", "WS", "MO", "Wing A", "P1");
+        p("P", "Friday", "13:30", "15:30", "FPL", "S8", "Wing B 109", "P2");
+        p("P", "Friday", "13:30", "15:30", "EXE", "NS2", "Wing C 101", "P3");
+        p("P", "Friday", "13:30", "15:30", "WS", "MO", "Wing A", "P1");
 
         addDailyBreaks();
         freezeAll();
