@@ -198,9 +198,9 @@ public final class FirstYearTimetableData {
         c("E", "Monday", "09:20", "10:20", "CS", "BM", "203");
         c("E", "Monday", "10:40", "11:40", "FPL", "AB", "202");
         c("E", "Monday", "11:40", "12:40", "LAM", "BG", "202");
-        p("E", "Monday", "13:30", "14:30", "EG", "SD", "Wing C 208", "E-2");
-        p("E", "Monday", "13:30", "14:30", "PHY", "MJ", "Wing B 115", "E-3");
-        p("E", "Monday", "13:30", "14:30", "ELE", "SS", "Wing A 206", "E-1");
+        p("E", "Monday", "13:30", "15:30", "EG", "SD", "Wing C 208", "E-2");
+        p("E", "Monday", "13:30", "15:30", "PHY", "MJ", "Wing B 115", "E-3");
+        p("E", "Monday", "13:30", "15:30", "ELE", "SS", "Wing A 206", "E-1");
         p("E", "Monday", "14:30", "15:30", "FPL", "AB", "Wing B 109", "E-3");
         p("E", "Monday", "14:30", "15:30", "PHY", "MJ", "Wing B 115", "E-1");
         p("E", "Monday", "14:30", "15:30", "LIBRARY", "", "Library", "E-2");
