@@ -10,6 +10,9 @@ This first import covers Divisions G, H, I, J, K, L and M (W.E.F. 16 September 2
 Revision 00), including each sheet's class teacher, subject/faculty abbreviations,
 and practical-batch roll ranges. Division B remains the existing app timetable.
 
+The accompanying [human-readable sheet transcription](docs/timetables/fe-2026-27-sem1-divisions-g-m-transcription.md)
+preserves the printed weekly cell labels for review.
+
 The catalog is a source-data staging file, not yet the live timetable engine.
 Before a new division is enabled for home schedules, attendance, widgets or alarms,
 its weekly cells must be normalized into time-bounded events and checked against
