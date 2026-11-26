@@ -371,6 +371,47 @@ public final class TimetableData {
         }
     }
 
+    /**
+     * Returns the official timetable for a selected First Year division.
+     * Division B intentionally delegates to the original timetable so existing
+     * B-division behaviour and event IDs remain unchanged.
+     */
+    public static List<ClassItem> forDivisionRollAndDay(
+            String division, int rollNumber, String day) {
+        String normalized = division == null ? "B"
+                : division.trim().toUpperCase(java.util.Locale.ENGLISH);
+        if (normalized.isEmpty() || "B".equals(normalized)) {
+            return forRollAndDay(rollNumber, day);
+        }
+        return FirstYearTimetableData.forRollAndDay(normalized, rollNumber, day);
+    }
+
+    public static String batchForDivisionRoll(String division, int rollNumber) {
+        String normalized = division == null ? "B"
+                : division.trim().toUpperCase(java.util.Locale.ENGLISH);
+        if (normalized.isEmpty() || "B".equals(normalized)) {
+            return batchForRoll(rollNumber);
+        }
+        return FirstYearTimetableData.batchForRoll(normalized, rollNumber);
+    }
+
+    public static String rollRangeForDivisionBatch(String division, String batch) {
+        String normalized = division == null ? "B"
+                : division.trim().toUpperCase(java.util.Locale.ENGLISH);
+        if (normalized.isEmpty() || "B".equals(normalized)) {
+            return rollRangeForBatch(batch);
+        }
+        return FirstYearTimetableData.rollRangeForBatch(normalized, batch);
+    }
+
+    public static boolean isSupportedDivision(String division) {
+        if (division == null) return false;
+        String normalized = division.trim().toUpperCase(java.util.Locale.ENGLISH);
+        return normalized.length() == 1
+                && normalized.charAt(0) >= 'A'
+                && normalized.charAt(0) <= 'P';
+    }
+
     private static ClassItem entry(
             String id,
             String start,
