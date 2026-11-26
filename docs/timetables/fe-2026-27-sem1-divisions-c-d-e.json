@@ -1,0 +1,55 @@
+{
+  "institution": "Nutan Maharashtra Institute of Engineering and Technology",
+  "department": "First Year Engineering",
+  "academicYear": "2026-27",
+  "semester": "I",
+  "effectiveFrom": "2026-09-16",
+  "revision": "00",
+  "wing": "C",
+  "sourceStatus": "official-sheet-metadata-captured; weekly-cells-require-normalized-event-review",
+  "timeSlots": [
+    {"id":"S1","start":"08:20","end":"09:20"},
+    {"id":"S2","start":"09:20","end":"10:20"},
+    {"id":"BREAK","start":"10:20","end":"10:40","kind":"SHORT_BREAK"},
+    {"id":"S3","start":"10:40","end":"11:40"},
+    {"id":"S4","start":"11:40","end":"12:40"},
+    {"id":"LUNCH","start":"12:40","end":"13:30","kind":"LUNCH"},
+    {"id":"S5","start":"13:30","end":"14:30"},
+    {"id":"S6","start":"14:30","end":"15:30"}
+  ],
+  "divisions": [
+    {
+      "division":"C",
+      "classTeacher":"Prof. Joyti Gore",
+      "batches":[{"id":"C-1","minRoll":1,"maxRoll":25},{"id":"C-2","minRoll":26,"maxRoll":50},{"id":"C-3","minRoll":51,"maxRoll":null}],
+      "staff":{"LAM":"Prof. Shankarrao Ugale","PHY":"Prof. Mahesh Godse","ELE":"Prof. Joyti Gore","EG":"Prof. Sandip Gore","FPL":"Prof. Tejal Girase","DTI":"Prof. Mujiaid Shaikh","CS":"Prof. Amol Bade"},
+      "staffAbbreviations":{"LAM":"SU","PHY":"MG","ELE":"JG","EG":"SG (timetable); SSD (footer as appears)","FPL":"TG","DTI":"MS","CS":"AB"},
+      "subjectCodes":{"LAM":"FE25BS101","PHY":"FE25BS102","ELE":"FE25ES102","EG":"FE25ES103","FPL":"FE25ES105","DTI":"FE25VS101","CS":"FE25AE101"},
+      "sourceReviewFlags":["Timetable cells use EG abbreviations SG and ML in different entries; staff footer lists Prof. Sandip Gore with abbreviation text resembling SSD. Preserve printed cell text pending confirmation."]
+    },
+    {
+      "division":"D",
+      "classTeacher":"Prof. Sagar Deshpande",
+      "batches":[{"id":"D-1","minRoll":1,"maxRoll":25},{"id":"D-2","minRoll":26,"maxRoll":50},{"id":"D-3","minRoll":51,"maxRoll":null}],
+      "staff":{"LAM":"Prof. Shankarrao Ugale","PHY":"Prof. Mahesh Godse","ELE":"Prof. Joyti Gore","EG":"Prof. Sagar Deshpande","FPL":"Prof. Tejal Girase","DTI":"Prof. Mujiaid Shaikh","CS":"Prof. Amol Bade"},
+      "staffAbbreviations":{"LAM":"SU","PHY":"MG","ELE":"JG","EG":"SD","FPL":"TG","DTI":"MS","CS":"AB"},
+      "subjectCodes":{"LAM":"FE25BS101","PHY":"FE25BS102","ELE":"FE25ES102","EG":"FE25ES103","FPL":"FE25ES105","DTI":"FE25VS101","CS":"FE25AE101"}
+    },
+    {
+      "division":"E",
+      "classTeacher":"Prof. Sahuraj Sabale",
+      "batches":[{"id":"E-1","minRoll":1,"maxRoll":25},{"id":"E-2","minRoll":26,"maxRoll":50},{"id":"E-3","minRoll":51,"maxRoll":null}],
+      "staff":{"LAM":"Prof. Bhimrao Gaikwad","PHY":"Prof. Manoj Junnarkar","ELE":"Prof. Sahuraj Sabale","EG":"Prof. Sagar Deshpande","FPL":"Prof. Akshay Bhosale","DTI":"Prof. Mujiaid Shaikh","CS":"Prof. Baldev Machave"},
+      "staffAbbreviations":{"LAM":"BG","PHY":"MJ","ELE":"SS","EG":"SD","FPL":"AB","DTI":"MS","CS":"BM"},
+      "subjectCodes":{"LAM":"FE25BS101","PHY":"FE25BS102","ELE":"FE25ES102","EG":"FE25ES103","FPL":"FE25ES105","DTI":"FE25VS101","CS":"FE25AE101"}
+    }
+  ],
+  "normalizationRules": {
+    "preservePrintedBatchIdentifiers":true,
+    "preservePrintedStaffAbbreviations":true,
+    "rollBasedTutorialsAndLibraryMustBeSeparateAudienceRules":true,
+    "doNotInferMissingFacultyOrRooms":true,
+    "doNotEnableRemindersUntilWeeklyEventsAreValidated":true,
+    "preserveOriginalRevisionAndEffectiveDate":true
+  }
+}
