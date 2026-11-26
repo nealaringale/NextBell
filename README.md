@@ -2,6 +2,20 @@
 
 NextBell is a local-first Android student planner for FE Division B. A student's roll number selects batch and tutorial entries from the published timetable. It now includes attendance records and target-based bunk estimates, assignment/exam/task reminders, a next-class home-screen widget, daily and weekly money controls, recurring-expense suggestions, and optional on-device bank SMS parsing.
 
+## NMIET First Year timetable source imports
+
+The official FE Semester I source-sheet metadata received so far is catalogued in
+[`docs/timetables/fe-2026-27-sem1-divisions-g-m.json`](docs/timetables/fe-2026-27-sem1-divisions-g-m.json).
+This first import covers Divisions G, H, I, J, K, L and M (W.E.F. 16 September 2026,
+Revision 00), including each sheet's class teacher, subject/faculty abbreviations,
+and practical-batch roll ranges. Division B remains the existing app timetable.
+
+The catalog is a source-data staging file, not yet the live timetable engine.
+Before a new division is enabled for home schedules, attendance, widgets or alarms,
+its weekly cells must be normalized into time-bounded events and checked against
+the source sheet for batch overlap, tutorial/library roll splits, room and faculty.
+Do not infer missing timetable details or enable reminders from an unverified import.
+
 ## Product and data model
 
 - **Android app:** Java, Android SDK 36 (Android 16), minimum Android 8.0 (API 26), target SDK 36. Screens are native views hosted in `MainActivity`; timetable, attendance, planner, finance, notification, SMS parsing, and backup logic live in Java classes.
