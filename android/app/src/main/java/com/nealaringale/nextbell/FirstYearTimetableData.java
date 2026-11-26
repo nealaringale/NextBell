@@ -976,14 +976,17 @@ public final class FirstYearTimetableData {
         }
 
         String batch = batchForRoll(keyDivision, rollNumber);
+        boolean validRoll = !batch.isEmpty();
         List<TimetableData.ClassItem> source = ALL.getOrDefault(
                 keyDivision + "|" + day, Collections.emptyList());
         List<TimetableData.ClassItem> filtered = new ArrayList<>();
         for (TimetableData.ClassItem item : source) {
             if ("COMMON".equals(item.audience)
-                    || item.audience.equals(batch)
-                    || ("ROLL_1_35".equals(item.audience) && rollNumber >= 1 && rollNumber <= 35)
-                    || ("ROLL_36_PLUS".equals(item.audience) && rollNumber >= 36)) {
+                    || (validRoll && item.audience.equals(batch))
+                    || (validRoll && "ROLL_1_35".equals(item.audience)
+                            && rollNumber >= 1 && rollNumber <= 35)
+                    || (validRoll && "ROLL_36_PLUS".equals(item.audience)
+                            && rollNumber >= 36)) {
                 filtered.add(item);
             }
         }
@@ -994,6 +997,16 @@ public final class FirstYearTimetableData {
             CACHE.put(cacheKey, result);
         }
         return result;
+    }
+
+    public static String[] divisions() {
+        return new String[]{"A", "B", "C", "D", "E", "F", "G", "H",
+                "I", "J", "K", "L", "M", "N", "O", "P"};
+    }
+
+    public static int maximumRoll(String division) {
+        String normalized = normalizeDivision(division);
+        return MAX_ROLL.getOrDefault(normalized, Integer.MAX_VALUE);
     }
 
     public static boolean supportsDivision(String division) {
