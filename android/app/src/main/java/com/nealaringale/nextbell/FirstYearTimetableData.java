@@ -633,12 +633,12 @@ public final class FirstYearTimetableData {
         t("O", "Monday", "10:40", "11:40", "LAM", "KT", "B-312", "ROLL_36_PLUS");
         libRoll("O", "Monday", "10:40", "11:40", "B-312", "ROLL_1_35");
         self("O", "Monday", "11:40", "12:40", "COMMON");
-        p("O", "Monday", "13:30", "14:30", "FPL", "NK", "Wing B 109", "O-2");
-        p("O", "Monday", "13:30", "14:30", "EM", "AJY", "Wing B 005", "O-3");
-        p("O", "Monday", "13:30", "14:30", "WS", "MO", "Wing A", "O-1");
-        p("O", "Monday", "14:30", "15:30", "WS", "MO", "Wing A", "O-2");
-        p("O", "Monday", "14:30", "15:30", "CHY", "DI", "Wing B 114", "O-3");
-        p("O", "Monday", "14:30", "15:30", "EXE", "SS", "Wing C 103", "O-1");
+        p("O", "Monday", "13:30", "15:30", "FPL", "NK", "Wing B 109", "O-2");
+        p("O", "Monday", "13:30", "15:30", "EM", "AJY", "Wing B 005", "O-3");
+        p("O", "Monday", "13:30", "15:30", "WS", "MO", "Wing A", "O-1");
+        p("O", "Tuesday", "13:30", "15:30", "WS", "MO", "Wing A", "O-2");
+        p("O", "Tuesday", "13:30", "15:30", "CHY", "DI", "Wing B 114", "O-3");
+        p("O", "Tuesday", "13:30", "15:30", "EXE", "SS", "Wing C 103", "O-1");
 
         c("O", "Tuesday", "08:20", "09:20", "EXE", "SS", "208");
         c("O", "Tuesday", "09:20", "10:20", "CHY", "DI", "208");
