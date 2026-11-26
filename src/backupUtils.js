@@ -7,6 +7,7 @@ export function createBackupJson({ profile, attendance, tasks, expenses, themeIn
   const preferences = {
     name: profile.name || 'Student',
     roll_number: Number(profile.rollNo) || 34,
+    division: String(profile.division || "B").toUpperCase(),
     theme: Number(themeIndex) || 0,
     attendance_target_percent: 75,
     attendance_sessions_v1: JSON.stringify(attendance || []),
@@ -51,7 +52,7 @@ export function parseBackupFile(jsonString) {
     const profile = {
       name: prefs.name || 'Student',
       rollNo: Number(prefs.roll_number) || 34,
-      division: 'B',
+      division: String(prefs.division || 'B').toUpperCase(),
       college: 'NMIET',
       year: 'FE 2026–27',
     };
