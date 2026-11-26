@@ -190,9 +190,6 @@ public final class FirstYearTimetableData {
         c("D", "Friday", "09:20", "10:20", "LAM", "SU", "203");
         c("D", "Friday", "10:40", "11:40", "ELE", "JG", "203");
         c("D", "Friday", "11:40", "12:40", "DTI", "MS", "203");
-        p("D", "Friday", "13:30", "14:30", "LIBRARY", "", "Library", "D-2");
-        p("D", "Friday", "13:30", "14:30", "FPL", "TG", "Wing B 109", "D-3");
-        p("D", "Friday", "13:30", "14:30", "ELE", "JG", "Wing A 206", "D-1");
 
         // -----------------------------------------------------------------
         // DIVISION E — official grid, Revision 00.
