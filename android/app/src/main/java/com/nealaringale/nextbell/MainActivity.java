@@ -69,6 +69,7 @@ public class MainActivity extends ComponentActivity {
     private static final String PREFS_NAME = "nextbell_profile";
     private static final String KEY_NAME = "name";
     private static final String KEY_ROLL_NUMBER = "roll_number";
+    private static final String KEY_DIVISION = "division";
     private static final String KEY_NOTIFICATION_PROMPTED = "notification_prompted";
     private static final String KEY_NOTIFICATION_PERMISSION_REQUESTED = "notification_permission_requested";
     private static final String KEY_THEME = "theme";
@@ -221,6 +222,10 @@ public class MainActivity extends ComponentActivity {
         });
 
         preferences = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        // Existing installations were Division B-only. Preserve their timetable.
+        if (!preferences.contains(KEY_DIVISION)) {
+            preferences.edit().putString(KEY_DIVISION, "B").apply();
+        }
         firebaseSyncManager = new FirebaseSyncManager(this, preferences,
                 new FirebaseSyncManager.StatusListener() {
                     @Override
@@ -330,14 +335,22 @@ public class MainActivity extends ComponentActivity {
         return preferences.getInt(KEY_ROLL_NUMBER, 34);
     }
 
-    private String getBatch() {
-        return TimetableData.batchForRoll(getRollNumber());
+    private String getDivision() {
+        String saved = preferences.getString(KEY_DIVISION, "B");
+        String division = saved == null ? "B" : saved.trim().toUpperCase(Locale.ENGLISH);
+        return TimetableData.isSupportedDivision(division) ? division : "B";
     }
 
-    private void saveProfile(String name, int rollNumber) {
+    private String getBatch() {
+        return TimetableData.batchForDivisionRoll(getDivision(), getRollNumber());
+    }
+
+    private void saveProfile(String name, int rollNumber, String division) {
+        String normalizedDivision = division == null ? "" : division.trim().toUpperCase(Locale.ENGLISH);
         preferences.edit()
                 .putString(KEY_NAME, name.trim())
                 .putInt(KEY_ROLL_NUMBER, rollNumber)
+                .putString(KEY_DIVISION, normalizedDivision)
                 .apply();
     }
 
@@ -689,8 +702,34 @@ public class MainActivity extends ComponentActivity {
         fieldParams2.setMargins(0, dp(8), 0, 0);
         card.addView(rollInput, fieldParams2);
 
+        TextView divisionLabel = sectionLabel("YOUR DIVISION");
+        LinearLayout.LayoutParams divisionLabelParams = new LinearLayout.LayoutParams(-1, -2);
+        divisionLabelParams.setMargins(0, dp(18), 0, 0);
+        card.addView(divisionLabel, divisionLabelParams);
+
+        final String[] selectedDivision = {""};
+        TextView divisionPicker = actionButton("Select your division", false);
+        divisionPicker.setGravity(Gravity.CENTER_VERTICAL);
+        divisionPicker.setPadding(dp(16), 0, dp(16), 0);
+        LinearLayout.LayoutParams divisionPickerParams = fieldParams();
+        divisionPickerParams.setMargins(0, dp(8), 0, 0);
+        card.addView(divisionPicker, divisionPickerParams);
+        String[] divisionOptions = FirstYearTimetableData.divisions();
+        divisionPicker.setOnClickListener(v -> {
+            tap(v);
+            new AlertDialog.Builder(this)
+                    .setTitle("Select your First Year division")
+                    .setItems(divisionOptions, (dialog, which) -> {
+                        selectedDivision[0] = divisionOptions[which];
+                        divisionPicker.setText("Division " + selectedDivision[0]);
+                        divisionPicker.setError(null);
+                    })
+                    .setNegativeButton("Cancel", null)
+                    .show();
+        });
+
         TextView batchHint = text(
-                "B1  1–25     B2  26–50     B3  51+",
+                "Your practical batch is assigned automatically from division and roll number.",
                 10,
                 MUTED
         );
@@ -709,15 +748,24 @@ public class MainActivity extends ComponentActivity {
                 nameInput.setError("Enter your name.");
                 return;
             }
+            if (selectedDivision[0].isEmpty()) {
+                divisionPicker.setError("Select your division.");
+                Toast.makeText(this, "Select your First Year division.", Toast.LENGTH_SHORT).show();
+                return;
+            }
 
             try {
                 int roll = Integer.parseInt(raw);
-                if (roll < 1 || roll > 999) {
-                    rollInput.setError("Enter a valid roll number.");
+                if (roll < 1 || roll > 999
+                        || TimetableData.batchForDivisionRoll(selectedDivision[0], roll).isEmpty()) {
+                    int maximum = FirstYearTimetableData.maximumRoll(selectedDivision[0]);
+                    rollInput.setError(maximum == Integer.MAX_VALUE
+                            ? "Enter a valid roll number."
+                            : "For Division " + selectedDivision[0] + ", enter a roll from 1 to " + maximum + ".");
                     return;
                 }
 
-                saveProfile(name, roll);
+                saveProfile(name, roll, selectedDivision[0]);
                 weekSelectedDay = todayNameOrMonday();
                 selectedScreen = "home";
                 openApp();
@@ -804,7 +852,7 @@ public class MainActivity extends ComponentActivity {
         profileRow.setGravity(Gravity.CENTER_VERTICAL);
 
         profileBadge = text(
-                getBatch() + "  •  Roll " + getRollNumber(),
+                "Division " + getDivision() + "  •  " + getBatch() + "  •  Roll " + getRollNumber(),
                 10,
                 ACCENT
         );
@@ -951,7 +999,7 @@ public class MainActivity extends ComponentActivity {
         page.addView(title);
 
         TextView subtitle = text(
-                getBatch() + "  •  Roll " + getRollNumber(),
+                "Division " + getDivision() + "  •  " + getBatch() + "  •  Roll " + getRollNumber(),
                 11,
                 MUTED
         );
@@ -1085,7 +1133,7 @@ public class MainActivity extends ComponentActivity {
         java.util.Map<String, TimetableData.ClassItem> courses = new java.util.LinkedHashMap<>();
         for (String day : TimetableData.DAYS) {
             for (TimetableData.ClassItem item :
-                    TimetableData.forRollAndDay(getRollNumber(), day)) {
+                    TimetableData.forDivisionRollAndDay(getDivision(), getRollNumber(), day)) {
                 if (item.isAcademic() && !item.subject.trim().isEmpty()) {
                     courses.putIfAbsent(item.subject, item);
                 }
@@ -1195,7 +1243,7 @@ public class MainActivity extends ComponentActivity {
         String day = date.getDayOfWeek().getDisplayName(
                 java.time.format.TextStyle.FULL, Locale.ENGLISH
         );
-        List<TimetableData.ClassItem> classes = TimetableData.forRollAndDay(getRollNumber(), day);
+        List<TimetableData.ClassItem> classes = TimetableData.forDivisionRollAndDay(getDivision(), getRollNumber(), day);
         classes = classes.stream().filter(TimetableData.ClassItem::isAcademic)
                 .collect(java.util.stream.Collectors.toList());
         if (classes.isEmpty()) {
@@ -3736,7 +3784,7 @@ public class MainActivity extends ComponentActivity {
         profileText.addView(name);
 
         TextView batch = text(
-                getBatch() + "  •  Roll " + getRollNumber(),
+                "Division " + getDivision() + "  •  " + getBatch() + "  •  Roll " + getRollNumber(),
                 10,
                 MUTED
         );
@@ -4275,9 +4323,29 @@ public class MainActivity extends ComponentActivity {
         rollParams.setMargins(0, dp(9), 0, 0);
         sheet.addView(rollInput, rollParams);
 
+        final String[] selectedDivision = {getDivision()};
+        TextView divisionPicker = actionButton("Division " + selectedDivision[0], false);
+        divisionPicker.setGravity(Gravity.CENTER_VERTICAL);
+        divisionPicker.setPadding(dp(16), 0, dp(16), 0);
+        LinearLayout.LayoutParams divisionParams = new LinearLayout.LayoutParams(-1, dp(50));
+        divisionParams.setMargins(0, dp(9), 0, 0);
+        sheet.addView(divisionPicker, divisionParams);
+        String[] divisionOptions = FirstYearTimetableData.divisions();
+        divisionPicker.setOnClickListener(v -> {
+            tap(v);
+            new AlertDialog.Builder(this)
+                    .setTitle("Select your First Year division")
+                    .setItems(divisionOptions, (pickerDialog, which) -> {
+                        selectedDivision[0] = divisionOptions[which];
+                        divisionPicker.setText("Division " + selectedDivision[0]);
+                    })
+                    .setNegativeButton("Cancel", null)
+                    .show();
+        });
+
         TextView batch = text(
                 "Your batch: " + getBatch() + "  •  " +
-                        TimetableData.rollRangeForBatch(getBatch()),
+                        TimetableData.rollRangeForDivisionBatch(selectedDivision[0], getBatch()),
                 9,
                 MUTED
         );
@@ -4323,9 +4391,20 @@ public class MainActivity extends ComponentActivity {
                 int roll = Integer.parseInt(rollInput.getText().toString().trim());
                 if (roll < 1 || roll > 999) throw new NumberFormatException();
 
-                saveProfile(name, roll);
+                if (TimetableData.batchForDivisionRoll(selectedDivision[0], roll).isEmpty()) {
+                    int maximum = FirstYearTimetableData.maximumRoll(selectedDivision[0]);
+                    rollInput.setError(maximum == Integer.MAX_VALUE
+                            ? "Enter a valid roll number."
+                            : "For Division " + selectedDivision[0] + ", enter a roll from 1 to " + maximum + ".");
+                    shake(save);
+                    return;
+                }
+
+                saveProfile(name, roll, selectedDivision[0]);
                 weekSelectedDay = todayNameOrMonday();
                 NotificationScheduler.scheduleUpcoming(this);
+                NextClassWidgetProvider.refreshAll(this);
+                LiveStatusReceiver.updateNow(this);
                 hideKeyboard();
                 dialog.dismiss();
                 navigate("settings");
@@ -4358,7 +4437,7 @@ public class MainActivity extends ComponentActivity {
         String day = isWeekend ? "Monday" : today;
 
         List<TimetableData.ClassItem> entries =
-                TimetableData.forRollAndDay(getRollNumber(), day);
+                TimetableData.forDivisionRollAndDay(getDivision(), getRollNumber(), day);
 
         int now = isWeekend ? -1 : nowSeconds();
         TimetableData.ClassItem currentClass = null;
@@ -4468,9 +4547,9 @@ public class MainActivity extends ComponentActivity {
         }
 
         homeSummary.setText(
-                academicBlocks + " sessions  •  " + breakBlocks + " breaks  •  " + getBatch()
+                academicBlocks + " sessions  •  " + breakBlocks + " breaks  •  Div " + getDivision() + " " + getBatch()
         );
-        profileBadge.setText(getBatch() + "  •  Roll " + getRollNumber());
+        profileBadge.setText("DIV " + getDivision() + "  •  " + getBatch() + "  •  Roll " + getRollNumber());
 
         StringBuilder signatureBuilder = new StringBuilder();
         signatureBuilder.append(getRollNumber()).append('|').append(day).append('|');
@@ -4509,7 +4588,7 @@ public class MainActivity extends ComponentActivity {
         if (weekSchedule == null) return;
 
         List<TimetableData.ClassItem> entries =
-                TimetableData.forRollAndDay(getRollNumber(), weekSelectedDay);
+                TimetableData.forDivisionRollAndDay(getDivision(), getRollNumber(), weekSelectedDay);
 
         String today = todayName();
         boolean viewingToday = weekSelectedDay.equals(today) && !today.isEmpty();
