@@ -88,7 +88,8 @@ public class FirstYearTimetableDataTest {
         assertEntry("L", 51, "Wednesday", "13:30", "14:30", "WS", "L3");
         assertEntry("M", 51, "Thursday", "13:30", "14:30", "FPL", "M3");
         assertEntry("N", 1, "Wednesday", "13:30", "14:30", "FPL", "N-1");
-        assertEntry("O", 26, "Monday", "13:30", "14:30", "FPL", "O-2");
+        assertEntry("O", 26, "Monday", "13:30", "15:30", "FPL", "O-2");
+        assertEntry("O", 26, "Tuesday", "13:30", "15:30", "WS", "O-2");
         assertEntry("P", 26, "Friday", "13:30", "15:30", "FPL", "P2");
     }
 
