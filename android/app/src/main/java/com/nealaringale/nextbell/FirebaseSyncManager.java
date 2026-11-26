@@ -183,6 +183,7 @@ public final class FirebaseSyncManager implements SharedPreferences.OnSharedPref
 
         editor.remove("name")
                 .remove("roll_number")
+                .remove("division")
                 .remove("firebase_profile_extras_v1")
                 .remove("firebase_settings_extras_v1")
                 .putInt("theme", 0)
@@ -352,7 +353,7 @@ public final class FirebaseSyncManager implements SharedPreferences.OnSharedPref
             }
             return;
         }
-        if ("name".equals(key) || "roll_number".equals(key)) {
+        if ("name".equals(key) || "roll_number".equals(key) || "division".equals(key)) {
             writeSingleton("profile", localProfile());
         } else if ("theme".equals(key) || "attendance_target_percent".equals(key)
                 || "expense_daily_limit".equals(key)
@@ -442,11 +443,14 @@ public final class FirebaseSyncManager implements SharedPreferences.OnSharedPref
             extras.remove("name");
             extras.remove("rollNo");
             extras.remove("roll_number");
+            extras.remove("division");
             SharedPreferences.Editor editor = preferences.edit();
             String name = profile.optString("name", "");
             if (!name.trim().isEmpty()) editor.putString("name", name);
             int roll = profile.optInt("rollNo", profile.optInt("roll_number", 0));
             if (roll > 0 && roll <= 120) editor.putInt("roll_number", roll);
+            String division = profile.optString("division", "B").trim().toUpperCase(java.util.Locale.ENGLISH);
+            if (division.matches("[A-P]")) editor.putString("division", division);
             editor.putString("firebase_profile_extras_v1", extras.toString());
             editor.commit();
         } finally {
@@ -523,6 +527,7 @@ public final class FirebaseSyncManager implements SharedPreferences.OnSharedPref
         try {
             value.put("name", preferences.getString("name", ""));
             value.put("rollNo", preferences.getInt("roll_number", 34));
+            value.put("division", preferences.getString("division", "B"));
         } catch (Exception ignored) {}
         return value;
     }
