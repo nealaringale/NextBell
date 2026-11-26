@@ -1,6 +1,6 @@
 # NextBell
 
-NextBell is a local-first Android student planner for FE Division B. A student's roll number selects batch and tutorial entries from the published timetable. It now includes attendance records and target-based bunk estimates, assignment/exam/task reminders, a next-class home-screen widget, daily and weekly money controls, recurring-expense suggestions, and optional on-device bank SMS parsing.
+NextBell is a local-first Android student planner for NMIET First Year Engineering. On the development branch, a student's division and roll number select the matching timetable and practical/tutorial groups. It includes attendance records and target-based bunk estimates, assignment/exam/task reminders, a next-class home-screen widget, daily and weekly money controls, recurring-expense suggestions, and optional on-device bank SMS parsing.
 
 ## NMIET First Year timetable source imports
 
@@ -67,7 +67,7 @@ before their schedules can drive Home, Week, Attendance, notifications or widget
 ## Product and data model
 
 - **Android app:** Java, Android SDK 36 (Android 16), minimum Android 8.0 (API 26), target SDK 36. Screens are native views hosted in `MainActivity`; timetable, attendance, planner, finance, notification, SMS parsing, and backup logic live in Java classes.
-- **Timetable:** bundled official FE Division B timetable, W.E.F. 16 September 2026, Revision 00. Schedule data is available offline; batch filtering is based on the student's roll number.
+- **Timetable:** Division B retains its original bundled timetable and identifiers. The development branch adds official Semester I schedules for Divisions A and C–P in `FirstYearTimetableData`, with roll-range and batch-aware filtering. New users select a division during setup; existing installs without a saved division migrate to B. All timetable data remains available offline.
 - **Study planning:** attendance marks, assignment/exam/task items, and due dates are stored locally. Bunk estimates use only sessions the student has recorded. Deadline reminders are approximate Android alarms and require notifications to be enabled.
 - **Profile, study data, and money:** stored locally in the app's private `SharedPreferences` by default. Optional Cloud Sync uses Firebase Authentication and Cloud Firestore when the user configures it and signs in. Android system cloud backup and device-to-device transfer are excluded. The user can export a readable JSON backup to a file they choose. Anyone who receives that file can read it.
 - **Money entry:** direct SMS ingestion is the primary bank-alert path after the user explicitly enables RECEIVE_SMS. Notification access remains an additional fallback for UPI/wallet alerts. The private debug APK must be installed via ADB so Android's shell installer can allowlist hard-restricted SMS permissions; tapping an APK in a file manager may not allow RECEIVE_SMS/READ_SMS. READ_SMS is requested separately only when the user chooses a 30-day inbox import. Raw message text is not saved or uploaded; only parsed transaction fields and duplicate fingerprints are retained. Parsed expense records can sync to the user's own Firebase account only when Cloud Sync is separately enabled. Google Play lists SMS-based money management (including budgeting apps) as an eligible SMS-permission use case, subject to the Play Console declaration and review/approval. Keep the prominent disclosure, consent, privacy policy and Data safety answers aligned with the actual on-device parsing and optional cloud-sync behaviour.
@@ -77,6 +77,26 @@ before their schedules can drive Home, Week, Attendance, notifications or widget
 - **Play Store resources:** [privacy policy](https://nealaringale.github.io/NextBell/privacy-policy.html) and [account/data deletion request](https://nealaringale.github.io/NextBell/delete-account.html) are published from `public/` by the GitHub Pages deployment. Verify both live URLs after merging to `main` before entering them in Play Console. See [Google Play's SMS permission policy](https://support.google.com/googleplay/android-developer/answer/10208820) and [Android's hard-restricted permission documentation](https://source.android.com/docs/core/permissions/runtime_perms).
 - **Admin companion:** a separate local draft tool. It does not publish timetable changes to student devices.
 - **Browser prototype:** `src/` is an older Vite demo with fixture data; it is not the Android app or the download website and should not be treated as the live timetable source.
+
+## Multi-division Android implementation (dev)
+
+The Android setup screen asks new users to select a First Year division (A–P) and
+enter their roll number. The profile stores both values. The selected division is
+used by Home, Week, attendance course selection, class reminders, live status and
+the home-screen widget. Practical batches are derived from each division's printed
+roll ranges; divisions J, K, L, M and P reject rolls above 74, as their source sheets
+specify. Other supplied sheets state 51 onwards.
+
+Existing installations without a division preference are migrated to Division B,
+and Division B timetable queries continue to delegate to the original `TimetableData` implementation. Division changes reschedule alarms and refresh the widget/live status.
+The Android backup includes all preferences, and the web backup now preserves the
+division field.
+
+**Verification:** `FirstYearTimetableDataTest` checks batch boundaries, weekday coverage,
+invalid capped roll numbers, representative official cells and merged-session durations,
+duplicate IDs, immutable results, non-overlapping/sorted schedules, and Division B
+regression equivalence. GitHub Actions runs on pushes to `dev` as well as release branches.
+New divisions are not being merged into `main` until review and verification are complete.
 
 ## Build and verify Android
 
