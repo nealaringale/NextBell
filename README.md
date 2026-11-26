@@ -19,6 +19,21 @@ its weekly cells must be normalized into time-bounded events and checked against
 the source sheet for batch overlap, tutorial/library roll splits, room and faculty.
 Do not infer missing timetable details or enable reminders from an unverified import.
 
+## NMIET First Year timetable source imports — second batch
+
+A second set of official FE Semester I source sheets has been catalogued at
+[`docs/timetables/fe-2026-27-sem1-divisions-a-b-n-o-p.json`](docs/timetables/fe-2026-27-sem1-divisions-a-b-n-o-p.json)
+with a [human-readable transcription](docs/timetables/fe-2026-27-sem1-divisions-a-b-n-o-p-transcription.md).
+This batch covers Divisions A, B, N, O and P (W.E.F. 16 September 2026, Revision 00).
+Division B already exists in the Android implementation; its newly supplied official
+sheet is for source comparison, not an automatic schedule replacement.
+
+Together with the first batch, official-sheet metadata has now been staged for
+Divisions A, B, G, H, I, J, K, L, M, N, O and P. These files remain source catalogues
+and transcriptions, not the live timetable engine. New divisions must not be enabled
+for student reminders, attendance, widgets or live schedules until every merged cell,
+time slot, room, faculty abbreviation and batch audience is normalized and reviewed.
+
 ## Product and data model
 
 - **Android app:** Java, Android SDK 36 (Android 16), minimum Android 8.0 (API 26), target SDK 36. Screens are native views hosted in `MainActivity`; timetable, attendance, planner, finance, notification, SMS parsing, and backup logic live in Java classes.
