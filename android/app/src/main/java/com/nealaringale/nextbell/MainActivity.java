@@ -4331,6 +4331,7 @@ public class MainActivity extends ComponentActivity {
         divisionParams.setMargins(0, dp(9), 0, 0);
         sheet.addView(divisionPicker, divisionParams);
         String[] divisionOptions = FirstYearTimetableData.divisions();
+        final TextView[] batchSummary = {null};
         divisionPicker.setOnClickListener(v -> {
             tap(v);
             new AlertDialog.Builder(this)
@@ -4338,17 +4339,29 @@ public class MainActivity extends ComponentActivity {
                     .setItems(divisionOptions, (pickerDialog, which) -> {
                         selectedDivision[0] = divisionOptions[which];
                         divisionPicker.setText("Division " + selectedDivision[0]);
+                        String previewBatch = TimetableData.batchForDivisionRoll(
+                                selectedDivision[0], getRollNumber());
+                        if (batchSummary[0] != null) {
+                            batchSummary[0].setText(previewBatch.isEmpty()
+                                    ? "Roll number is outside this division’s listed range."
+                                    : "Your batch: " + previewBatch + "  •  " +
+                                            TimetableData.rollRangeForDivisionBatch(selectedDivision[0], previewBatch));
+                        }
                     })
                     .setNegativeButton("Cancel", null)
                     .show();
         });
 
+        String previewBatch = TimetableData.batchForDivisionRoll(selectedDivision[0], getRollNumber());
         TextView batch = text(
-                "Your batch: " + getBatch() + "  •  " +
-                        TimetableData.rollRangeForDivisionBatch(selectedDivision[0], getBatch()),
+                previewBatch.isEmpty()
+                        ? "Roll number is outside this division’s listed range."
+                        : "Your batch: " + previewBatch + "  •  " +
+                                TimetableData.rollRangeForDivisionBatch(selectedDivision[0], previewBatch),
                 9,
                 MUTED
         );
+        batchSummary[0] = batch;
         batch.setPadding(0, dp(8), 0, 0);
         sheet.addView(batch);
 
