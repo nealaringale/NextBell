@@ -34,6 +34,22 @@ and transcriptions, not the live timetable engine. New divisions must not be ena
 for student reminders, attendance, widgets or live schedules until every merged cell,
 time slot, room, faculty abbreviation and batch audience is normalized and reviewed.
 
+## NMIET First Year timetable source imports — third batch
+
+The third batch of official FE Semester I sheets is catalogued in
+[`docs/timetables/fe-2026-27-sem1-divisions-c-d-e.json`](docs/timetables/fe-2026-27-sem1-divisions-c-d-e.json)
+with a [human-readable transcription](docs/timetables/fe-2026-27-sem1-divisions-c-d-e-transcription.md).
+This batch covers Divisions C, D and E (W.E.F. 16 September 2026, Revision 00).
+
+Official timetable source sheets have now been staged for Divisions A, B, C, D, E,
+G, H, I, J, K, L, M, N, O and P. Division F is the only A–P sheet still outstanding.
+Division B's newly supplied official sheet is a source-validation copy and must be
+compared against its existing Android timetable before any replacement.
+
+These files remain source catalogues/transcriptions, not the live timetable engine.
+Every merged cell must be normalized to its exact time interval and audience before
+new divisions are enabled for schedules, attendance, widgets or notifications.
+
 ## Product and data model
 
 - **Android app:** Java, Android SDK 36 (Android 16), minimum Android 8.0 (API 26), target SDK 36. Screens are native views hosted in `MainActivity`; timetable, attendance, planner, finance, notification, SMS parsing, and backup logic live in Java classes.
