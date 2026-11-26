@@ -570,9 +570,9 @@ public final class FirstYearTimetableData {
         c("M", "Thursday", "09:20", "10:20", "EXE", "PH", "206");
         c("M", "Thursday", "10:40", "11:40", "FPL", "YR", "209");
         c("M", "Thursday", "11:40", "12:40", "CHY", "AD", "209");
-        p("M", "Thursday", "13:30", "15:30", "FPL", "YR", "Wing B 109", "M3");
-        p("M", "Thursday", "13:30", "15:30", "CHY", "AD", "Wing A 017", "M2");
-        self("M", "Thursday", "13:30", "15:30", "M1");
+        p("M", "Thursday", "13:30", "14:30", "FPL", "YR", "Wing B 109", "M3");
+        p("M", "Thursday", "13:30", "14:30", "CHY", "AD", "Wing A 017", "M2");
+        self("M", "Thursday", "13:30", "14:30", "M1");
 
         c("M", "Friday", "08:20", "09:20", "EM", "TK", "208");
         c("M", "Friday", "09:20", "10:20", "LAM", "SE", "208");
@@ -609,9 +609,9 @@ public final class FirstYearTimetableData {
         p("N", "Wednesday", "10:40", "12:40", "FPL", "NK", "Wing B 109", "N-2");
         p("N", "Wednesday", "10:40", "12:40", "EM", "TK", "Wing B 005", "N-3");
         p("N", "Wednesday", "10:40", "12:40", "WS", "MO", "Wing A", "N-1");
-        p("N", "Wednesday", "13:30", "15:30", "FPL", "NK", "Wing B 109", "N-1");
-        p("N", "Wednesday", "13:30", "15:30", "CHY", "AD", "Wing A 017", "N-2");
-        self("N", "Wednesday", "13:30", "15:30", "N-3");
+        p("N", "Wednesday", "13:30", "14:30", "FPL", "NK", "Wing B 109", "N-1");
+        p("N", "Wednesday", "13:30", "14:30", "CHY", "AD", "Wing A 017", "N-2");
+        self("N", "Wednesday", "13:30", "14:30", "N-3");
 
         special("N", "Thursday", "08:20", "10:20", "LS", "LS-1 / LS-2");
         p("N", "Thursday", "10:40", "12:40", "FPL", "NK", "Wing B 109", "N-3");
