@@ -1,0 +1,76 @@
+{
+  "institution": "Nutan Maharashtra Institute of Engineering and Technology",
+  "department": "First Year Engineering",
+  "academicYear": "2026-27",
+  "semester": "I",
+  "effectiveFrom": "2026-09-16",
+  "revision": "00",
+  "wing": "C",
+  "sourceStatus": "official-sheet-metadata-captured; weekly-cells-require-normalized-event-review",
+  "timeSlots": [
+    {"id":"S1","start":"08:20","end":"09:20"},
+    {"id":"S2","start":"09:20","end":"10:20"},
+    {"id":"BREAK","start":"10:20","end":"10:40","kind":"SHORT_BREAK"},
+    {"id":"S3","start":"10:40","end":"11:40"},
+    {"id":"S4","start":"11:40","end":"12:40"},
+    {"id":"LUNCH","start":"12:40","end":"13:30","kind":"LUNCH"},
+    {"id":"S5","start":"13:30","end":"14:30"},
+    {"id":"S6","start":"14:30","end":"15:30"}
+  ],
+  "divisions": [
+    {
+      "division":"A",
+      "classTeacher":"Prof. Rupali Jagnade",
+      "existingAppSchedule":false,
+      "batches":[{"id":"A-1","minRoll":1,"maxRoll":25},{"id":"A-2","minRoll":26,"maxRoll":50},{"id":"A-3","minRoll":51,"maxRoll":null}],
+      "staff":{"LAM":"Prof. Premkumar Kolle","PHY":"Prof. Rupali Jagnade","ELE":"Prof. Arti S. Bindu","EG":"Prof. Santosh Dabhole","FPL":"Prof. Sanket Sontakke","DTI":"Prof. Mujiaid Shaikh","CS":"Prof. Amol Bade"},
+      "staffAbbreviations":{"LAM":"PK","PHY":"RJ","ELE":"ASB","EG":"SSD","FPL":"SS","DTI":"MS","CS":"AB"},
+      "subjectCodes":{"LAM":"FE25BS101","PHY":"FE25BS102","ELE":"FE25ES102","EG":"FE25ES103","FPL":"FE25ES105","DTI":"FE25VS101","CS":"FE25AE101"}
+    },
+    {
+      "division":"B",
+      "classTeacher":"Prof. Santosh Dabhole",
+      "existingAppSchedule":true,
+      "sourceSheetRequiresComparisonWithCurrentTimetableData":true,
+      "batches":[{"id":"B-1","minRoll":1,"maxRoll":25},{"id":"B-2","minRoll":26,"maxRoll":50},{"id":"B-3","minRoll":51,"maxRoll":null}],
+      "staff":{"LAM":"Prof. Vrushali Gujar","PHY":"Prof. Rupali Jagnade","ELE":"Prof. Arti S. Bindu","EG":"Prof. Santosh Dabhole","FPL":"Prof. Sanket Sontakke","DTI":"Prof. Mujiaid Shaikh","CS":"Prof. Amol Bade"},
+      "staffAbbreviations":{"LAM":"VG","PHY":"RJ","ELE":"ASB","EG":"SSD","FPL":"SS","DTI":"MS","CS":"AB"},
+      "subjectCodes":{"LAM":"FE25BS101","PHY":"FE25BS102","ELE":"FE25ES102","EG":"FE25ES103","FPL":"FE25ES105","DTI":"FE25VS101","CS":"FE25AE101"}
+    },
+    {
+      "division":"N",
+      "classTeacher":"Dr. Shankarrao Ugale",
+      "existingAppSchedule":false,
+      "batches":[{"id":"N-1","minRoll":1,"maxRoll":25},{"id":"N-2","minRoll":26,"maxRoll":50},{"id":"N-3","minRoll":51,"maxRoll":null}],
+      "staff":{"LAM":"Prof. Shankarrao Ugale","CHY":"Dr. Anand Daultabad","BXE":"Prof. Sachinkumar Shahare","EM":"Dr. Tejaswita Kajale","FPL":"Prof. Neha Kumari","WS":"Dr. Milind Ovhal","CS":"Prof. Amol Bade"},
+      "staffAbbreviations":{"LAM":"SU","CHY":"AD","BXE":"SS","EM":"TK","FPL":"NK","WS":"MO","CS":"BM"},
+      "subjectCodes":{"LAM":"FE25BS101","CHY":"FE25BS103","BXE":"FE25ES101","EM":"FE25ES104","FPL":"FE25ES105","WS":"FE25VS102","CS":"FE25AE101"}
+    },
+    {
+      "division":"O",
+      "classTeacher":"Prof. Kirti Takale",
+      "existingAppSchedule":false,
+      "batches":[{"id":"O-1","minRoll":1,"maxRoll":25},{"id":"O-2","minRoll":26,"maxRoll":50},{"id":"O-3","minRoll":51,"maxRoll":null}],
+      "staff":{"LAM":"Prof. Kirti Takale","CHY":"Prof. Damayanti Ingale","BXE":"Prof. Sachinkumar Shahare","EM":"Prof. Anil J. Yadav","FPL":"Prof. Neha Kumari","WS":"Dr. Milind Ovhal","CS":"Prof. Baldev Machave"},
+      "staffAbbreviations":{"LAM":"KT","CHY":"DI","BXE":"SS","EM":"AJY","FPL":"NK","WS":"MO","CS":"BM"},
+      "subjectCodes":{"LAM":"FE25BS101","CHY":"FE25BS103","BXE":"FE25ES101","EM":"FE25ES104","FPL":"FE25ES105","WS":"FE25VS102","CS":"FE25AE101"}
+    },
+    {
+      "division":"P",
+      "classTeacher":"Prof. Damayanti Ingale",
+      "existingAppSchedule":false,
+      "batches":[{"id":"P1","minRoll":1,"maxRoll":25},{"id":"P2","minRoll":26,"maxRoll":50},{"id":"P3","minRoll":51,"maxRoll":74}],
+      "staff":{"LAM":"Prof. Kirti Takale","CHY":"Prof. Damayanti Ingale","BXE":"Prof. NS2 (as printed)","EM":"Prof. Milind Landge","FPL":"Prof. S8 (as printed)","WS":"Dr. Milind Ovhal","CS":"Prof. Baldev Machave"},
+      "staffAbbreviations":{"LAM":"KT","CHY":"DI","BXE":"NS2","EM":"ML","FPL":"S8","WS":"MO","CS":"BM"},
+      "subjectCodes":{"LAM":"FE25BS101","CHY":"FE25BS103","BXE":"FE25ES101","EM":"FE25ES104","FPL":"FE25ES105","WS":"FE25VS102","CS":"FE25AE101"}
+    }
+  ],
+  "normalizationRules": {
+    "preservePrintedBatchIdentifiers":true,
+    "rollBasedTutorialsAndLibraryMustBeSeparateAudienceRules":true,
+    "doNotInferMissingFacultyOrRooms":true,
+    "doNotEnableRemindersUntilWeeklyEventsAreValidated":true,
+    "preserveOriginalRevisionAndEffectiveDate":true,
+    "divisionBMustBeAuditedAgainstExistingAndroidTimetableData":true
+  }
+}
