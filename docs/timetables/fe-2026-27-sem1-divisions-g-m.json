@@ -8,65 +8,343 @@
   "wing": "C",
   "sourceStatus": "official-sheet-metadata-captured; weekly-cells-require-normalized-event-review",
   "timeSlots": [
-    {"id":"S1","start":"08:20","end":"09:20"},
-    {"id":"S2","start":"09:20","end":"10:20"},
-    {"id":"BREAK","start":"10:20","end":"10:40","kind":"SHORT_BREAK"},
-    {"id":"S3","start":"10:40","end":"11:40"},
-    {"id":"S4","start":"11:40","end":"12:40"},
-    {"id":"LUNCH","start":"12:40","end":"13:30","kind":"LUNCH"},
-    {"id":"S5","start":"13:30","end":"14:30"},
-    {"id":"S6","start":"14:30","end":"15:30"}
+    {
+      "id": "S1",
+      "start": "08:20",
+      "end": "09:20"
+    },
+    {
+      "id": "S2",
+      "start": "09:20",
+      "end": "10:20"
+    },
+    {
+      "id": "BREAK",
+      "start": "10:20",
+      "end": "10:40",
+      "kind": "SHORT_BREAK"
+    },
+    {
+      "id": "S3",
+      "start": "10:40",
+      "end": "11:40"
+    },
+    {
+      "id": "S4",
+      "start": "11:40",
+      "end": "12:40"
+    },
+    {
+      "id": "LUNCH",
+      "start": "12:40",
+      "end": "13:30",
+      "kind": "LUNCH"
+    },
+    {
+      "id": "S5",
+      "start": "13:30",
+      "end": "14:30"
+    },
+    {
+      "id": "S6",
+      "start": "14:30",
+      "end": "15:30"
+    }
   ],
   "divisions": [
     {
-      "division":"G",
-      "classTeacher":"Prof. Sandip Gore",
-      "batches":[{"id":"G1","minRoll":1,"maxRoll":25},{"id":"G2","minRoll":26,"maxRoll":50},{"id":"G3","minRoll":51,"maxRoll":74}],
-      "staff":{"LAM":"Prof. Vallabh Shinde","PHY":"Prof. Anil Rakshe","ELE":"Prof. Rasmi Singh","EG":"Prof. Sandip Gore","FPL":"Prof. Ramkrishna Patil","DTI":"Prof. Mujiaid Shaikh","CS":"Prof. Amol Bade","WS":"Dr. Milind Ovhal"},
-      "subjectCodes":{"LAM":"FE25BS101","PHY":"FE25BS102","ELE":"FE25ES102","EG":"FE25ES103","FPL":"FE25ES105","DTI":"FE25VS101","CS":"FE25AE101","WS":"FE25VS102"}
+      "division": "G",
+      "classTeacher": "Prof. Sandip Gore",
+      "batches": [
+        {
+          "id": "G1",
+          "minRoll": 1,
+          "maxRoll": 25
+        },
+        {
+          "id": "G2",
+          "minRoll": 26,
+          "maxRoll": 50
+        },
+        {
+          "id": "G3",
+          "minRoll": 51,
+          "maxRoll": null
+        }
+      ],
+      "staff": {
+        "LAM": "Prof. Vallabh Shinde",
+        "PHY": "Prof. Anil Rakshe",
+        "ELE": "Prof. Rasmi Singh",
+        "EG": "Prof. Sandip Gore",
+        "FPL": "Prof. Ramkrishna Patil",
+        "DTI": "Prof. Mujiaid Shaikh",
+        "CS": "Prof. Amol Bade",
+        "WS": "Dr. Milind Ovhal"
+      },
+      "subjectCodes": {
+        "LAM": "FE25BS101",
+        "PHY": "FE25BS102",
+        "ELE": "FE25ES102",
+        "EG": "FE25ES103",
+        "FPL": "FE25ES105",
+        "DTI": "FE25VS101",
+        "CS": "FE25AE101",
+        "WS": "FE25VS102"
+      }
     },
     {
-      "division":"H",
-      "classTeacher":"Prof. Swati Narule",
-      "batches":[{"id":"H1","minRoll":1,"maxRoll":25},{"id":"H2","minRoll":26,"maxRoll":50},{"id":"H3","minRoll":51,"maxRoll":74}],
-      "staff":{"LAM":"Prof. Kirti Tikale","CHY":"Dr. Archana Yewale","BXE":"Prof. Swati Narule","EM":"Prof. Anil J. Yadav","FPL":"Prof. Ankita Gadekar","WS":"Dr. Milind Ovhal","CS":"Prof. Baldev Machave"}
+      "division": "H",
+      "classTeacher": "Prof. Swati Narule",
+      "batches": [
+        {
+          "id": "H1",
+          "minRoll": 1,
+          "maxRoll": 25
+        },
+        {
+          "id": "H2",
+          "minRoll": 26,
+          "maxRoll": 50
+        },
+        {
+          "id": "H3",
+          "minRoll": 51,
+          "maxRoll": null
+        }
+      ],
+      "staff": {
+        "LAM": "Prof. Kirti Tikale",
+        "CHY": "Dr. Archana Yewale",
+        "BXE": "Prof. Swati Narule",
+        "EM": "Prof. Anil J. Yadav",
+        "FPL": "Prof. Ankita Gadekar",
+        "WS": "Dr. Milind Ovhal",
+        "CS": "Prof. Baldev Machave"
+      },
+      "subjectCodes": {
+        "LAM": "FE25BS101",
+        "CHY": "FE25BS103",
+        "BXE": "FE25ES101",
+        "EM": "FE25ES104",
+        "FPL": "FE25ES105",
+        "WS": "FE25VS102",
+        "CS": "FE25AE101"
+      }
     },
     {
-      "division":"I",
-      "classTeacher":"Prof. Anil Rakshe",
-      "batches":[{"id":"I-1","minRoll":1,"maxRoll":25},{"id":"I-2","minRoll":26,"maxRoll":50},{"id":"I-3","minRoll":51,"maxRoll":74}],
-      "staff":{"LAM":"Prof. Vallabh Shinde","PHY":"Prof. Anil Rakshe","ELE":"Prof. Rasmi Singh","EG":"Prof. Milind Landge","FPL":"Prof. Ramkrishna Patil","DTI":"Prof. Mujiaid Shaikh","CS":"Prof. Amol Bade"}
+      "division": "I",
+      "classTeacher": "Prof. Anil Rakshe",
+      "batches": [
+        {
+          "id": "I-1",
+          "minRoll": 1,
+          "maxRoll": 25
+        },
+        {
+          "id": "I-2",
+          "minRoll": 26,
+          "maxRoll": 50
+        },
+        {
+          "id": "I-3",
+          "minRoll": 51,
+          "maxRoll": null
+        }
+      ],
+      "staff": {
+        "LAM": "Prof. Vallabh Shinde",
+        "PHY": "Prof. Anil Rakshe",
+        "ELE": "Prof. Rasmi Singh",
+        "EG": "Prof. Milind Landge",
+        "FPL": "Prof. Ramkrishna Patil",
+        "DTI": "Prof. Mujiaid Shaikh",
+        "CS": "Prof. Amol Bade"
+      },
+      "subjectCodes": {
+        "LAM": "FE25BS101",
+        "PHY": "FE25BS102",
+        "ELE": "FE25ES102",
+        "EG": "FE25ES103",
+        "FPL": "FE25ES105",
+        "DTI": "FE25VS101",
+        "CS": "FE25AE101"
+      }
     },
     {
-      "division":"J",
-      "classTeacher":"Dr. Kavita Shinde",
-      "batches":[{"id":"J1","minRoll":1,"maxRoll":25},{"id":"J2","minRoll":26,"maxRoll":50},{"id":"J3","minRoll":51,"maxRoll":74}],
-      "staff":{"LAM":"Dr. Kavita Shinde","CHY":"Prof. Pratiksha Tanpure","BXE":"Prof. NS2 (initials as printed)","EM":"Dr. Aniruddh Dubal","FPL":"Prof. S8 (initials as printed)","WS":"Dr. Milind Ovhal","CS":"Prof. Baldev Machave"}
+      "division": "J",
+      "classTeacher": "Dr. Kavita Shinde",
+      "batches": [
+        {
+          "id": "J1",
+          "minRoll": 1,
+          "maxRoll": 25
+        },
+        {
+          "id": "J2",
+          "minRoll": 26,
+          "maxRoll": 50
+        },
+        {
+          "id": "J3",
+          "minRoll": 51,
+          "maxRoll": 74
+        }
+      ],
+      "staff": {
+        "LAM": "Dr. Kavita Shinde",
+        "CHY": "Prof. Pratiksha Tanpure",
+        "BXE": "Prof. NS2 (initials as printed)",
+        "EM": "Dr. Aniruddh Dubal",
+        "FPL": "Prof. S8 (initials as printed)",
+        "WS": "Dr. Milind Ovhal",
+        "CS": "Prof. Baldev Machave"
+      },
+      "subjectCodes": {
+        "LAM": "FE25BS101",
+        "CHY": "FE25BS103",
+        "BXE": "FE25ES101",
+        "EM": "FE25ES104",
+        "FPL": "FE25ES105",
+        "WS": "FE25VS102",
+        "CS": "FE25AE101"
+      }
     },
     {
-      "division":"K",
-      "classTeacher":"Prof. Pratiksha Tanpure",
-      "batches":[{"id":"K1","minRoll":1,"maxRoll":25},{"id":"K2","minRoll":26,"maxRoll":50},{"id":"K3","minRoll":51,"maxRoll":74}],
-      "staff":{"LAM":"Prof. Shital Ekhande","CHY":"Prof. Pratiksha Tanpure","BXE":"Prof. Swati Narule","EM":"Dr. Shekhar Rahane","FPL":"Prof. Ankita Gadekar","WS":"Dr. Milind Ovhal","CS":"Prof. Baldev Machave"}
+      "division": "K",
+      "classTeacher": "Prof. Pratiksha Tanpure",
+      "batches": [
+        {
+          "id": "K1",
+          "minRoll": 1,
+          "maxRoll": 25
+        },
+        {
+          "id": "K2",
+          "minRoll": 26,
+          "maxRoll": 50
+        },
+        {
+          "id": "K3",
+          "minRoll": 51,
+          "maxRoll": 74
+        }
+      ],
+      "staff": {
+        "LAM": "Prof. Shital Ekhande",
+        "CHY": "Prof. Pratiksha Tanpure",
+        "BXE": "Prof. Swati Narule",
+        "EM": "Dr. Shekhar Rahane",
+        "FPL": "Prof. Ankita Gadekar",
+        "WS": "Dr. Milind Ovhal",
+        "CS": "Prof. Baldev Machave"
+      },
+      "subjectCodes": {
+        "LAM": "FE25BS101",
+        "CHY": "FE25BS103",
+        "BXE": "FE25ES101",
+        "EM": "FE25ES104",
+        "FPL": "FE25ES105",
+        "WS": "FE25VS102",
+        "CS": "FE25AE101"
+      }
     },
     {
-      "division":"L",
-      "classTeacher":"Dr. Aniruddh Dubal",
-      "batches":[{"id":"L1","minRoll":1,"maxRoll":25},{"id":"L2","minRoll":26,"maxRoll":50},{"id":"L3","minRoll":51,"maxRoll":74}],
-      "staff":{"LAM":"Prof. Vallabh Shinde","CHY":"Prof. Pratiksha Tanpure","BXE":"Prof. Priyanka Hiremath","EM":"Dr. Aniruddh Dubal","FPL":"Prof. Yogita Rode","WS":"Dr. Milind Ovhal","CS":"Prof. Baldev Machave"}
+      "division": "L",
+      "classTeacher": "Dr. Aniruddh Dubal",
+      "batches": [
+        {
+          "id": "L1",
+          "minRoll": 1,
+          "maxRoll": 25
+        },
+        {
+          "id": "L2",
+          "minRoll": 26,
+          "maxRoll": 50
+        },
+        {
+          "id": "L3",
+          "minRoll": 51,
+          "maxRoll": 74
+        }
+      ],
+      "staff": {
+        "LAM": "Prof. Vallabh Shinde",
+        "CHY": "Prof. Pratiksha Tanpure",
+        "BXE": "Prof. Priyanka Hiremath",
+        "EM": "Dr. Aniruddh Dubal",
+        "FPL": "Prof. Yogita Rode",
+        "WS": "Dr. Milind Ovhal",
+        "CS": "Prof. Baldev Machave"
+      },
+      "subjectCodes": {
+        "LAM": "FE25BS101",
+        "CHY": "FE25BS103",
+        "BXE": "FE25ES101",
+        "EM": "FE25ES104",
+        "FPL": "FE25ES105",
+        "WS": "FE25VS102",
+        "CS": "FE25AE101"
+      }
     },
     {
-      "division":"M",
-      "classTeacher":"Prof. Shital Ekhande",
-      "batches":[{"id":"M1","minRoll":1,"maxRoll":25},{"id":"M2","minRoll":26,"maxRoll":50},{"id":"M3","minRoll":51,"maxRoll":74}],
-      "staff":{"LAM":"Prof. Shital Ekhande","CHY":"Dr. Anand Daultabad","BXE":"Prof. Priyanka Hiremath","EM":"Dr. Tejaswita Kajale","FPL":"Prof. Yogita Rode","WS":"Dr. Milind Ovhal","CS":"Prof. Baldev Machave"}
+      "division": "M",
+      "classTeacher": "Prof. Shital Ekhande",
+      "batches": [
+        {
+          "id": "M1",
+          "minRoll": 1,
+          "maxRoll": 25
+        },
+        {
+          "id": "M2",
+          "minRoll": 26,
+          "maxRoll": 50
+        },
+        {
+          "id": "M3",
+          "minRoll": 51,
+          "maxRoll": 74
+        }
+      ],
+      "staff": {
+        "LAM": "Prof. Shital Ekhande",
+        "CHY": "Dr. Anand Daultabad",
+        "BXE": "Prof. Priyanka Hiremath",
+        "EM": "Dr. Tejaswita Kajale",
+        "FPL": "Prof. Yogita Rode",
+        "WS": "Dr. Milind Ovhal",
+        "CS": "Prof. Baldev Machave"
+      },
+      "subjectCodes": {
+        "LAM": "FE25BS101",
+        "CHY": "FE25BS103",
+        "BXE": "FE25ES101",
+        "EM": "FE25ES104",
+        "FPL": "FE25ES105",
+        "WS": "FE25VS102",
+        "CS": "FE25AE101"
+      }
     }
   ],
   "normalizationRules": {
-    "rollRangeTutorials": [{"audience":"ROLL_1_35","minRoll":1,"maxRoll":35},{"audience":"ROLL_36_PLUS","minRoll":36,"maxRoll":74}],
+    "rollRangeTutorials": [
+      {
+        "audience": "ROLL_1_35",
+        "minRoll": 1,
+        "maxRoll": 35
+      },
+      {
+        "audience": "ROLL_36_PLUS",
+        "minRoll": 36,
+        "maxRoll": 74
+      }
+    ],
     "batchAssignmentsMustComeFromDivisionSheet": true,
     "doNotInferMissingFacultyOrRooms": true,
     "doNotEnableRemindersUntilWeeklyEventsAreValidated": true,
-    "preserveOriginalRevisionAndEffectiveDate": true
+    "preserveOriginalRevisionAndEffectiveDate": true,
+    "maxRollFromPrintedBatchFooter": true
   }
 }
