@@ -43,6 +43,7 @@ public final class NextClassWidgetProvider extends AppWidgetProvider {
                 SmsTransactionService.PREFS_NAME, Context.MODE_PRIVATE
         );
         int roll = preferences.getInt("roll_number", -1);
+        String division = preferences.getString("division", "B");
         String name = preferences.getString("name", "").trim();
 
         Intent open = new Intent(context, MainActivity.class)
@@ -68,7 +69,7 @@ public final class NextClassWidgetProvider extends AppWidgetProvider {
         for (int offset = 0; offset < 8 && next == null; offset++) {
             LocalDate date = today.plusDays(offset);
             String day = date.getDayOfWeek().getDisplayName(TextStyle.FULL, Locale.ENGLISH);
-            List<TimetableData.ClassItem> entries = TimetableData.forRollAndDay(roll, day);
+            List<TimetableData.ClassItem> entries = TimetableData.forDivisionRollAndDay(division, roll, day);
             for (TimetableData.ClassItem item : entries) {
                 if (!item.isAcademic()) continue;
                 LocalTime start = LocalTime.parse(item.start);
@@ -89,7 +90,7 @@ public final class NextClassWidgetProvider extends AppWidgetProvider {
 
         TimetableData.ClassItem item = current != null ? current : next;
         if (item == null || nextDate == null) {
-            views.setTextViewText(R.id.widget_eyebrow, "NEXTBELL · STUDENT DAY");
+            views.setTextViewText(R.id.widget_eyebrow, "NEXTBELL · DIV " + division.toUpperCase(Locale.ENGLISH));
             views.setTextViewText(R.id.widget_subject, "No upcoming class");
             views.setTextViewText(R.id.widget_meta, "Your timetable is clear for now");
             views.setContentDescription(R.id.widget_next_class_root, "No upcoming class");
