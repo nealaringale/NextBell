@@ -2,7 +2,7 @@ name: Build NextBell Android Apps
 
 on:
   push:
-    branches: ["main", "feature/announcements"]
+    branches: ["main", "feature/announcements", "dev"]
     tags: ["nextbell-v*"]
   pull_request:
     branches: ["main"]
