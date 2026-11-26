@@ -57,6 +57,41 @@ public class FirstYearTimetableDataTest {
         }
     }
 
+    private static void assertEntry(String division, int roll, String day,
+                                    String start, String end, String code, String audience) {
+        boolean found = false;
+        for (TimetableData.ClassItem item :
+                TimetableData.forDivisionRollAndDay(division, roll, day)) {
+            if (item.start.equals(start) && item.end.equals(end)
+                    && item.code.equals(code) && item.audience.equals(audience)) {
+                found = true;
+                break;
+            }
+        }
+        assertTrue("Missing official entry: division " + division
+                + ", roll " + roll + ", " + day + " " + start + "-" + end
+                + ", " + code + ", audience " + audience, found);
+    }
+
+    @Test
+    public void representativeOfficialCellsAndMergedSlotDurationsMatchAllNewDivisions() {
+        assertEntry("A", 1, "Monday", "10:40", "12:40", "FPL", "A-1");
+        assertEntry("C", 51, "Tuesday", "13:30", "15:30", "FPL", "C-3");
+        assertEntry("D", 51, "Thursday", "13:30", "15:30", "ELE", "D-3");
+        assertEntry("E", 26, "Monday", "13:30", "15:30", "EG", "E-2");
+        assertEntry("F", 51, "Wednesday", "13:30", "15:30", "PHY", "F-3");
+        assertEntry("G", 26, "Monday", "13:30", "15:30", "LIBRARY", "G2");
+        assertEntry("H", 26, "Wednesday", "13:30", "15:30", "WS", "H2");
+        assertEntry("I", 51, "Wednesday", "13:30", "15:30", "FPL", "I-3");
+        assertEntry("J", 26, "Thursday", "13:30", "15:30", "WS", "J2");
+        assertEntry("K", 51, "Monday", "13:30", "15:30", "FPL", "K3");
+        assertEntry("L", 51, "Wednesday", "13:30", "14:30", "WS", "L3");
+        assertEntry("M", 51, "Thursday", "13:30", "14:30", "FPL", "M3");
+        assertEntry("N", 1, "Wednesday", "13:30", "14:30", "FPL", "N-1");
+        assertEntry("O", 26, "Monday", "13:30", "14:30", "FPL", "O-2");
+        assertEntry("P", 26, "Friday", "13:30", "15:30", "FPL", "P2");
+    }
+
     @Test
     public void everyDivisionHasWeekdayEntriesForRollBoundaries() {
         for (String division : DIVISIONS) {
