@@ -17,6 +17,7 @@ public class LiveStatusReceiver extends BroadcastReceiver {
     public static final String ACTION_UPDATE_LIVE = "com.nealaringale.nextbell.UPDATE_LIVE";
     private static final String PREFS_NAME = "nextbell_profile";
     private static final String KEY_ROLL_NUMBER = "roll_number";
+    private static final String KEY_DIVISION = "division";
     private static final String CHANNEL_ID = "nextbell_live_status";
     private static final ZoneId ZONE = ZoneId.of("Asia/Kolkata");
     private static final int NOTIFICATION_ID = 4201;
@@ -38,6 +39,7 @@ public class LiveStatusReceiver extends BroadcastReceiver {
         }
 
         int roll = prefs.getInt(KEY_ROLL_NUMBER, -1);
+        String division = prefs.getString(KEY_DIVISION, "B");
         if (roll < 1) return;
 
         NotificationScheduler.ensureLiveChannel(context);
@@ -52,7 +54,7 @@ public class LiveStatusReceiver extends BroadcastReceiver {
         String todayName = dayName(today);
         if (!todayName.isEmpty()) {
             List<TimetableData.ClassItem> entries =
-                    TimetableData.forRollAndDay(roll, todayName);
+                    TimetableData.forDivisionRollAndDay(division, roll, todayName);
 
             for (TimetableData.ClassItem item : entries) {
                 if (!item.isAcademic()) continue;
@@ -79,7 +81,7 @@ public class LiveStatusReceiver extends BroadcastReceiver {
                 if (day.isEmpty()) continue;
 
                 List<TimetableData.ClassItem> entries =
-                        TimetableData.forRollAndDay(roll, day);
+                        TimetableData.forDivisionRollAndDay(division, roll, day);
 
                 for (TimetableData.ClassItem item : entries) {
                     if (item.isAcademic()) {
