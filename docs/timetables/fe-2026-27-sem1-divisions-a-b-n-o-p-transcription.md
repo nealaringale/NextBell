@@ -54,10 +54,10 @@ Machine-readable division, batch, class-teacher and staff metadata:
 **Staff:** LAM—Prof. Shankarrao Ugale (SU); CHY—Dr. Anand Daultabad (AD); BXE—Prof. Sachinkumar Shahare (SS); EM—Dr. Tejaswita Kajale (TK); FPL—Prof. Neha Kumari (NK); WS—Dr. Milind Ovhal (MO); CS—Prof. Amol Bade (BM).
 
 ### Printed weekly cells
-- **Monday:** FPL (NK)/210; EXE (SS)/210; WS (MO)/N3/Wing A; CHY (AD)/N1/Wing A 017; SELF LEARNING/N2; SELF LEARNING/N1; LAM (BG)/TU/206 (36 onwards); LIBRARY (1 to 35); SELF LEARNING.
-- **Tuesday:** EM (TK)/210; LAM (SU)/210; EM (TK)/N2/Wing B 005; EXE (SS)/N3/Wing A 206; FPL (NK)/N2/Wing B 109; CHY (AD)/209; LAM (BG)/TU/209 (1–35); LIBRARY (36 onwards).
+- **Monday:** FPL (NK)/210; EXE (SS)/210; WS (MO)/N3/Wing A; CHY (AD)/N1/Wing A 017; SELF LEARNING/N2; SELF LEARNING/N1; LAM (BG; abbreviation differs from SU in the staff footer)/TU/206 (36 onwards); LIBRARY (1 to 35); SELF LEARNING.
+- **Tuesday:** EM (TK)/210; LAM (SU)/210; EM (TK)/N2/Wing B 005; EXE (SS)/N3/Wing A 206; FPL (NK)/N2/Wing B 109; CHY (AD)/209; LAM (BG; abbreviation differs from SU in the staff footer)/TU/209 (1–35); LIBRARY (36 onwards).
 - **Wednesday:** CHY (AD)/210; FPL (NK)/210; FPL (NK)/N1/Wing B 109; EM (TK)/N3/Wing B 005; WS (MO)/N1/Wing A; FPL (NK)/N3/Wing B 109; EM (TK)/N1/Wing A 005; EXE (PH)/N2/Wing C 103; WS (MO)/N2/Wing A; CHY (AD)/N3/Wing A 017; EXE (SS)/N1/Wing C 101.
-- **Thursday:** LS-1 / LS-2; WS (MO)/N2/Wing A; CHY (AD)/N3/Wing A 017; SELF LEARNING/N?; LAM (SU)/205; EXE (SS)/205.
+- **Thursday:** LS-1 / LS-2; WS (MO)/N2/Wing A; CHY (AD)/N3/Wing A 017; SELF LEARNING (batch suffix not legible in the supplied image); LAM (SU)/205; EXE (SS)/205.
 - **Friday:** LAM (SU)/210; EM (TK)/210; CS (AB)/205; CS (AB)/205.
 
 ## Division O
@@ -81,7 +81,7 @@ Machine-readable division, batch, class-teacher and staff metadata:
 
 ### Printed weekly cells
 - **Monday:** WS (MO)/P3/Wing A; CHY (DI)/P1/Wing B 114; EM (ML)/P2/Wing A 003; CS (BM)/207; LAM (KT)/207; SELF LEARNING.
-- **Tuesday:** FPL (S8)/P3/Wing B 109; EM (SR)/P1/Wing A 003; EXE (NS2)/P2/Wing A 212; EM (ML)/210; CHY (DI)/210; EXE (NS2)/202; LAM (KT)/TU/202 (1–35); LIBRARY (36 onwards).
+- **Tuesday:** FPL (S8)/P3/Wing B 109; EM (SR as printed; footer lists ML)/P1/Wing A 003; EXE (NS2)/P2/Wing A 212; EM (ML)/210; CHY (DI)/210; EXE (NS2)/202; LAM (KT)/TU/202 (1–35); LIBRARY (36 onwards).
 - **Wednesday:** WS (MO)/P2/Wing A; CHY (DI)/P3/Wing B 114; EXE (NS2)/P1/Wing A 212; FPL (S8)/P1/Wing B 109; CHY (DI)/P2/Wing B 114; EM (SR)/P3/Wing A 003; EM (ML)/202; LAM (KT)/TU/202 (36 onwards); LIBRARY (1 to 35).
 - **Thursday:** FPL (S8)/209; CS (BM)/209; LAM (KT)/207; CHY (DD)/207; LS-1 / LS-2.
 - **Friday:** EXE (NS2)/209; LAM (KT)/209; FPL (S8)/209; SELF LEARNING; FPL (S8)/P2/Wing B 109; EXE (NS2)/P3/Wing C 101; WS (MO)/P1/Wing A.
