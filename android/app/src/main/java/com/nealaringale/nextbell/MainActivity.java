@@ -4507,14 +4507,35 @@ public class MainActivity extends ComponentActivity {
     private void refreshHome() {
         if (homeSchedule == null || homeHero == null) return;
 
+        boolean dypit = CollegeCatalog.DYPIIT_PIMPRI.equals(getCollegeId());
+        LocalDate scheduleDate = LocalDate.now(zone);
         String today = todayName();
-        boolean isWeekend = today.isEmpty();
-        String day = isWeekend ? "Monday" : today;
+        boolean isWeekend = !dypit && today.isEmpty();
+        boolean futurePreview = false;
+        String day = dypit ? CollegeScheduleData.dayName(scheduleDate)
+                : (isWeekend ? "Monday" : today);
 
-        List<TimetableData.ClassItem> entries =
-                TimetableData.forDivisionRollAndDay(getDivision(), getRollNumber(), day);
+        List<TimetableData.ClassItem> entries;
+        if (dypit) {
+            entries = CollegeScheduleData.forDate(
+                    getCollegeId(), getDivision(), getRollNumber(), scheduleDate);
+            if (entries.isEmpty()) {
+                LocalDate nextPublished = CollegeScheduleData.nextPublishedDate(
+                        getCollegeId(), scheduleDate.plusDays(1));
+                if (nextPublished != null) {
+                    scheduleDate = nextPublished;
+                    day = CollegeScheduleData.dayName(scheduleDate);
+                    entries = CollegeScheduleData.forDate(
+                            getCollegeId(), getDivision(), getRollNumber(), scheduleDate);
+                    futurePreview = !entries.isEmpty();
+                }
+            }
+        } else {
+            entries = CollegeScheduleData.forDay(
+                    getCollegeId(), getDivision(), getRollNumber(), day, scheduleDate);
+        }
 
-        int now = isWeekend ? -1 : nowSeconds();
+        int now = (isWeekend || futurePreview) ? -1 : nowSeconds();
         TimetableData.ClassItem currentClass = null;
         TimetableData.ClassItem currentBreak = null;
         TimetableData.ClassItem next = null;
@@ -4522,58 +4543,56 @@ public class MainActivity extends ComponentActivity {
         for (TimetableData.ClassItem item : entries) {
             int start = toSeconds(item.start);
             int end = toSeconds(item.end);
-
-            if (!isWeekend && start <= now && now < end) {
-                if (item.isBreak()) {
-                    currentBreak = item;
-                } else if (item.isAcademic()) {
-                    currentClass = item;
-                }
-            } else if (isWeekend && item.isAcademic() && next == null) {
+            if (!futurePreview && !isWeekend && start <= now && now < end) {
+                if (item.isBreak()) currentBreak = item;
+                else if (item.isAcademic()) currentClass = item;
+            } else if ((isWeekend || futurePreview) && item.isAcademic() && next == null) {
                 next = item;
-            } else if (!isWeekend && item.isAcademic() && start > now && next == null) {
+            } else if (!isWeekend && !futurePreview
+                    && item.isAcademic() && start > now && next == null) {
                 next = item;
             }
         }
 
-        if (currentBreak != null) {
+        if (dypit && entries.isEmpty()) {
+            heroLabel.setText("TIMETABLE NOT AVAILABLE");
+            heroLabel.setTextColor(ACCENT);
+            heroSubject.setText("No classes published for this date.");
+            heroMeta.setText("Add the next timetable from your college when it is released.");
+            heroTimeRange.setText("—");
+            clearHeroLocation();
+            heroCountdown.setText("—");
+            heroCountdownLabel.setText("No upcoming published date");
+            animateHero("no-published-timetable", SURFACE_2, BORDER);
+        } else if (currentBreak != null) {
             int minutes = Math.max(1,
                     (toSeconds(currentBreak.end) - toSeconds(currentBreak.start)) / 60);
             boolean lunch = currentBreak.kind == TimetableData.Kind.LUNCH;
             int breakAccent = lunch ? ACCENT_2 : ACCENT;
-
             heroLabel.setText(lunch ? "LUNCH BREAK" : "SHORT BREAK");
             heroLabel.setTextColor(breakAccent);
             heroSubject.setText(lunch ? "Take your lunch." : "Recharge for the next class.");
-            heroMeta.setText(
-                    formatTime(currentBreak.start) + " → " + formatTime(currentBreak.end)
-                            + "  •  " + minutes + " min"
-            );
+            heroMeta.setText(formatTime(currentBreak.start) + " → "
+                    + formatTime(currentBreak.end) + "  •  " + minutes + " min");
             heroTimeRange.setText("BREAK NOW");
             heroRoomText.setText(lunch ? "TYPE\nLUNCH" : "TYPE\nBREAK");
             heroWingText.setText("DURATION\n" + minutes + " MIN");
             heroWingText.setTextColor(breakAccent);
-            heroCountdown.setText(
-                    formatCountdown(Math.max(0, toSeconds(currentBreak.end) - now))
-            );
+            heroCountdown.setText(formatCountdown(
+                    Math.max(0, toSeconds(currentBreak.end) - now)));
             heroCountdownLabel.setText("until break ends");
-            animateHero(
-                    "break:" + currentBreak.id,
-                    blend(SURFACE_2, breakAccent, 0.22f),
-                    breakAccent
-            );
+            animateHero("break:" + currentBreak.id,
+                    blend(SURFACE_2, breakAccent, 0.22f), breakAccent);
         } else if (currentClass != null) {
             heroLabel.setText("HAPPENING NOW");
             heroLabel.setTextColor(ACCENT);
             heroSubject.setText(currentClass.subject);
             heroMeta.setText(formatTeacher(currentClass));
-            heroTimeRange.setText(
-                    formatTime(currentClass.start) + " → " + formatTime(currentClass.end)
-            );
+            heroTimeRange.setText(formatTime(currentClass.start) + " → "
+                    + formatTime(currentClass.end));
             setHeroLocation(currentClass);
-            heroCountdown.setText(
-                    formatCountdown(Math.max(0, toSeconds(currentClass.end) - now))
-            );
+            heroCountdown.setText(formatCountdown(
+                    Math.max(0, toSeconds(currentClass.end) - now)));
             heroCountdownLabel.setText("until it ends");
             animateHero("current:" + currentClass.id, ACCENT_BG, ACCENT);
         } else if (next != null) {
@@ -4584,14 +4603,20 @@ public class MainActivity extends ComponentActivity {
             heroTimeRange.setText(formatTime(next.start) + " → " + formatTime(next.end));
             setHeroLocation(next);
 
-            if (isWeekend) {
+            if (futurePreview) {
+                long secondsUntil = java.time.Duration.between(
+                        java.time.LocalDateTime.now(zone),
+                        scheduleDate.atTime(LocalTime.parse(next.start))
+                ).getSeconds();
+                heroCountdown.setText(formatHumanCountdown(Math.max(0, secondsUntil)));
+                heroCountdownLabel.setText("on " + scheduleDate.format(dateFormatter));
+            } else if (isWeekend) {
                 long secondsUntil = secondsUntilNextWeekendClass(next);
                 heroCountdown.setText(formatHumanCountdown(secondsUntil));
-                heroCountdownLabel.setText("until Monday · " + getBatch());
+                heroCountdownLabel.setText("until Monday · " + getStudentGroupLabel());
             } else {
-                heroCountdown.setText(
-                        formatCountdown(Math.max(0, toSeconds(next.start) - now))
-                );
+                heroCountdown.setText(formatCountdown(
+                        Math.max(0, toSeconds(next.start) - now)));
                 heroCountdownLabel.setText("until it starts");
             }
             animateHero("next:" + next.id, SURFACE_2, BORDER);
@@ -4607,32 +4632,34 @@ public class MainActivity extends ComponentActivity {
             animateHero("done", SURFACE_2, BORDER);
         }
 
-        homeDayLabel.setText(
-                isWeekend ? "MONDAY PREVIEW" : "TODAY  •  " + formatTodayDate()
-        );
+        if (dypit) {
+            homeDayLabel.setText(futurePreview
+                    ? "NEXT PUBLISHED  •  " + scheduleDate.format(dateFormatter).toUpperCase(Locale.ENGLISH)
+                    : (entries.isEmpty() ? "TIMETABLE UPDATE NEEDED"
+                    : "TODAY  •  " + scheduleDate.format(dateFormatter).toUpperCase(Locale.ENGLISH)));
+        } else {
+            homeDayLabel.setText(isWeekend
+                    ? "MONDAY PREVIEW" : "TODAY  •  " + formatTodayDate());
+        }
 
         int academicBlocks = 0;
         int breakBlocks = 0;
         for (TimetableData.ClassItem item : entries) {
-            if (item.isBreak()) {
-                breakBlocks++;
-            } else {
-                academicBlocks++;
-            }
+            if (item.isBreak()) breakBlocks++;
+            else academicBlocks++;
         }
-
-        homeSummary.setText(
-                academicBlocks + " sessions  •  " + breakBlocks + " breaks  •  Div " + getDivision() + " " + getBatch()
-        );
-        profileBadge.setText("DIV " + getDivision() + "  •  " + getBatch() + "  •  Roll " + getRollNumber());
+        homeSummary.setText(academicBlocks + " sessions  •  " + breakBlocks
+                + " breaks  •  " + getStudentGroupLabel());
+        profileBadge.setText(getStudentGroupLabel().toUpperCase(Locale.ENGLISH));
 
         StringBuilder signatureBuilder = new StringBuilder();
-        signatureBuilder.append(getRollNumber()).append('|').append(day).append('|');
+        signatureBuilder.append(getCollegeId()).append('|')
+                .append(getRollNumber()).append('|').append(scheduleDate).append('|').append(day).append('|');
         if (currentClass != null) signatureBuilder.append("C:").append(currentClass.id);
         if (currentBreak != null) signatureBuilder.append("B:").append(currentBreak.id);
         for (TimetableData.ClassItem item : entries) {
             signatureBuilder.append(';').append(item.id).append(':').append(item.isBreak());
-            if (!isWeekend && item.isAcademic()) {
+            if (!isWeekend && !futurePreview && item.isAcademic()) {
                 signatureBuilder.append(':').append(toSeconds(item.end) <= now);
             }
         }
@@ -4641,18 +4668,14 @@ public class MainActivity extends ComponentActivity {
         if (!scheduleSignature.equals(lastHomeScheduleSignature)) {
             lastHomeScheduleSignature = scheduleSignature;
             homeSchedule.removeAllViews();
-
             int index = 0;
             for (TimetableData.ClassItem item : entries) {
                 boolean isCurrent = currentClass != null && currentClass.id.equals(item.id);
-                boolean isDone = !isWeekend
-                        && item.isAcademic()
-                        && toSeconds(item.end) <= now;
-
+                boolean isDone = !isWeekend && !futurePreview
+                        && item.isAcademic() && toSeconds(item.end) <= now;
                 View row = item.isBreak()
                         ? breakRow(item)
                         : classRow(item, isCurrent, false, isDone);
-
                 homeSchedule.addView(row);
                 animateListItem(row, index++);
             }
@@ -4662,12 +4685,26 @@ public class MainActivity extends ComponentActivity {
     private void refreshWeekSchedule() {
         if (weekSchedule == null) return;
 
-        List<TimetableData.ClassItem> entries =
-                TimetableData.forDivisionRollAndDay(getDivision(), getRollNumber(), weekSelectedDay);
+        LocalDate todayDate = LocalDate.now(zone);
+        boolean dypit = CollegeCatalog.DYPIIT_PIMPRI.equals(getCollegeId());
+        LocalDate selectedDate = dypit
+                ? CollegeScheduleData.dateForDay(getCollegeId(), weekSelectedDay, todayDate)
+                : null;
+        List<TimetableData.ClassItem> entries = CollegeScheduleData.forDay(
+                getCollegeId(), getDivision(), getRollNumber(), weekSelectedDay, todayDate);
 
         String today = todayName();
-        boolean viewingToday = weekSelectedDay.equals(today) && !today.isEmpty();
+        boolean viewingToday = dypit
+                ? selectedDate != null && selectedDate.equals(todayDate)
+                : weekSelectedDay.equals(today) && !today.isEmpty();
         int now = viewingToday ? nowSeconds() : -1;
+
+        if (dypit && weekDayTitle != null) {
+            weekDayTitle.setText(selectedDate == null
+                    ? weekSelectedDay.toUpperCase(Locale.ENGLISH) + "  •  NO DATE IN UPLOAD"
+                    : weekSelectedDay.toUpperCase(Locale.ENGLISH) + "  •  "
+                            + selectedDate.format(dateFormatter).toUpperCase(Locale.ENGLISH));
+        }
 
         TimetableData.ClassItem current = null;
         if (viewingToday) {
@@ -4683,7 +4720,8 @@ public class MainActivity extends ComponentActivity {
         }
 
         StringBuilder signatureBuilder = new StringBuilder();
-        signatureBuilder.append(getRollNumber()).append('|').append(weekSelectedDay).append('|');
+        signatureBuilder.append(getCollegeId()).append('|').append(getRollNumber())
+                .append('|').append(weekSelectedDay).append('|').append(selectedDate).append('|');
         if (current != null) signatureBuilder.append("C:").append(current.id);
         for (TimetableData.ClassItem item : entries) {
             signatureBuilder.append(';').append(item.id).append(':').append(item.isBreak());
@@ -4692,16 +4730,18 @@ public class MainActivity extends ComponentActivity {
             }
         }
         String scheduleSignature = signatureBuilder.toString();
-
         if (scheduleSignature.equals(lastWeekScheduleSignature)) return;
         lastWeekScheduleSignature = scheduleSignature;
 
         weekSchedule.removeAllViews();
-
         if (entries.isEmpty()) {
-            TextView empty = text("No classes scheduled.", 13, MUTED);
+            String message = dypit
+                    ? "No timetable is published for " + weekSelectedDay
+                            + (selectedDate == null ? " in the uploaded PDF." : " on " + selectedDate.format(dateFormatter) + ".")
+                    : "No classes scheduled.";
+            TextView empty = text(message, 13, MUTED);
             empty.setGravity(Gravity.CENTER);
-            empty.setPadding(0, dp(30), 0, dp(30));
+            empty.setPadding(dp(16), dp(30), dp(16), dp(30));
             weekSchedule.addView(empty);
             animateListItem(empty, 0);
             return;
@@ -4710,14 +4750,10 @@ public class MainActivity extends ComponentActivity {
         int index = 0;
         for (TimetableData.ClassItem item : entries) {
             boolean isCurrent = current != null && current.id.equals(item.id);
-            boolean isDone = viewingToday
-                    && item.isAcademic()
-                    && toSeconds(item.end) <= now;
-
+            boolean isDone = viewingToday && item.isAcademic() && toSeconds(item.end) <= now;
             View row = item.isBreak()
                     ? breakRow(item)
                     : classRow(item, isCurrent, false, isDone);
-
             weekSchedule.addView(row);
             animateListItem(row, index++);
         }
