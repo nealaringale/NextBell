@@ -580,59 +580,71 @@ public final class SmsTransactionParser {
         };
 
         static String match(String body) {
+            return match(body, "");
+        }
+
+        static String match(String body, String extractedMerchant) {
             String normalized = normalize(body);
+            String extracted = normalize(extractedMerchant);
+            String bestName = "";
+            int bestLength = -1;
+            boolean ambiguousExact = false;
+
+            // Prefer the most specific exact alias. This prevents "Amazon Prime"
+            // from being classified as generic Amazon shopping.
             for (String[] merchant : MERCHANTS) {
                 for (String alias : merchant[2].split(",")) {
                     String candidate = normalize(alias);
-                    if (candidate.isEmpty()) continue;
-                    if (containsPhrase(normalized, candidate)) return merchant[0];
-                    if (!candidate.contains(" ") && candidate.length() >= 5
-                            && fuzzyWordPresent(normalized, candidate)) return merchant[0];
+                    if (candidate.isEmpty() || !containsPhrase(normalized, candidate)) continue;
+                    if (candidate.length() > bestLength) {
+                        bestName = merchant[0];
+                        bestLength = candidate.length();
+                        ambiguousExact = false;
+                    } else if (candidate.length() == bestLength
+                            && !bestName.equals(merchant[0])) {
+                        ambiguousExact = true;
+                    }
                 }
             }
-            return "";
+            if (bestLength >= 0) return ambiguousExact ? "" : bestName;
+
+            // Fuzzy correction is intentionally constrained to the extracted
+            // payee, never arbitrary bank IDs, balance text or notification boilerplate.
+            if (extracted.isEmpty()) return "";
+            int bestDistance = Integer.MAX_VALUE;
+            String fuzzyName = "";
+            boolean ambiguousFuzzy = false;
+            for (String[] merchant : MERCHANTS) {
+                for (String alias : merchant[2].split(",")) {
+                    String candidate = normalize(alias);
+                    if (candidate.isEmpty() || candidate.contains(" ") || candidate.length() < 6) {
+                        continue;
+                    }
+                    for (String word : extracted.split(" ")) {
+                        if (Math.abs(word.length() - candidate.length()) > 1) continue;
+                        if (!editDistanceAtMostOne(word, candidate)) continue;
+                        int distance = word.equals(candidate) ? 0 : 1;
+                        if (distance < bestDistance) {
+                            bestDistance = distance;
+                            fuzzyName = merchant[0];
+                            ambiguousFuzzy = false;
+                        } else if (distance == bestDistance
+                                && !fuzzyName.equals(merchant[0])) {
+                            ambiguousFuzzy = true;
+                        }
+                    }
+                }
+            }
+            return bestDistance == Integer.MAX_VALUE || ambiguousFuzzy ? "" : fuzzyName;
         }
 
         static String categoryFor(String body, String merchant, String direction) {
             if (direction.equals(CREDIT)) return "Income & Refunds";
             String normalized = normalize(body + " " + merchant);
-            String known = match(body);
+            String known = match(body, merchant);
             if (!known.isEmpty()) {
                 for (String[] item : MERCHANTS) if (item[0].equals(known)) return item[1];
             }
-            if (containsAny(normalized, "tea", "coffee", "snack", "chai", "bakery")) {
-                return "Tea & Coffee";
-            }
-            if (containsAny(normalized, "petrol", "fuel", "diesel")) {
-                return "Transport & Fuel";
-            }
-            if (containsAny(normalized, "metro", "bus", "taxi", "railway", "travel")) {
-                return "Travel";
-            }
-            if (containsAny(normalized, "rent", "hostel", "electricity", "water bill", "gas bill")) {
-                return "Home & Bills";
-            }
-            if (containsAny(normalized, "grocery", "vegetable", "supermarket", "kirana")) {
-                return "Groceries";
-            }
-            if (containsAny(normalized, "college", "tuition", "university", "exam fee", "stationery")) {
-                return "College";
-            }
-            if (containsAny(normalized, "recharge", "mobile bill", "broadband", "internet bill")) {
-                return "Bills & Recharge";
-            }
-            if (containsAny(normalized, "subscription", "monthly plan", "membership")) {
-                return "Subscriptions";
-            }
-            if (containsAny(normalized, "atm", "cash withdrawal", "self transfer")) {
-                return "Transfers & ATM";
-            }
-            if (containsAny(normalized, "restaurant", "food", "dining", "swiggy", "zomato")) {
-                return "Food & Drinks";
-            }
-            return "Other";
-        }
-
         private static boolean containsPhrase(String text, String phrase) {
             return (" " + text + " ").contains(" " + phrase + " ");
         }
