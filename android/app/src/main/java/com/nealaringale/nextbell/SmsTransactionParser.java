@@ -643,8 +643,45 @@ public final class SmsTransactionParser {
             String normalized = normalize(body + " " + merchant);
             String known = match(body, merchant);
             if (!known.isEmpty()) {
-                for (String[] item : MERCHANTS) if (item[0].equals(known)) return item[1];
+                for (String[] item : MERCHANTS) {
+                    if (item[0].equals(known)) return item[1];
+                }
             }
+            if (containsAny(normalized, "tea", "coffee", "snack", "chai", "bakery")) {
+                return "Tea & Coffee";
+            }
+            if (containsAny(normalized, "petrol", "fuel", "diesel")) {
+                return "Transport & Fuel";
+            }
+            if (containsAny(normalized, "metro", "bus", "taxi", "railway", "travel")) {
+                return "Travel";
+            }
+            if (containsAny(normalized, "rent", "hostel", "electricity", "water bill", "gas bill")) {
+                return "Home & Bills";
+            }
+            if (containsAny(normalized, "grocery", "vegetable", "supermarket", "kirana")) {
+                return "Groceries";
+            }
+            if (containsAny(normalized, "college", "tuition", "university", "exam fee", "stationery")) {
+                return "College";
+            }
+            if (containsAny(normalized, "recharge", "mobile bill", "broadband", "internet bill")) {
+                return "Bills & Recharge";
+            }
+            if (containsAny(normalized, "subscription", "monthly plan", "membership")) {
+                return "Subscriptions";
+            }
+            if (containsAny(normalized, "atm", "cash withdrawal", "self transfer",
+                    "transfer to", "transferred to", "sent to", "p2p", "person to person",
+                    "upi transfer", "imps transfer", "neft transfer", "rtgs transfer")) {
+                return "Transfers & ATM";
+            }
+            if (containsAny(normalized, "restaurant", "food", "dining", "swiggy", "zomato")) {
+                return "Food & Drinks";
+            }
+            return "Other";
+        }
+
         private static boolean containsPhrase(String text, String phrase) {
             return (" " + text + " ").contains(" " + phrase + " ");
         }
