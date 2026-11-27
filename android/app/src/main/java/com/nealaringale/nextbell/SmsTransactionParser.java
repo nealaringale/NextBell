@@ -470,7 +470,7 @@ public final class SmsTransactionParser {
         if (hasToken(body, "imps")) return "IMPS";
         if (hasToken(body, "rtgs")) return "RTGS";
         if (hasToken(body, "nach") || hasToken(body, "ach")) return "Bank Transfer";
-        return "Bank Transfer";
+        return "Other";
     }
 
     private static boolean hasToken(String text, String token) {
