@@ -213,8 +213,8 @@ public class LiveStatusReceiver extends BroadcastReceiver {
     }
 
     private static String dayShort(LocalDate date) {
-        String day = dayName(date);
-        return day.isEmpty() ? "" : day.substring(0, 3);
+        return date.getDayOfWeek().getDisplayName(
+                java.time.format.TextStyle.SHORT, Locale.ENGLISH);
     }
 
     private static String dayName(LocalDate date) {
