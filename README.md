@@ -1,6 +1,6 @@
 # NextBell
 
-NextBell is a local-first Android student planner for NMIET First Year Engineering. On the development branch, a student's division and roll number select the matching timetable and practical/tutorial groups. It includes attendance records and target-based bunk estimates, assignment/exam/task reminders, a next-class home-screen widget, daily and weekly money controls, recurring-expense suggestions, and optional on-device bank SMS parsing.
+NextBell is a local-first Android student planner with college-aware student profiles. On the development branch, students choose their college, division and roll number; the app routes timetable, attendance, class reminders, live status and the home-screen widget through that college's academic data package. Current bundled timetable sources include NMIET First Year Engineering (weekly, divisions A–P) and Dr. D. Y. Patil Institute of Technology, Pimpri (date-scoped FE Sem-I schedule for five dates in December 2026). It also includes assignment/exam/task reminders, a next-class widget, daily and weekly money controls, recurring-expense suggestions, and optional on-device bank SMS parsing.
 
 ## NMIET First Year timetable source imports
 
@@ -67,9 +67,9 @@ before their schedules can drive Home, Week, Attendance, notifications or widget
 ## Product and data model
 
 - **Android app:** Java, Android SDK 36 (Android 16), minimum Android 8.0 (API 26), target SDK 36. Screens are native views hosted in `MainActivity`; timetable, attendance, planner, finance, notification, SMS parsing, and backup logic live in Java classes.
-- **Timetable:** Division B retains its original bundled timetable and identifiers. The development branch adds official Semester I schedules for Divisions A and C–P in `FirstYearTimetableData`, with roll-range and batch-aware filtering. New users select a division during setup; existing installs without a saved division migrate to B. All timetable data remains available offline.
+- **Timetable:** The active profile stores a college identifier as well as division and roll number. NMIET Division B retains its original bundled timetable and identifiers; the development branch includes NMIET First Year Semester I schedules for Divisions A–P. D. Y. Patil Institute of Technology, Pimpri includes a separate date-specific timetable for 1, 3, 5, 6 and 8 December 2026, covering Divisions A–T. The DYP import is deliberately not repeated weekly because the supplied PDF only publishes those five dates. New users choose a college and division during setup; existing installs without a college identifier migrate to NMIET. All bundled timetable data remains available offline.
 - **Study planning:** attendance marks, assignment/exam/task items, and due dates are stored locally. Bunk estimates use only sessions the student has recorded. Deadline reminders are approximate Android alarms and require notifications to be enabled.
-- **Profile, study data, and money:** stored locally in the app's private `SharedPreferences` by default. Optional Cloud Sync uses Firebase Authentication and Cloud Firestore when the user configures it and signs in. Android system cloud backup and device-to-device transfer are excluded. The user can export a readable JSON backup to a file they choose. Anyone who receives that file can read it.
+- **Profile, study data, and money:** stored locally in the app's private `SharedPreferences` by default. The selected college is included in local backups and optional Firebase profile sync. Attendance meeting keys are college-scoped so changing colleges does not mix attendance records for matching subjects/times. Optional Cloud Sync uses Firebase Authentication and Cloud Firestore when the user configures it and signs in. Android system cloud backup and device-to-device transfer are excluded. The user can export a readable JSON backup to a file they choose. Anyone who receives that file can read it.
 - **Money entry:** direct SMS ingestion is the primary bank-alert path after the user explicitly enables RECEIVE_SMS. Notification access remains an additional fallback for UPI/wallet alerts. The private debug APK must be installed via ADB so Android's shell installer can allowlist hard-restricted SMS permissions; tapping an APK in a file manager may not allow RECEIVE_SMS/READ_SMS. READ_SMS is requested separately only when the user chooses a 30-day inbox import. Raw message text is not saved or uploaded; only parsed transaction fields and duplicate fingerprints are retained. Parsed expense records can sync to the user's own Firebase account only when Cloud Sync is separately enabled. Google Play lists SMS-based money management (including budgeting apps) as an eligible SMS-permission use case, subject to the Play Console declaration and review/approval. Keep the prominent disclosure, consent, privacy policy and Data safety answers aligned with the actual on-device parsing and optional cloud-sync behaviour.
 - **Private debug install (Windows):** enable USB debugging, connect the phone, extract the student APK, then run `adb install -r NextBell-student-debug.apk` from the folder containing the APK. ADB's shell package installer allowlists restricted permissions by default unless told to restrict them; this does not itself grant runtime permissions. Open NextBell → Money → Manage → Enable SMS tracking and grant the Android prompt.
 - **realme/ColorOS background settings:** allow NextBell background activity/auto-launch and remove battery restrictions when available. OEM power controls can stop background listener services even while Notification access still appears granted.
@@ -78,19 +78,28 @@ before their schedules can drive Home, Week, Attendance, notifications or widget
 - **Admin companion:** a separate local draft tool. It does not publish timetable changes to student devices.
 - **Browser prototype:** `src/` is an older Vite demo with fixture data; it is not the Android app or the download website and should not be treated as the live timetable source.
 
-## Multi-division Android implementation (dev)
+## Multi-college and multi-division Android implementation (dev)
 
-The Android setup screen asks new users to select a First Year division (A–P) and
-enter their roll number. The profile stores both values. The selected division is
-used by Home, Week, attendance course selection, class reminders, live status and
-the home-screen widget. Practical batches are derived from each division's printed
-roll ranges; divisions J, K, L, M and P reject rolls above 74, as their source sheets
-specify. Other supplied sheets state 51 onwards.
+The Android setup screen asks new users to select a college, division and roll number.
+A dedicated College tab shows the active institution, programme/semester label,
+available divisions, timetable coverage and college-specific notes. The selected
+college is used by Home, Week, attendance course selection, class reminders, live
+status, the home-screen widget and the Firebase student profile.
+
+For NMIET, practical batches are derived from each division's printed roll ranges;
+divisions J, K, L, M and P reject rolls above 74, as their source sheets specify.
+For D. Y. Patil Pimpri, the supplied PDF lists Divisions A–T and room/faculty codes,
+but does not provide practical-batch ranges or a course/faculty legend, so the app
+preserves those printed codes and does not invent batch assignments or full names.
+The imported DYP schedule covers only 1, 3, 5, 6 and 8 December 2026. Missing dates
+remain empty rather than being extrapolated into a weekly pattern.
 
 Existing installations without a division preference are migrated to Division B,
-and Division B timetable queries continue to delegate to the original `TimetableData` implementation. Division changes reschedule alarms and refresh the widget/live status.
-The Android backup includes all preferences, and the web backup now preserves the
-division field.
+and installations without a college identifier are migrated to NMIET. Division B
+timetable queries continue to delegate to the original `TimetableData` implementation.
+College or division changes reschedule alarms and refresh the widget/live status.
+The Android JSON backup includes all preferences; Firebase profile sync includes
+the selected college, division and roll number.
 
 **Verification:** `FirstYearTimetableDataTest` checks batch boundaries, weekday coverage,
 invalid capped roll numbers, representative official cells and merged-session durations,
