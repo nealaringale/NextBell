@@ -200,12 +200,9 @@ public class LiveStatusReceiver extends BroadcastReceiver {
 
         if (matcher.find()) return matcher.group().replace("wing", "Wing");
 
-        if (CollegeCatalog.DYPIIT_PIMPRI.equals(CollegeCatalog.normalize(
-                androidPreferenceCollegeId(item)))) {
-            java.util.regex.Matcher blockMatcher = java.util.regex.Pattern
-                    .compile("^([A-Z])\\s*\\d{3}$").matcher(item.room.trim());
-            if (blockMatcher.find()) return "Block " + blockMatcher.group(1);
-        }
+        java.util.regex.Matcher blockMatcher = java.util.regex.Pattern
+                .compile("^([A-Z])\\s*\\d{3}$").matcher(item.room.trim());
+        if (blockMatcher.find()) return "Block " + blockMatcher.group(1);
 
         if (item.room.matches("\\d{3}")) return "Wing C";
         return "";
