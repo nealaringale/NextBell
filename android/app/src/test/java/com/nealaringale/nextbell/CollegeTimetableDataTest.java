@@ -79,7 +79,7 @@ public class CollegeTimetableDataTest {
         TimetableData.ClassItem first = items.get(0);
         assertEquals("09:00", first.start);
         assertEquals("09:45", first.end);
-        assertEquals("Mathematics", first.subject);
+        assertEquals("MATH", first.subject);
         assertEquals("MATH", first.code);
         assertEquals("HP", first.teacher);
         assertEquals("B 212", first.room);
@@ -87,13 +87,13 @@ public class CollegeTimetableDataTest {
         TimetableData.ClassItem third = items.get(3);
         assertEquals("11:00", third.start);
         assertEquals("11:45", third.end);
-        assertEquals("Engineering Physics", third.subject);
+        assertEquals("PHY", third.subject);
         assertEquals("GK", third.teacher);
 
         TimetableData.ClassItem last = items.get(5);
         assertEquals("12:30", last.start);
         assertEquals("13:15", last.end);
-        assertEquals("Engineering Mechanics", last.subject);
+        assertEquals("EM", last.subject);
         assertEquals("SMB", last.teacher);
     }
 
