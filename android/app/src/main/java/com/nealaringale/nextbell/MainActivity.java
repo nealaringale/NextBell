@@ -539,6 +539,7 @@ public class MainActivity extends ComponentActivity {
 
         nav.addView(navItem("home", "Home", R.drawable.ic_home), navWeight());
         nav.addView(navItem("week", "Week", R.drawable.ic_calendar), navWeight());
+        nav.addView(navItem("college", "College", R.drawable.ic_college), navWeight());
         nav.addView(navItem("expenses", "Money", R.drawable.ic_wallet), navWeight());
         nav.addView(navItem("study", "Study", R.drawable.ic_study), navWeight());
         nav.addView(navItem("settings", "Settings", R.drawable.ic_settings), navWeight());
@@ -617,6 +618,7 @@ public class MainActivity extends ComponentActivity {
     private String labelForScreen(String id) {
         switch (id) {
             case "week": return "Week";
+            case "college": return "College";
             case "expenses": return "Money";
             case "study": return "Study";
             case "settings": return "Settings";
@@ -641,6 +643,8 @@ public class MainActivity extends ComponentActivity {
         } else if ("week".equals(screen)) {
             lastWeekScheduleSignature = "";
             buildWeekScreen();
+        } else if ("college".equals(screen)) {
+            buildCollegeScreen();
         } else if ("expenses".equals(screen)) {
             buildExpensesScreen();
         } else if ("study".equals(screen)) {
@@ -3742,6 +3746,100 @@ public class MainActivity extends ComponentActivity {
         dialog.show();
     }
 
+    private void buildCollegeScreen() {
+        LinearLayout page = scrollPage();
+
+        TextView eyebrow = sectionLabel("YOUR CAMPUS");
+        eyebrow.setTextColor(ACCENT);
+        page.addView(eyebrow);
+
+        TextView title = text("College", themeHeadingSize(), TEXT);
+        title.setTypeface(Typeface.DEFAULT_BOLD);
+        title.setPadding(0, dp(5), 0, 0);
+        page.addView(title);
+
+        TextView subtitle = text(
+                "Your timetable, class reminders and student records follow this college profile.",
+                11, MUTED
+        );
+        subtitle.setPadding(0, dp(5), 0, dp(18));
+        page.addView(subtitle);
+
+        LinearLayout collegeCard = cardColumn();
+        TextView collegeName = text(CollegeCatalog.name(getCollegeId()), 17, TEXT);
+        collegeName.setTypeface(Typeface.DEFAULT_BOLD);
+        collegeCard.addView(collegeName);
+        TextView academic = text(CollegeCatalog.academicLabel(getCollegeId()), 10, ACCENT);
+        academic.setPadding(0, dp(7), 0, 0);
+        collegeCard.addView(academic);
+        TextView studentGroup = text(getStudentGroupLabel(), 11, MUTED);
+        studentGroup.setPadding(0, dp(8), 0, dp(13));
+        collegeCard.addView(studentGroup);
+        TextView change = actionButton("CHANGE COLLEGE / PROFILE", true);
+        collegeCard.addView(change, new LinearLayout.LayoutParams(-1, CONTROL_HEIGHT_DP()));
+        change.setOnClickListener(v -> {
+            tap(v);
+            showEditProfile();
+        });
+        page.addView(collegeCard, sectionParams(0, 20));
+
+        page.addView(sectionLabel("TIMETABLE COVERAGE"), sectionParams(0, 8));
+        LinearLayout timetableCard = cardColumn();
+        TextView timetableTitle = text("Academic schedule", 14, TEXT);
+        timetableTitle.setTypeface(Typeface.DEFAULT_BOLD);
+        timetableCard.addView(timetableTitle);
+
+        String coverage;
+        if (CollegeCatalog.DYPIIT_PIMPRI.equals(getCollegeId())) {
+            StringBuilder dates = new StringBuilder();
+            for (LocalDate date : DypitTimetableData.dates()) {
+                if (dates.length() > 0) dates.append("  ·  ");
+                dates.append(date.format(dateFormatter));
+            }
+            coverage = "Date-specific timetable imported for " + DypitTimetableData.publishedDateCount()
+                    + " dates: " + dates + ". The PDF has " + DypitTimetableData.divisionCount(
+                            DypitTimetableData.dates()[0]) + " divisions (A–T). It is not treated as a repeating weekly timetable.";
+        } else {
+            coverage = "Weekly timetable available Monday to Friday for First Year divisions A–P. Practical groups are selected from your division and roll number.";
+        }
+        TextView coverageText = text(coverage, 10, MUTED);
+        coverageText.setPadding(0, dp(6), 0, dp(13));
+        timetableCard.addView(coverageText);
+        TextView openWeek = actionButton("OPEN TIMETABLE", false);
+        timetableCard.addView(openWeek, new LinearLayout.LayoutParams(-1, CONTROL_HEIGHT_DP()));
+        openWeek.setOnClickListener(v -> {
+            tap(v);
+            navigate("week");
+        });
+        page.addView(timetableCard, sectionParams(0, 20));
+
+        page.addView(sectionLabel("PERSONALISED FEATURES"), sectionParams(0, 8));
+        LinearLayout features = cardColumn();
+        String featureCopy = "• Home screen and Week use the selected college timetable\n"
+                + "• Next-class countdown follows its published class dates\n"
+                + "• Class reminders and the home-screen widget use the same schedule\n"
+                + "• Attendance course lists are built from this college's subjects\n"
+                + "• Changing college keeps your expenses and planner, while attendance stays separated by college";
+        TextView featureText = text(featureCopy, 10, MUTED);
+        featureText.setLineSpacing(dp(5), 1f);
+        features.addView(featureText);
+        page.addView(features, sectionParams(0, 20));
+
+        LinearLayout campusInfo = cardColumn();
+        TextView campusTitle = text("Campus information", 13, TEXT);
+        campusTitle.setTypeface(Typeface.DEFAULT_BOLD);
+        campusInfo.addView(campusTitle);
+        String campusDescription = CollegeCatalog.DYPIIT_PIMPRI.equals(getCollegeId())
+                ? "Address printed on the timetable: Pimpri, Pune – 411018. Classroom labels are shown as listed in the PDF; a detailed campus map has not been supplied."
+                : "Campus room and map details are not yet part of this college's timetable package.";
+        TextView campusText = text(campusDescription, 9, MUTED);
+        campusText.setPadding(0, dp(5), 0, 0);
+        campusInfo.addView(campusText);
+        page.addView(campusInfo, sectionParams(0, 18));
+
+        addBottomSpace(page);
+    }
+
     private void buildSettingsScreen() {
         LinearLayout page = scrollPage();
 
@@ -5945,9 +6043,10 @@ public class MainActivity extends ComponentActivity {
     private int screenIndex(String screen) {
         if ("home".equals(screen)) return 0;
         if ("week".equals(screen)) return 1;
-        if ("expenses".equals(screen)) return 2;
-        if ("study".equals(screen)) return 3;
-        return 4;
+        if ("college".equals(screen)) return 2;
+        if ("expenses".equals(screen)) return 3;
+        if ("study".equals(screen)) return 4;
+        return 5;
     }
 
     private int themeHeadingSize() {
