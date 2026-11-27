@@ -24,6 +24,7 @@ public final class NotificationScheduler {
     private static final String PREFS_NAME = "nextbell_profile";
     private static final String KEY_ROLL_NUMBER = "roll_number";
     private static final String KEY_DIVISION = "division";
+    private static final String KEY_COLLEGE_ID = "college_id";
     private static final String KEY_SCHEDULED_ALARMS = "scheduled_alarm_ids";
     private static final String KEY_LIVE_ALARMS = "live_status_alarm_ids";
 
@@ -50,6 +51,8 @@ public final class NotificationScheduler {
 
         int roll = preferences.getInt(KEY_ROLL_NUMBER, -1);
         String division = preferences.getString(KEY_DIVISION, "B");
+        String collegeId = CollegeCatalog.normalize(
+                preferences.getString(KEY_COLLEGE_ID, CollegeCatalog.NMIET));
         if (roll < 1) return;
 
         ensureChannel(context);
@@ -68,7 +71,8 @@ public final class NotificationScheduler {
 
         for (int offset = 0; offset < 8; offset++) {
             LocalDate date = today.plusDays(offset);
-            String day = dayName(date);
+            String day = CollegeCatalog.DYPIIT_PIMPRI.equals(collegeId)
+                    ? CollegeScheduleData.dayName(date) : dayName(date);
             if (day.isEmpty()) continue;
 
             // Refresh the persistent "next class" notification shortly after
@@ -84,7 +88,7 @@ public final class NotificationScheduler {
             );
 
             List<TimetableData.ClassItem> classes =
-                    TimetableData.forDivisionRollAndDay(division, roll, day);
+                    CollegeScheduleData.forDate(collegeId, division, roll, date);
 
             for (TimetableData.ClassItem item : classes) {
                 if (!item.isAcademic()) continue;
