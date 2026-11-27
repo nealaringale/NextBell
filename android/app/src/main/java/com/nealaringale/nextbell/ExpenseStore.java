@@ -267,6 +267,12 @@ public final class ExpenseStore {
                     && !candidateMerchant.equals("unidentified merchant")
                     && candidateMerchant.equals(storedMerchant);
 
+            // Semantic matching is primarily for SMS <-> notification reconciliation.
+            // Same-source duplicate deliveries should already share the normalized
+            // fingerprint/reference; do not collapse a second genuine same-merchant spend.
+            boolean crossSource = !candidate.source.equalsIgnoreCase(stored.source);
+            if (!crossSource) continue;
+
             // Account suffix + amount + direction + rail + close event time is a
             // strong cross-source match. Without account data, require an exact
             // merchant and a tighter window to avoid collapsing separate purchases.
