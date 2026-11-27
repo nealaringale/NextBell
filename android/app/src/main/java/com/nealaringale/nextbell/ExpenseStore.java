@@ -60,11 +60,15 @@ public final class ExpenseStore {
         public String fingerprint;
         public String direction;
         public long availableBalancePaise;
+        public String referenceId;
+        public String accountSuffix;
+        public long eventTimestampMillis;
 
         public Expense(long id, long amountPaise, LocalDate date,
                        String category, String note, String paymentMode) {
             this(id, amountPaise, date, category, note, paymentMode,
-                    "", "MANUAL", 1.0f, "", SmsTransactionParser.DEBIT, -1L);
+                    "", "MANUAL", 1.0f, "", SmsTransactionParser.DEBIT, -1L,
+                    "", "", 0L);
         }
 
         public Expense(long id, long amountPaise, LocalDate date,
@@ -72,13 +76,23 @@ public final class ExpenseStore {
                        String merchant, String source,
                        float confidence, String fingerprint) {
             this(id, amountPaise, date, category, note, paymentMode, merchant, source,
-                    confidence, fingerprint, SmsTransactionParser.DEBIT, -1L);
+                    confidence, fingerprint, SmsTransactionParser.DEBIT, -1L,
+                    "", "", 0L);
         }
 
         public Expense(long id, long amountPaise, LocalDate date,
                        String category, String note, String paymentMode,
                        String merchant, String source, float confidence,
                        String fingerprint, String direction, long availableBalancePaise) {
+            this(id, amountPaise, date, category, note, paymentMode, merchant, source,
+                    confidence, fingerprint, direction, availableBalancePaise, "", "", 0L);
+        }
+
+        public Expense(long id, long amountPaise, LocalDate date,
+                       String category, String note, String paymentMode,
+                       String merchant, String source, float confidence,
+                       String fingerprint, String direction, long availableBalancePaise,
+                       String referenceId, String accountSuffix, long eventTimestampMillis) {
             this.id = id;
             this.amountPaise = amountPaise;
             this.date = date;
@@ -93,6 +107,9 @@ public final class ExpenseStore {
                     ? SmsTransactionParser.CREDIT : SmsTransactionParser.DEBIT;
             this.availableBalancePaise = availableBalancePaise >= 0L
                     ? availableBalancePaise : -1L;
+            this.referenceId = referenceId == null ? "" : referenceId;
+            this.accountSuffix = accountSuffix == null ? "" : accountSuffix;
+            this.eventTimestampMillis = Math.max(0L, eventTimestampMillis);
         }
     }
 
@@ -127,7 +144,10 @@ public final class ExpenseStore {
                         (float) item.optDouble("confidence", 1.0),
                         item.optString("fingerprint", ""),
                         item.optString("direction", SmsTransactionParser.DEBIT),
-                        item.optLong("availableBalancePaise", -1L)
+                        item.optLong("availableBalancePaise", -1L),
+                        item.optString("referenceId", ""),
+                        item.optString("accountSuffix", ""),
+                        item.optLong("eventTimestampMillis", 0L)
                 ));
             } catch (Exception ignored) {
                 // Skip one damaged row without hiding the rest of the ledger.
@@ -161,6 +181,9 @@ public final class ExpenseStore {
                 item.put("fingerprint", expense.fingerprint);
                 item.put("direction", expense.direction);
                 item.put("availableBalancePaise", expense.availableBalancePaise);
+                item.put("referenceId", expense.referenceId);
+                item.put("accountSuffix", expense.accountSuffix);
+                item.put("eventTimestampMillis", expense.eventTimestampMillis);
                 array.put(item);
             } catch (Exception ignored) {
                 // Skip only an invalid object; other expenses remain persisted.
@@ -191,6 +214,74 @@ public final class ExpenseStore {
         expenses.removeIf(expense -> expense.id == id);
         save(prefs, expenses);
     }
+    /**
+     * Atomically inserts an auto-imported transaction only if the same event
+     * has not already arrived through SMS, inbox scan or notification preview.
+     */
+    public static synchronized boolean insertIfAbsent(
+            SharedPreferences prefs, Expense candidate
+    ) {
+        if (candidate == null) return false;
+        List<Expense> expenses = load(prefs);
+        if (isDuplicate(expenses, candidate)) return false;
+        expenses.add(candidate);
+        save(prefs, expenses);
+        return true;
+    }
+
+    /** Pure ledger comparison so duplicate rules can be regression-tested. */
+    public static boolean isDuplicate(List<Expense> existing, Expense candidate) {
+        if (existing == null || candidate == null) return false;
+        for (Expense stored : existing) {
+            if (stored == null) continue;
+            if (!candidate.fingerprint.isEmpty()
+                    && candidate.fingerprint.equals(stored.fingerprint)) return true;
+
+            if (!candidate.referenceId.isEmpty()
+                    && candidate.referenceId.equalsIgnoreCase(stored.referenceId)) return true;
+
+            if (candidate.amountPaise != stored.amountPaise
+                    || !candidate.date.equals(stored.date)
+                    || !candidate.direction.equals(stored.direction)
+                    || !candidate.paymentMode.equalsIgnoreCase(stored.paymentMode)) {
+                continue;
+            }
+
+            long candidateAt = candidate.eventTimestampMillis;
+            long storedAt = stored.eventTimestampMillis;
+            if (candidateAt <= 0L || storedAt <= 0L) continue;
+            long delta = candidateAt >= storedAt
+                    ? candidateAt - storedAt : storedAt - candidateAt;
+
+            String candidateAccount = digits(candidate.accountSuffix);
+            String storedAccount = digits(stored.accountSuffix);
+            boolean sameAccount = !candidateAccount.isEmpty()
+                    && candidateAccount.equals(storedAccount);
+            String candidateMerchant = normalizedMerchant(candidate.merchant);
+            String storedMerchant = normalizedMerchant(stored.merchant);
+            boolean sameMerchant = !candidateMerchant.isEmpty()
+                    && !storedMerchant.isEmpty()
+                    && !candidateMerchant.equals("unidentified merchant")
+                    && candidateMerchant.equals(storedMerchant);
+
+            // Account suffix + amount + direction + rail + close event time is a
+            // strong cross-source match. Without account data, require an exact
+            // merchant and a tighter window to avoid collapsing separate purchases.
+            if (sameAccount && delta <= 120_000L) return true;
+            if (sameMerchant && delta <= 45_000L) return true;
+        }
+        return false;
+    }
+
+    private static String digits(String value) {
+        return value == null ? "" : value.replaceAll("[^0-9]", "");
+    }
+
+    private static String normalizedMerchant(String value) {
+        return value == null ? "" : value.toLowerCase(java.util.Locale.ENGLISH)
+                .replaceAll("[^a-z0-9]+", " ").trim().replaceAll("\\s+", " ");
+    }
+
     public static boolean hasFingerprint(SharedPreferences prefs, String fingerprint) {
         if (fingerprint == null || fingerprint.isEmpty()) return false;
         for (Expense expense : load(prefs)) {
