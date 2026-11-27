@@ -12,6 +12,7 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Locale;
 
 public class LiveStatusReceiver extends BroadcastReceiver {
     public static final String ACTION_UPDATE_LIVE = "com.nealaringale.nextbell.UPDATE_LIVE";
