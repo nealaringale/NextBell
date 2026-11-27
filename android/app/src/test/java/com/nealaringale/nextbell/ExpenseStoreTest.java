@@ -90,6 +90,7 @@ public class ExpenseStoreTest {
                 2, date, 24_000L, "Swiggy", "Notification fingerprint",
                 "123456789012", "0702", 1_794_000_090_000L
         );
+        notification.source = "NOTIFICATION";
 
         assertTrue(ExpenseStore.isDuplicate(Arrays.asList(sms), notification));
     }
@@ -105,6 +106,7 @@ public class ExpenseStoreTest {
                 2, date, 24_000L, "Swiggy", "notification-hash",
                 "", "0702", 1_794_000_105_000L
         );
+        notification.source = "NOTIFICATION";
 
         assertTrue(ExpenseStore.isDuplicate(Arrays.asList(sms), notification));
     }
@@ -120,13 +122,30 @@ public class ExpenseStoreTest {
                 2, date, 24_000L, "Swiggy", "replay",
                 "", "", 1_794_000_030_000L
         );
+        replay.source = "NOTIFICATION";
         ExpenseStore.Expense laterPurchase = transaction(
                 3, date, 24_000L, "Swiggy", "later",
                 "", "", 1_794_000_090_000L
         );
+        laterPurchase.source = "NOTIFICATION";
 
         assertTrue(ExpenseStore.isDuplicate(Arrays.asList(first), replay));
         assertFalse(ExpenseStore.isDuplicate(Arrays.asList(first), laterPurchase));
+    }
+
+    @Test
+    public void sameSourceSameMerchantDifferentMessagesAreNotMergedByHeuristic() {
+        LocalDate date = LocalDate.of(2026, 11, 7);
+        ExpenseStore.Expense first = transaction(
+                1, date, 24_000L, "Swiggy", "first",
+                "", "0702", 1_794_000_000_000L
+        );
+        ExpenseStore.Expense second = transaction(
+                2, date, 24_000L, "Swiggy", "second",
+                "", "0702", 1_794_000_030_000L
+        );
+
+        assertFalse(ExpenseStore.isDuplicate(Arrays.asList(first), second));
     }
 
     @Test
