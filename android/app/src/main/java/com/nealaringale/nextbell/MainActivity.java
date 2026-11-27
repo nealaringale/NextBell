@@ -244,8 +244,11 @@ public class MainActivity extends ComponentActivity {
                     public void onRemoteDataChanged() {
                         themeIndex = clampTheme(preferences.getInt(KEY_THEME, themeIndex));
                         applyTheme();
+                        NotificationScheduler.scheduleUpcoming(MainActivity.this);
+                        NextClassWidgetProvider.refreshAll(MainActivity.this);
                         if ("home".equals(selectedScreen)) buildHomeScreen();
                         else if ("week".equals(selectedScreen)) buildWeekScreen();
+                        else if ("college".equals(selectedScreen)) buildCollegeScreen();
                         else if ("study".equals(selectedScreen)) buildStudyScreen();
                         else refreshMoneyAndSettings();
                     }
