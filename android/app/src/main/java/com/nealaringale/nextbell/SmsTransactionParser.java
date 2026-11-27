@@ -463,15 +463,19 @@ public final class SmsTransactionParser {
     }
 
     private static String paymentMode(String body) {
-        String lower = body.toLowerCase(Locale.ENGLISH);
-        if (lower.contains("upi")) return "UPI";
-        if (lower.contains("atm")) return "ATM";
-        if (lower.contains("pos") || lower.contains("card")) return "Card";
-        if (lower.contains("neft")) return "NEFT";
-        if (lower.contains("imps")) return "IMPS";
-        if (lower.contains("rtgs")) return "RTGS";
-        if (lower.contains("nach") || lower.contains("ach")) return "Bank Transfer";
+        if (hasToken(body, "upi")) return "UPI";
+        if (hasToken(body, "atm")) return "ATM";
+        if (hasToken(body, "pos") || hasToken(body, "card")) return "Card";
+        if (hasToken(body, "neft")) return "NEFT";
+        if (hasToken(body, "imps")) return "IMPS";
+        if (hasToken(body, "rtgs")) return "RTGS";
+        if (hasToken(body, "nach") || hasToken(body, "ach")) return "Bank Transfer";
         return "Bank Transfer";
+    }
+
+    private static boolean hasToken(String text, String token) {
+        return Pattern.compile("(?i)\\b" + Pattern.quote(token) + "\\b")
+                .matcher(text == null ? "" : text).find();
     }
 
     private static String extractMerchant(String body, String direction) {
