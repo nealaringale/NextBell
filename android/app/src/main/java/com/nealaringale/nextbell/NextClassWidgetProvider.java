@@ -68,7 +68,7 @@ public final class NextClassWidgetProvider extends AppWidgetProvider {
         LocalDate nextDate = null;
         LocalDate today = LocalDate.now(ZONE);
         LocalTime now = LocalTime.now(ZONE);
-        for (int offset = 0; offset < 8 && next == null; offset++) {
+        for (int offset = 0; offset < 15 && next == null; offset++) {
             LocalDate date = today.plusDays(offset);
             String day = date.getDayOfWeek().getDisplayName(TextStyle.FULL, Locale.ENGLISH);
             List<TimetableData.ClassItem> entries =
