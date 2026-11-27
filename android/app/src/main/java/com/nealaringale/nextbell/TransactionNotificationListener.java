@@ -110,6 +110,7 @@ public final class TransactionNotificationListener extends NotificationListenerS
         final String capturedPackage = packageName;
         final String capturedTitle = title;
         final String capturedBody = body;
+        final long capturedPostedAt = postedAt;
         try {
             WORKER.execute(() -> {
                 try {
@@ -119,7 +120,8 @@ public final class TransactionNotificationListener extends NotificationListenerS
                     if (!SmsTransactionService.isEnabled(current)
                             || !TransactionNotificationAccess.hasAccess(this)) return;
                     boolean imported = SmsTransactionService.processNotification(
-                            current, capturedPackage, capturedTitle, capturedBody, receivedDate
+                            current, capturedPackage, capturedTitle, capturedBody,
+                            receivedDate, capturedPostedAt
                     );
                     if (imported) ExpenseDailyAlertReceiver.maybeNotifyNow(this);
                 } catch (RuntimeException error) {
@@ -138,38 +140,49 @@ public final class TransactionNotificationListener extends NotificationListenerS
     }
 
     private static String collectBody(Notification notification, Bundle extras) {
-        StringBuilder body = new StringBuilder();
-        append(body, extras.getCharSequence(Notification.EXTRA_BIG_TEXT));
-        append(body, extras.getCharSequence(Notification.EXTRA_TEXT));
-        append(body, extras.getCharSequence(Notification.EXTRA_SUB_TEXT));
-        append(body, extras.getCharSequence(Notification.EXTRA_SUMMARY_TEXT));
-        append(body, extras.getCharSequence(Notification.EXTRA_INFO_TEXT));
-        append(body, extras.getCharSequence(Notification.EXTRA_TITLE_BIG));
-        append(body, extras.getCharSequence(Notification.EXTRA_CONVERSATION_TITLE));
+        // Android often repeats the same text in EXTRA_BIG_TEXT, EXTRA_TEXT and
+        // EXTRA_TEXT_LINES. Concatenating all fields manufactured different
+        // fingerprints for the same bank alert and made parsing less reliable.
+        String bigText = value(extras.getCharSequence(Notification.EXTRA_BIG_TEXT));
+        if (!bigText.isEmpty()) return limit(bigText);
 
         CharSequence[] textLines = extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES);
-        if (textLines != null) {
-            for (CharSequence line : textLines) append(body, line);
+        if (textLines != null && textLines.length > 0) {
+            for (int i = textLines.length - 1; i >= 0; i--) {
+                String line = value(textLines[i]);
+                if (!line.isEmpty()) return limit(line);
+            }
         }
+
+        String text = value(extras.getCharSequence(Notification.EXTRA_TEXT));
+        if (!text.isEmpty()) return limit(text);
 
         Parcelable[] messages = extras.getParcelableArray(Notification.EXTRA_MESSAGES);
         if (messages != null) {
-            for (Parcelable item : messages) {
+            for (int i = messages.length - 1; i >= 0; i--) {
+                Parcelable item = messages[i];
                 if (item instanceof Bundle) {
-                    append(body, ((Bundle) item).getCharSequence("text"));
+                    String message = value(((Bundle) item).getCharSequence("text"));
+                    if (!message.isEmpty()) return limit(message);
                 }
             }
         }
-        String value = body.toString().trim();
-        return value.length() > 2_000 ? value.substring(0, 2_000) : value;
+
+        String[] fallbacks = {
+                value(extras.getCharSequence(Notification.EXTRA_SUB_TEXT)),
+                value(extras.getCharSequence(Notification.EXTRA_SUMMARY_TEXT)),
+                value(extras.getCharSequence(Notification.EXTRA_INFO_TEXT)),
+                value(extras.getCharSequence(Notification.EXTRA_TITLE_BIG)),
+                value(extras.getCharSequence(Notification.EXTRA_CONVERSATION_TITLE))
+        };
+        for (String fallback : fallbacks) {
+            if (!fallback.isEmpty()) return limit(fallback);
+        }
+        return "";
     }
 
-    private static void append(StringBuilder destination, CharSequence value) {
-        if (value == null || TextUtils.isEmpty(value)) return;
-        String text = value.toString().trim();
-        if (text.isEmpty()) return;
-        if (destination.length() > 0) destination.append(". ");
-        destination.append(text);
+    private static String limit(String value) {
+        return value.length() > 2_000 ? value.substring(0, 2_000) : value;
     }
 
     private static String value(CharSequence value) {
