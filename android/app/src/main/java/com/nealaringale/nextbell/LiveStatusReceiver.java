@@ -79,7 +79,7 @@ public class LiveStatusReceiver extends BroadcastReceiver {
         }
 
         if (current == null && next == null) {
-            for (int offset = 1; offset <= 7; offset++) {
+            for (int offset = 1; offset <= 14; offset++) {
                 LocalDate date = today.plusDays(offset);
                 String day = CollegeCatalog.DYPIIT_PIMPRI.equals(collegeId)
                         ? CollegeScheduleData.dayName(date) : dayName(date);
