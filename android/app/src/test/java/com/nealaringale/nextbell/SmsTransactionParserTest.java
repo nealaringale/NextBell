@@ -358,4 +358,129 @@ public class SmsTransactionParserTest {
         assertEquals("Shopping", first.category);
         assertEquals(first.fingerprint, second.fingerprint);
     }
+
+    @Test
+    public void refundRemainsCreditWhenOriginalPurchaseIsMentionedLater() {
+        SmsTransactionParser.ParsedTransaction parsed = SmsTransactionParser.parse(
+                "VM-ICICIB",
+                "Refund of INR 499.00 for your earlier purchase has been credited to your account. "
+                        + "Original purchase was debited on 01-Nov-2026.",
+                RECEIVED
+        );
+
+        assertNotNull(parsed);
+        assertEquals(49_900L, parsed.amountPaise);
+        assertEquals(SmsTransactionParser.CREDIT, parsed.direction);
+        assertEquals("Income & Refunds", parsed.category);
+    }
+
+    @Test
+    public void completedDebitSurvivesGenericFailureHelpTextInLaterSentence() {
+        SmsTransactionParser.ParsedTransaction parsed = SmsTransactionParser.parse(
+                "VM-HDFCBK",
+                "A/c XX702 debited by INR 250.00 at Cafe. "
+                        + "If you did not make this transaction, contact the bank if it failed.",
+                RECEIVED
+        );
+
+        assertNotNull(parsed);
+        assertEquals(25_000L, parsed.amountPaise);
+        assertEquals(SmsTransactionParser.DEBIT, parsed.direction);
+    }
+
+    @Test
+    public void ambiguousSuccessfulTransferIsNotAssumedToBeDebit() {
+        assertNull(SmsTransactionParser.parseNotification(
+                "com.google.android.apps.messaging",
+                "Bank transaction",
+                "UPI transaction of INR 500.00 successful.",
+                RECEIVED
+        ));
+    }
+
+    @Test
+    public void extractsBankReferenceAndAccountSuffixForStableIdentity() {
+        SmsTransactionParser.ParsedTransaction parsed = SmsTransactionParser.parseIncomingSms(
+                "AX-ICICIT-S",
+                "ICICI Bank A/c XX702 debited by Rs 150.00 at Swiggy. "
+                        + "UPI Ref No 123456789012. Avl Bal INR 1,200.00",
+                RECEIVED,
+                1_794_000_000_000L
+        );
+
+        assertNotNull(parsed);
+        assertEquals("123456789012", parsed.referenceId);
+        assertEquals("702", parsed.accountSuffix);
+        assertEquals(15_000L, parsed.amountPaise);
+        assertEquals("UPI", parsed.paymentMode);
+    }
+
+    @Test
+    public void smsAndNotificationPreviewsCarryTheSameReferenceDespiteDifferentText() {
+        long timestamp = 1_794_000_000_000L;
+        SmsTransactionParser.ParsedTransaction sms = SmsTransactionParser.parseIncomingSms(
+                "AX-ICICIT-S",
+                "ICICI Bank A/c XX702 debited by Rs 240.00 at Swiggy on 27-Nov-2026. "
+                        + "UPI Ref No 123456789012.",
+                RECEIVED,
+                timestamp
+        );
+        SmsTransactionParser.ParsedTransaction notification = SmsTransactionParser.parseNotification(
+                "com.google.android.apps.messaging",
+                "ICICI Bank",
+                "A/c XX702 debited by INR 240.00 at Swiggy. UPI Ref No 123456789012.",
+                RECEIVED,
+                timestamp + 18_000L
+        );
+
+        assertNotNull(sms);
+        assertNotNull(notification);
+        assertEquals("123456789012", sms.referenceId);
+        assertEquals(sms.referenceId, notification.referenceId);
+        assertEquals("702", notification.accountSuffix);
+        assertEquals(SmsTransactionParser.DEBIT, notification.direction);
+        assertEquals(240_00L, notification.amountPaise);
+    }
+
+    @Test
+    public void specificMerchantAliasWinsOverGenericAmazonAlias() {
+        SmsTransactionParser.ParsedTransaction parsed = SmsTransactionParser.parseNotification(
+                "com.google.android.apps.messaging",
+                "Card alert",
+                "Your card was charged INR 999.00 at Amazon Prime Video.",
+                RECEIVED
+        );
+
+        assertNotNull(parsed);
+        assertEquals("Prime Video", parsed.merchant);
+        assertEquals("Subscriptions", parsed.category);
+    }
+
+    @Test
+    public void personToPersonUpiTransferUsesTransferCategory() {
+        SmsTransactionParser.ParsedTransaction parsed = SmsTransactionParser.parse(
+                "VM-SBIINB",
+                "UPI transfer of INR 500.00 debited to Rahul successfully.",
+                RECEIVED
+        );
+
+        assertNotNull(parsed);
+        assertEquals(SmsTransactionParser.DEBIT, parsed.direction);
+        assertEquals("Rahul", parsed.merchant);
+        assertEquals("Transfers & ATM", parsed.category);
+    }
+
+    @Test
+    public void depositWordingDoesNotAccidentallyBecomePosCardMode() {
+        SmsTransactionParser.ParsedTransaction parsed = SmsTransactionParser.parse(
+                "AD-ICICIB",
+                "INR 500.00 credited to your account as deposit from Rahul.",
+                RECEIVED
+        );
+
+        assertNotNull(parsed);
+        assertEquals(SmsTransactionParser.CREDIT, parsed.direction);
+        assertEquals("Other", parsed.paymentMode);
+    }
+
 }
