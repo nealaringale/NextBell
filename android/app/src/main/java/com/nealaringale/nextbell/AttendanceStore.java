@@ -25,6 +25,11 @@ public final class AttendanceStore {
         public final String collegeId;
 
         Session(String key, String subject, String start, String end,
+                LocalDate date, String status) {
+            this(key, subject, start, end, date, status, CollegeCatalog.NMIET);
+        }
+
+        Session(String key, String subject, String start, String end,
                 LocalDate date, String status, String collegeId) {
             this.key = key;
             this.subject = subject;
