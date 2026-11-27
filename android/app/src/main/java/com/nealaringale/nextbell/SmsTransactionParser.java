@@ -220,6 +220,7 @@ public final class SmsTransactionParser {
 
     private static ParsedTransaction parseInternal(String sender, String body,
                                                     LocalDate receivedDate,
+                                                    long eventTimestampMillis,
                                                     boolean trustedNotificationSource) {
         if ((!trustedNotificationSource && !isBankLikeSender(sender))
                 || body == null || body.trim().isEmpty() || receivedDate == null) return null;
@@ -227,46 +228,40 @@ public final class SmsTransactionParser {
         String normalized = body.replace('\u00a0', ' ')
                 .replaceAll("\\s+", " ")
                 .trim();
-        if (FAILED.matcher(normalized).find()
-                || normalized.matches("(?i).*\\bnot\\s+(?:debited|credited)\\b.*")) {
-            return null;
-        }
 
         long signedDebitAmountPaise = extractSignedDebitAmountPaise(normalized);
-        long amountPaise = signedDebitAmountPaise > 0L
-                ? signedDebitAmountPaise : extractTransactionAmountPaise(normalized);
-        if (amountPaise <= 0L) return null;
+        AmountCandidate amountCandidate = signedDebitAmountPaise > 0L
+                ? new AmountCandidate(signedDebitAmountPaise, signedAmountContext(normalized), 0)
+                : extractTransactionAmount(normalized);
+        if (amountCandidate == null || amountCandidate.amountPaise <= 0L) return null;
 
-        boolean explicitDebit = signedDebitAmountPaise > 0L
-                || DEBIT_TERMS.matcher(normalized).find();
-        boolean accountCredit = CREDIT_TERMS.matcher(normalized).find();
-        boolean successfulRail = RAIL_SUCCESS.matcher(normalized).find();
-
-        // Explicit debit wording wins over recipient-side phrases such as
-        // "credited to VPA". A rail success message is a debit only when no
-        // account-credit wording was found.
-        String direction;
-        if (explicitDebit) {
-            direction = DEBIT;
-        } else if (accountCredit) {
-            direction = CREDIT;
-        } else if (successfulRail) {
-            direction = DEBIT;
-        } else {
+        // Failure words in a separate help sentence must not suppress a completed
+        // transaction. Only status wording in the selected amount clause is relevant.
+        if (FAILED.matcher(amountCandidate.context).find()
+                || amountCandidate.context.matches("(?i).*\\bnot\\s+(?:debited|credited)\\b.*")) {
             return null;
         }
+
+        String direction = signedDebitAmountPaise > 0L
+                ? DEBIT : classifyDirection(amountCandidate.context, amountCandidate.amountIndex);
+        if (direction.isEmpty()) return null;
 
         long balancePaise = extractAvailableBalancePaise(normalized);
         String paymentMode = paymentMode(normalized);
-        String merchant = MerchantCatalog.match(normalized);
-        if (merchant.isEmpty()) merchant = extractMerchant(normalized, direction);
+        String extractedMerchant = extractMerchant(normalized, direction);
+        String merchant = MerchantCatalog.match(normalized, extractedMerchant);
+        if (merchant.isEmpty()) merchant = extractedMerchant;
         String category = MerchantCatalog.categoryFor(normalized, merchant, direction);
         String fingerprint = fingerprint(sender, normalized);
-        float confidence = merchant.isEmpty() ? 0.72f : 0.92f;
+        String referenceId = extractReferenceId(normalized);
+        String accountSuffix = extractAccountSuffix(normalized);
+        float confidence = signedDebitAmountPaise > 0L ? 0.78f
+                : merchant.isEmpty() ? 0.72f : 0.92f;
 
-        return new ParsedTransaction(amountPaise, balancePaise,
+        return new ParsedTransaction(amountCandidate.amountPaise, balancePaise,
                 transactionDate(normalized, receivedDate), direction, merchant,
-                category, paymentMode, confidence, fingerprint);
+                category, paymentMode, confidence, fingerprint,
+                referenceId, accountSuffix, eventTimestampMillis);
     }
 
     /**
