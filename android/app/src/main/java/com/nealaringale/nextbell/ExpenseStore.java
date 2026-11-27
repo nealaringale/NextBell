@@ -240,10 +240,13 @@ public final class ExpenseStore {
             if (!candidate.referenceId.isEmpty()
                     && candidate.referenceId.equalsIgnoreCase(stored.referenceId)) return true;
 
+            boolean sameRail = candidate.paymentMode.equalsIgnoreCase(stored.paymentMode)
+                    || "Other".equalsIgnoreCase(candidate.paymentMode)
+                    || "Other".equalsIgnoreCase(stored.paymentMode);
             if (candidate.amountPaise != stored.amountPaise
                     || !candidate.date.equals(stored.date)
                     || !candidate.direction.equals(stored.direction)
-                    || !candidate.paymentMode.equalsIgnoreCase(stored.paymentMode)) {
+                    || !sameRail) {
                 continue;
             }
 
