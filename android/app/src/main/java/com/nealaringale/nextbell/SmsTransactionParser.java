@@ -83,7 +83,7 @@ public final class SmsTransactionParser {
                     + "(?:merchant(?:\\s+name)?|towards|at|spent\\s+at|spent\\s+on|"
                     + "purchase\\s+at|to))\\s+(.{2,64}?)"
                     + "(?=\\s+(?:on|ref|upi|txn|transaction|avl|available|balance|"
-                    + "a/c|ac|from|using|via|through|success|completed|for|rrn|utr)\\b|[,.;]|$)"
+                    + "a/c|ac|from|using|via|through|success|successfully|completed|for|rrn|utr)\\b|[,.;]|$)"
     );
     private static final Pattern CREDIT_COUNTERPARTY = Pattern.compile(
             "(?i)\\b(?:received\\s+from|credited\\s+by|from)\\s+(.{2,64}?)"
