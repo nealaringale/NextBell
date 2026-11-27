@@ -1173,7 +1173,7 @@ public class MainActivity extends ComponentActivity {
             ));
         } else {
             for (String course : courses.keySet()) {
-                AttendanceStore.Stats stats = AttendanceStore.stats(sessions, course, target);
+                AttendanceStore.Stats stats = AttendanceStore.stats(sessions, course, target, getCollegeId());
                 LinearLayout row = new LinearLayout(this);
                 row.setGravity(Gravity.CENTER_VERTICAL);
                 row.setPadding(0, dp(9), 0, dp(9));
@@ -1327,26 +1327,26 @@ public class MainActivity extends ComponentActivity {
                 if (choices.getChildCount() > 0) actionParams.setMargins(dp(5), 0, 0, 0);
                 choices.addView(action, actionParams);
             }
-            String status = AttendanceStore.statusFor(sessions, date, item);
+            String status = AttendanceStore.statusFor(sessions, date, item, getCollegeId());
             present.setAlpha("PRESENT".equals(status) ? 1f : 0.72f);
             absent.setAlpha("ABSENT".equals(status) ? 1f : 0.72f);
             clear.setEnabled(!status.isEmpty());
             present.setOnClickListener(v -> {
-                AttendanceStore.mark(preferences, date, item, "PRESENT");
+                AttendanceStore.mark(preferences, date, item, "PRESENT", getCollegeId());
                 buildStudyScreen();
                 present.setAlpha(1f);
                 absent.setAlpha(0.72f);
                 clear.setEnabled(true);
             });
             absent.setOnClickListener(v -> {
-                AttendanceStore.mark(preferences, date, item, "ABSENT");
+                AttendanceStore.mark(preferences, date, item, "ABSENT", getCollegeId());
                 buildStudyScreen();
                 present.setAlpha(0.72f);
                 absent.setAlpha(1f);
                 clear.setEnabled(true);
             });
             clear.setOnClickListener(v -> {
-                AttendanceStore.clear(preferences, date, item);
+                AttendanceStore.clear(preferences, date, item, getCollegeId());
                 buildStudyScreen();
                 present.setAlpha(0.72f);
                 absent.setAlpha(0.72f);
