@@ -1,6 +1,8 @@
 package com.nealaringale.nextbell;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -74,6 +76,91 @@ public class ExpenseStoreTest {
         assertEquals(700L, ExpenseStore.totalReceivedPaise(transactions));
         assertEquals(500L, ExpenseStore.categoryTotals(transactions).get("Food & Drinks").longValue());
         assertEquals(20_000L, credit.availableBalancePaise);
+    }
+
+
+    @Test
+    public void sameBankReferenceIsDeduplicatedAcrossDifferentMessageBodies() {
+        LocalDate date = LocalDate.of(2026, 11, 7);
+        ExpenseStore.Expense sms = transaction(
+                1, date, 24_000L, "Swiggy", "SMS fingerprint",
+                "123456789012", "0702", 1_794_000_000_000L
+        );
+        ExpenseStore.Expense notification = transaction(
+                2, date, 24_000L, "Swiggy", "Notification fingerprint",
+                "123456789012", "0702", 1_794_000_090_000L
+        );
+
+        assertTrue(ExpenseStore.isDuplicate(Arrays.asList(sms), notification));
+    }
+
+    @Test
+    public void crossSourceFallbackUsesAccountAndShortTimestampWindow() {
+        LocalDate date = LocalDate.of(2026, 11, 7);
+        ExpenseStore.Expense sms = transaction(
+                1, date, 24_000L, "Swiggy", "sms-hash",
+                "", "0702", 1_794_000_000_000L
+        );
+        ExpenseStore.Expense notification = transaction(
+                2, date, 24_000L, "Swiggy", "notification-hash",
+                "", "0702", 1_794_000_105_000L
+        );
+
+        assertTrue(ExpenseStore.isDuplicate(Arrays.asList(sms), notification));
+    }
+
+    @Test
+    public void sameMerchantFallbackHasTighterWindowAndDoesNotCollapseSeparatePurchases() {
+        LocalDate date = LocalDate.of(2026, 11, 7);
+        ExpenseStore.Expense first = transaction(
+                1, date, 24_000L, "Swiggy", "first",
+                "", "", 1_794_000_000_000L
+        );
+        ExpenseStore.Expense replay = transaction(
+                2, date, 24_000L, "Swiggy", "replay",
+                "", "", 1_794_000_030_000L
+        );
+        ExpenseStore.Expense laterPurchase = transaction(
+                3, date, 24_000L, "Swiggy", "later",
+                "", "", 1_794_000_090_000L
+        );
+
+        assertTrue(ExpenseStore.isDuplicate(Arrays.asList(first), replay));
+        assertFalse(ExpenseStore.isDuplicate(Arrays.asList(first), laterPurchase));
+    }
+
+    @Test
+    public void sameAmountAloneNeverMakesTwoTransactionsDuplicates() {
+        LocalDate date = LocalDate.of(2026, 11, 7);
+        ExpenseStore.Expense first = transaction(
+                1, date, 10_000L, "Cafe", "first", "", "0702", 1_794_000_000_000L
+        );
+        ExpenseStore.Expense otherMerchant = transaction(
+                2, date, 10_000L, "Amazon", "second", "", "9911", 1_794_000_020_000L
+        );
+        ExpenseStore.Expense oppositeDirection = new ExpenseStore.Expense(
+                3, 10_000L, date, "Income & Refunds", "", "UPI",
+                "Cafe", "NOTIFICATION", 0.9f, "credit",
+                SmsTransactionParser.CREDIT, -1L, "", "0702", 1_794_000_020_000L
+        );
+        ExpenseStore.Expense noTimestamp = transaction(
+                4, date, 10_000L, "Cafe", "untimed", "", "0702", 0L
+        );
+
+        assertFalse(ExpenseStore.isDuplicate(Arrays.asList(first), otherMerchant));
+        assertFalse(ExpenseStore.isDuplicate(Arrays.asList(first), oppositeDirection));
+        assertFalse(ExpenseStore.isDuplicate(Arrays.asList(first), noTimestamp));
+    }
+
+    private static ExpenseStore.Expense transaction(
+            long id, LocalDate date, long amountPaise, String merchant, String fingerprint,
+            String referenceId, String accountSuffix, long eventTimestampMillis
+    ) {
+        return new ExpenseStore.Expense(
+                id, amountPaise, date, "Food & Drinks", "", "UPI",
+                merchant, "SMS", 0.92f, fingerprint, SmsTransactionParser.DEBIT, -1L,
+                referenceId, accountSuffix, eventTimestampMillis
+        );
     }
 
     private static ExpenseStore.Expense expense(long id, LocalDate date, long amount) {
