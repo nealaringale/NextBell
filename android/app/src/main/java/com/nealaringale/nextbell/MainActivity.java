@@ -5130,8 +5130,11 @@ public class MainActivity extends ComponentActivity {
         heroRoomText.setText(
                 roomValue.isEmpty() ? "ROOM\nNot listed" : "ROOM\n" + roomValue
         );
+        String locationKind = CollegeCatalog.DYPIIT_PIMPRI.equals(getCollegeId())
+                ? "BLOCK" : "WING";
         heroWingText.setText(
-                wingValue.isEmpty() ? "WING\nNot listed" : "WING\n" + wingValue
+                wingValue.isEmpty() ? locationKind + "\nNot listed"
+                        : locationKind + "\n" + wingValue
         );
     }
 
@@ -5290,6 +5293,12 @@ public class MainActivity extends ComponentActivity {
                 java.util.regex.Pattern.compile("Wing\\s+[A-Z]", java.util.regex.Pattern.CASE_INSENSITIVE)
                         .matcher(item.room);
         if (matcher.find()) return matcher.group().replace("wing", "Wing");
+
+        if (CollegeCatalog.DYPIIT_PIMPRI.equals(getCollegeId())) {
+            java.util.regex.Matcher blockMatcher = java.util.regex.Pattern
+                    .compile("^([A-Z])\\s*\\d{3}$").matcher(item.room.trim());
+            if (blockMatcher.find()) return "Block " + blockMatcher.group(1);
+        }
 
         // The official timetable is headed Wing C; room-only three-digit
         // common classrooms therefore use Wing C as the displayed default.
