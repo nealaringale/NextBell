@@ -70,6 +70,7 @@ public class MainActivity extends ComponentActivity {
     private static final String KEY_NAME = "name";
     private static final String KEY_ROLL_NUMBER = "roll_number";
     private static final String KEY_DIVISION = "division";
+    private static final String KEY_COLLEGE_ID = "college_id";
     private static final String KEY_NOTIFICATION_PROMPTED = "notification_prompted";
     private static final String KEY_NOTIFICATION_PERMISSION_REQUESTED = "notification_permission_requested";
     private static final String KEY_THEME = "theme";
@@ -226,6 +227,9 @@ public class MainActivity extends ComponentActivity {
         if (!preferences.contains(KEY_DIVISION)) {
             preferences.edit().putString(KEY_DIVISION, "B").apply();
         }
+        if (!preferences.contains(KEY_COLLEGE_ID)) {
+            preferences.edit().putString(KEY_COLLEGE_ID, CollegeCatalog.NMIET).apply();
+        }
         firebaseSyncManager = new FirebaseSyncManager(this, preferences,
                 new FirebaseSyncManager.StatusListener() {
                     @Override
@@ -335,22 +339,32 @@ public class MainActivity extends ComponentActivity {
         return preferences.getInt(KEY_ROLL_NUMBER, 34);
     }
 
+    private String getCollegeId() {
+        return CollegeCatalog.normalize(preferences.getString(KEY_COLLEGE_ID, CollegeCatalog.NMIET));
+    }
+
     private String getDivision() {
         String saved = preferences.getString(KEY_DIVISION, "B");
         String division = saved == null ? "B" : saved.trim().toUpperCase(Locale.ENGLISH);
-        return TimetableData.isSupportedDivision(division) ? division : "B";
+        return CollegeScheduleData.supportsDivision(getCollegeId(), division) ? division
+                : (CollegeCatalog.DYPIIT_PIMPRI.equals(getCollegeId()) ? "A" : "B");
     }
 
     private String getBatch() {
-        return TimetableData.batchForDivisionRoll(getDivision(), getRollNumber());
+        return CollegeScheduleData.batchForRoll(getCollegeId(), getDivision(), getRollNumber());
     }
 
-    private void saveProfile(String name, int rollNumber, String division) {
+    private String getStudentGroupLabel() {
+        return CollegeScheduleData.studentGroupLabel(getCollegeId(), getDivision(), getRollNumber());
+    }
+
+    private void saveProfile(String name, int rollNumber, String division, String collegeId) {
         String normalizedDivision = division == null ? "" : division.trim().toUpperCase(Locale.ENGLISH);
         preferences.edit()
                 .putString(KEY_NAME, name.trim())
                 .putInt(KEY_ROLL_NUMBER, rollNumber)
                 .putString(KEY_DIVISION, normalizedDivision)
+                .putString(KEY_COLLEGE_ID, CollegeCatalog.normalize(collegeId))
                 .apply();
     }
 
@@ -659,9 +673,7 @@ public class MainActivity extends ComponentActivity {
         logo.setImageResource(R.drawable.ic_nextbell_logo);
         logo.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
         logo.setContentDescription("NextBell logo");
-
-        LinearLayout.LayoutParams logoParams =
-                new LinearLayout.LayoutParams(dp(82), dp(82));
+        LinearLayout.LayoutParams logoParams = new LinearLayout.LayoutParams(dp(82), dp(82));
         logoParams.gravity = Gravity.CENTER_HORIZONTAL;
         page.addView(logo, logoParams);
 
@@ -672,9 +684,8 @@ public class MainActivity extends ComponentActivity {
         page.addView(title);
 
         TextView subtitle = text(
-                "Your college day, without the mental math.",
-                13,
-                MUTED
+                "Choose your college and NextBell will load the academic tools available for it.",
+                13, MUTED
         );
         subtitle.setGravity(Gravity.CENTER);
         subtitle.setPadding(0, dp(8), 0, dp(26));
@@ -685,19 +696,30 @@ public class MainActivity extends ComponentActivity {
         card.setPadding(dp(20), dp(20), dp(20), dp(20));
         card.setBackground(round(SURFACE, BORDER, 22));
 
-        card.addView(sectionLabel("YOUR NAME"));
-        EditText nameInput = field("e.g. Neal", false);
+        final String[] selectedCollege = {CollegeCatalog.NMIET};
+        final String[] selectedDivision = {""};
+        String[] collegeIds = CollegeCatalog.ids();
+        String[] collegeNames = CollegeCatalog.names();
+
+        card.addView(sectionLabel("YOUR COLLEGE"));
+        TextView collegePicker = actionButton(collegeNames[0], false);
+        collegePicker.setGravity(Gravity.CENTER_VERTICAL);
+        collegePicker.setPadding(dp(16), 0, dp(16), 0);
+        LinearLayout.LayoutParams collegePickerParams = fieldParams();
+        collegePickerParams.setMargins(0, dp(8), 0, 0);
+        card.addView(collegePicker, collegePickerParams);
+
+        card.addView(sectionLabel("YOUR NAME"), sectionParams(0, 18));
+        EditText nameInput = field("e.g. Your name", false);
         LinearLayout.LayoutParams fieldParams1 = fieldParams();
         fieldParams1.setMargins(0, dp(8), 0, 0);
         card.addView(nameInput, fieldParams1);
 
         TextView rollLabel = sectionLabel("ROLL NUMBER");
-        LinearLayout.LayoutParams rollLabelParams =
-                new LinearLayout.LayoutParams(-1, -2);
+        LinearLayout.LayoutParams rollLabelParams = new LinearLayout.LayoutParams(-1, -2);
         rollLabelParams.setMargins(0, dp(18), 0, 0);
         card.addView(rollLabel, rollLabelParams);
-
-        EditText rollInput = field("e.g. 34", true);
+        EditText rollInput = field("Enter your roll number", true);
         LinearLayout.LayoutParams fieldParams2 = fieldParams();
         fieldParams2.setMargins(0, dp(8), 0, 0);
         card.addView(rollInput, fieldParams2);
@@ -707,18 +729,44 @@ public class MainActivity extends ComponentActivity {
         divisionLabelParams.setMargins(0, dp(18), 0, 0);
         card.addView(divisionLabel, divisionLabelParams);
 
-        final String[] selectedDivision = {""};
         TextView divisionPicker = actionButton("Select your division", false);
         divisionPicker.setGravity(Gravity.CENTER_VERTICAL);
         divisionPicker.setPadding(dp(16), 0, dp(16), 0);
         LinearLayout.LayoutParams divisionPickerParams = fieldParams();
         divisionPickerParams.setMargins(0, dp(8), 0, 0);
         card.addView(divisionPicker, divisionPickerParams);
-        String[] divisionOptions = FirstYearTimetableData.divisions();
-        divisionPicker.setOnClickListener(v -> {
+
+        TextView batchHint = text(
+                "Choose your division. Practical batch details will follow your college timetable.",
+                10, MUTED
+        );
+        batchHint.setGravity(Gravity.CENTER);
+        batchHint.setPadding(0, dp(9), 0, dp(18));
+        card.addView(batchHint);
+
+        collegePicker.setOnClickListener(v -> {
             tap(v);
             new AlertDialog.Builder(this)
-                    .setTitle("Select your First Year division")
+                    .setTitle("Choose your college")
+                    .setItems(collegeNames, (dialog, which) -> {
+                        selectedCollege[0] = collegeIds[which];
+                        selectedDivision[0] = "";
+                        collegePicker.setText(collegeNames[which]);
+                        divisionPicker.setText("Select your division");
+                        divisionPicker.setError(null);
+                        batchHint.setText(CollegeCatalog.DYPIIT_PIMPRI.equals(selectedCollege[0])
+                                ? "This D. Y. Patil PDF does not specify practical batches."
+                                : "Your NMIET practical batch is assigned from division and roll number.");
+                    })
+                    .setNegativeButton("Cancel", null)
+                    .show();
+        });
+
+        divisionPicker.setOnClickListener(v -> {
+            tap(v);
+            String[] divisionOptions = CollegeScheduleData.divisions(selectedCollege[0]);
+            new AlertDialog.Builder(this)
+                    .setTitle("Select your division")
                     .setItems(divisionOptions, (dialog, which) -> {
                         selectedDivision[0] = divisionOptions[which];
                         divisionPicker.setText("Division " + selectedDivision[0]);
@@ -728,46 +776,34 @@ public class MainActivity extends ComponentActivity {
                     .show();
         });
 
-        TextView batchHint = text(
-                "Your practical batch is assigned automatically from division and roll number.",
-                10,
-                MUTED
-        );
-        batchHint.setGravity(Gravity.CENTER);
-        batchHint.setPadding(0, dp(9), 0, dp(18));
-        card.addView(batchHint);
-
         TextView continueButton = actionButton("Continue", true);
         card.addView(continueButton, new LinearLayout.LayoutParams(-1, dp(50)));
-
         continueButton.setOnClickListener(v -> {
             String name = nameInput.getText().toString().trim();
             String raw = rollInput.getText().toString().trim();
-
             if (name.isEmpty()) {
                 nameInput.setError("Enter your name.");
                 return;
             }
             if (selectedDivision[0].isEmpty()) {
                 divisionPicker.setError("Select your division.");
-                Toast.makeText(this, "Select your First Year division.", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "Select your division.", Toast.LENGTH_SHORT).show();
                 return;
             }
-
             try {
                 int roll = Integer.parseInt(raw);
-                if (roll < 1 || roll > 999
-                        || TimetableData.batchForDivisionRoll(selectedDivision[0], roll).isEmpty()) {
-                    int maximum = FirstYearTimetableData.maximumRoll(selectedDivision[0]);
+                if (!CollegeScheduleData.isValidRoll(selectedCollege[0], selectedDivision[0], roll)) {
+                    int maximum = CollegeScheduleData.maximumRoll(selectedCollege[0], selectedDivision[0]);
                     rollInput.setError(maximum == Integer.MAX_VALUE
                             ? "Enter a valid roll number."
-                            : "For Division " + selectedDivision[0] + ", enter a roll from 1 to " + maximum + ".");
+                            : "For this division, enter a roll from 1 to " + maximum + ".");
                     return;
                 }
-
-                saveProfile(name, roll, selectedDivision[0]);
+                saveProfile(name, roll, selectedDivision[0], selectedCollege[0]);
                 weekSelectedDay = todayNameOrMonday();
                 selectedScreen = "home";
+                NotificationScheduler.scheduleUpcoming(this);
+                NextClassWidgetProvider.refreshAll(this);
                 openApp();
             } catch (NumberFormatException e) {
                 rollInput.setError("Enter your roll number.");
@@ -775,12 +811,7 @@ public class MainActivity extends ComponentActivity {
         });
 
         page.addView(card, new LinearLayout.LayoutParams(-1, -2));
-
-        TextView privacy = text(
-                "Saved locally on this phone.",
-                10,
-                MUTED
-        );
+        TextView privacy = text("Your profile is saved on this phone.", 10, MUTED);
         privacy.setGravity(Gravity.CENTER);
         privacy.setPadding(0, dp(14), 0, 0);
         page.addView(privacy);
@@ -998,11 +1029,7 @@ public class MainActivity extends ComponentActivity {
         title.setPadding(0, dp(5), 0, 0);
         page.addView(title);
 
-        TextView subtitle = text(
-                "Division " + getDivision() + "  •  " + getBatch() + "  •  Roll " + getRollNumber(),
-                11,
-                MUTED
-        );
+        TextView subtitle = text(getStudentGroupLabel(), 11, MUTED);
         subtitle.setPadding(0, dp(5), 0, dp(17));
         page.addView(subtitle);
 
@@ -1012,11 +1039,11 @@ public class MainActivity extends ComponentActivity {
 
         LinearLayout dayRow = new LinearLayout(this);
         dayRow.setOrientation(LinearLayout.HORIZONTAL);
-        for (String day : TimetableData.DAYS) {
+        String[] scheduleDays = CollegeScheduleData.days(getCollegeId());
+        for (int i = 0; i < scheduleDays.length; i++) {
+            String day = scheduleDays[i];
             dayRow.addView(dayChip(day), new LinearLayout.LayoutParams(dp(78), dp(56)));
-            if (!day.equals(TimetableData.DAYS[TimetableData.DAYS.length - 1])) {
-                dayRow.addView(spacer(dp(8), 1));
-            }
+            if (i < scheduleDays.length - 1) dayRow.addView(spacer(dp(8), 1));
         }
 
         scroller.addView(dayRow);
@@ -1131,9 +1158,10 @@ public class MainActivity extends ComponentActivity {
 
         List<AttendanceStore.Session> sessions = AttendanceStore.load(preferences);
         java.util.Map<String, TimetableData.ClassItem> courses = new java.util.LinkedHashMap<>();
-        for (String day : TimetableData.DAYS) {
+        for (String day : CollegeScheduleData.days(getCollegeId())) {
             for (TimetableData.ClassItem item :
-                    TimetableData.forDivisionRollAndDay(getDivision(), getRollNumber(), day)) {
+                    CollegeScheduleData.forDay(getCollegeId(), getDivision(), getRollNumber(),
+                            day, LocalDate.now(zone))) {
                 if (item.isAcademic() && !item.subject.trim().isEmpty()) {
                     courses.putIfAbsent(item.subject, item);
                 }
@@ -1243,7 +1271,8 @@ public class MainActivity extends ComponentActivity {
         String day = date.getDayOfWeek().getDisplayName(
                 java.time.format.TextStyle.FULL, Locale.ENGLISH
         );
-        List<TimetableData.ClassItem> classes = TimetableData.forDivisionRollAndDay(getDivision(), getRollNumber(), day);
+        List<TimetableData.ClassItem> classes = CollegeScheduleData.forDate(
+                getCollegeId(), getDivision(), getRollNumber(), date);
         classes = classes.stream().filter(TimetableData.ClassItem::isAcademic)
                 .collect(java.util.stream.Collectors.toList());
         if (classes.isEmpty()) {
@@ -3767,6 +3796,25 @@ public class MainActivity extends ComponentActivity {
         cloudCard.addView(cloudActions);
         page.addView(cloudCard, sectionParams(0, 20));
 
+        page.addView(sectionLabel("COLLEGE & ACADEMICS"), sectionParams(0, 8));
+        LinearLayout collegeCard = cardColumn();
+        TextView collegeName = text(CollegeCatalog.name(getCollegeId()), 14, TEXT);
+        collegeName.setTypeface(Typeface.DEFAULT_BOLD);
+        collegeCard.addView(collegeName);
+        TextView academicLabel = text(CollegeCatalog.academicLabel(getCollegeId()), 10, MUTED);
+        academicLabel.setPadding(0, dp(5), 0, 0);
+        collegeCard.addView(academicLabel);
+        TextView timetableInfo = text(CollegeCatalog.timetableDescription(getCollegeId()), 9, MUTED);
+        timetableInfo.setPadding(0, dp(7), 0, dp(12));
+        collegeCard.addView(timetableInfo);
+        TextView changeCollege = actionButton("CHANGE COLLEGE / ACADEMICS", false);
+        collegeCard.addView(changeCollege, new LinearLayout.LayoutParams(-1, CONTROL_HEIGHT_DP()));
+        changeCollege.setOnClickListener(v -> {
+            tap(v);
+            showEditProfile();
+        });
+        page.addView(collegeCard, sectionParams(0, 20));
+
         page.addView(sectionLabel("PROFILE"), sectionParams(0, 9));
 
         LinearLayout profileCard = cardColumn();
@@ -3783,11 +3831,7 @@ public class MainActivity extends ComponentActivity {
         name.setTypeface(Typeface.DEFAULT_BOLD);
         profileText.addView(name);
 
-        TextView batch = text(
-                "Division " + getDivision() + "  •  " + getBatch() + "  •  Roll " + getRollNumber(),
-                10,
-                MUTED
-        );
+        TextView batch = text(getStudentGroupLabel(), 10, MUTED);
         batch.setPadding(0, dp(4), 0, 0);
         profileText.addView(batch);
 
@@ -4010,17 +4054,15 @@ public class MainActivity extends ComponentActivity {
         aboutCard.addView(aboutTitle);
 
         TextView aboutSubtitle = text(
-                "FE Division B  •  Academic Year 2026–27",
-                10,
-                MUTED
+                CollegeCatalog.name(getCollegeId()) + "  •  " + CollegeCatalog.academicLabel(getCollegeId()),
+                10, MUTED
         );
         aboutSubtitle.setPadding(0, dp(4), 0, dp(2));
         aboutCard.addView(aboutSubtitle);
 
         TextView source = text(
-                "Official timetable • W.E.F. 16/09/2026 • Revision 00",
-                9,
-                SUBTLE
+                CollegeCatalog.timetableDescription(getCollegeId()),
+                9, SUBTLE
         );
         source.setPadding(0, 0, 0, dp(16));
         aboutCard.addView(source);
@@ -4295,26 +4337,34 @@ public class MainActivity extends ComponentActivity {
 
     private void showEditProfile() {
         LinearLayout sheet = dialogSheet();
-
         ImageView icon = dialogIcon(R.drawable.ic_settings, ACCENT);
         sheet.addView(icon, dialogMarginParams(48, 0, 0, 14));
 
-        TextView title = text("Edit profile", 23, TEXT);
+        TextView title = text("Student & college profile", 23, TEXT);
         title.setTypeface(Typeface.DEFAULT_BOLD);
         sheet.addView(title);
-
         TextView subtitle = text(
-                "Update the details NextBell uses for your timetable.",
-                10,
-                MUTED
+                "Your college, division and roll number control your timetable and reminders.",
+                10, MUTED
         );
         subtitle.setPadding(0, dp(5), 0, dp(15));
         sheet.addView(subtitle);
+
+        final String[] selectedCollege = {getCollegeId()};
+        final String[] selectedDivision = {getDivision()};
+        String[] collegeIds = CollegeCatalog.ids();
+        String[] collegeNames = CollegeCatalog.names();
+
+        TextView collegePicker = actionButton(CollegeCatalog.name(selectedCollege[0]), false);
+        collegePicker.setGravity(Gravity.CENTER_VERTICAL);
+        collegePicker.setPadding(dp(16), 0, dp(16), 0);
+        sheet.addView(collegePicker, new LinearLayout.LayoutParams(-1, dp(50)));
 
         EditText nameInput = field("Your name", false);
         nameInput.setText(getName());
         nameInput.setSelection(nameInput.length());
         LinearLayout.LayoutParams nameParams = new LinearLayout.LayoutParams(-1, dp(50));
+        nameParams.setMargins(0, dp(9), 0, 0);
         sheet.addView(nameInput, nameParams);
 
         EditText rollInput = field("Roll number", true);
@@ -4323,47 +4373,64 @@ public class MainActivity extends ComponentActivity {
         rollParams.setMargins(0, dp(9), 0, 0);
         sheet.addView(rollInput, rollParams);
 
-        final String[] selectedDivision = {getDivision()};
         TextView divisionPicker = actionButton("Division " + selectedDivision[0], false);
         divisionPicker.setGravity(Gravity.CENTER_VERTICAL);
         divisionPicker.setPadding(dp(16), 0, dp(16), 0);
         LinearLayout.LayoutParams divisionParams = new LinearLayout.LayoutParams(-1, dp(50));
         divisionParams.setMargins(0, dp(9), 0, 0);
         sheet.addView(divisionPicker, divisionParams);
-        String[] divisionOptions = FirstYearTimetableData.divisions();
+
         final TextView[] batchSummary = {null};
-        divisionPicker.setOnClickListener(v -> {
+        Runnable updateBatchSummary = () -> {
+            String batch = CollegeScheduleData.batchForRoll(
+                    selectedCollege[0], selectedDivision[0], getRollNumber());
+            String description;
+            if (CollegeCatalog.DYPIIT_PIMPRI.equals(selectedCollege[0])) {
+                description = "No practical-batch assignment is present in the uploaded PDF.";
+            } else {
+                description = batch.isEmpty()
+                        ? "Enter a roll number within this division’s published range."
+                        : "Your batch: " + batch + "  •  " +
+                                CollegeScheduleData.rollRangeForBatch(
+                                        selectedCollege[0], selectedDivision[0], batch);
+            }
+            if (batchSummary[0] != null) batchSummary[0].setText(description);
+        };
+
+        collegePicker.setOnClickListener(v -> {
             tap(v);
             new AlertDialog.Builder(this)
-                    .setTitle("Select your First Year division")
-                    .setItems(divisionOptions, (pickerDialog, which) -> {
-                        selectedDivision[0] = divisionOptions[which];
-                        divisionPicker.setText("Division " + selectedDivision[0]);
-                        String previewBatch = TimetableData.batchForDivisionRoll(
-                                selectedDivision[0], getRollNumber());
-                        if (batchSummary[0] != null) {
-                            batchSummary[0].setText(previewBatch.isEmpty()
-                                    ? "Roll number is outside this division’s listed range."
-                                    : "Your batch: " + previewBatch + "  •  " +
-                                            TimetableData.rollRangeForDivisionBatch(selectedDivision[0], previewBatch));
-                        }
+                    .setTitle("Choose your college")
+                    .setItems(collegeNames, (pickerDialog, which) -> {
+                        selectedCollege[0] = collegeIds[which];
+                        selectedDivision[0] = "";
+                        collegePicker.setText(collegeNames[which]);
+                        divisionPicker.setText("Select your division");
+                        updateBatchSummary.run();
                     })
                     .setNegativeButton("Cancel", null)
                     .show();
         });
 
-        String previewBatch = TimetableData.batchForDivisionRoll(selectedDivision[0], getRollNumber());
-        TextView batch = text(
-                previewBatch.isEmpty()
-                        ? "Roll number is outside this division’s listed range."
-                        : "Your batch: " + previewBatch + "  •  " +
-                                TimetableData.rollRangeForDivisionBatch(selectedDivision[0], previewBatch),
-                9,
-                MUTED
-        );
+        divisionPicker.setOnClickListener(v -> {
+            tap(v);
+            String[] divisionOptions = CollegeScheduleData.divisions(selectedCollege[0]);
+            new AlertDialog.Builder(this)
+                    .setTitle("Select your division")
+                    .setItems(divisionOptions, (pickerDialog, which) -> {
+                        selectedDivision[0] = divisionOptions[which];
+                        divisionPicker.setText("Division " + selectedDivision[0]);
+                        updateBatchSummary.run();
+                    })
+                    .setNegativeButton("Cancel", null)
+                    .show();
+        });
+
+        TextView batch = text("", 9, MUTED);
         batchSummary[0] = batch;
         batch.setPadding(0, dp(8), 0, 0);
         sheet.addView(batch);
+        updateBatchSummary.run();
 
         LinearLayout actions = new LinearLayout(this);
         actions.setGravity(Gravity.CENTER_VERTICAL);
@@ -4382,16 +4449,13 @@ public class MainActivity extends ComponentActivity {
         nameInput.postDelayed(() -> {
             InputMethodManager imm = (InputMethodManager)
                     getSystemService(Context.INPUT_METHOD_SERVICE);
-            if (imm != null) {
-                imm.showSoftInput(nameInput, InputMethodManager.SHOW_IMPLICIT);
-            }
+            if (imm != null) imm.showSoftInput(nameInput, InputMethodManager.SHOW_IMPLICIT);
         }, 220);
 
         cancel.setOnClickListener(v -> {
             hideKeyboard();
             dialog.dismiss();
         });
-
         save.setOnClickListener(v -> {
             String name = nameInput.getText().toString().trim();
             if (name.isEmpty()) {
@@ -4399,28 +4463,26 @@ public class MainActivity extends ComponentActivity {
                 shake(save);
                 return;
             }
-
             try {
                 int roll = Integer.parseInt(rollInput.getText().toString().trim());
-                if (roll < 1 || roll > 999) throw new NumberFormatException();
-
-                if (TimetableData.batchForDivisionRoll(selectedDivision[0], roll).isEmpty()) {
-                    int maximum = FirstYearTimetableData.maximumRoll(selectedDivision[0]);
+                if (!CollegeScheduleData.isValidRoll(
+                        selectedCollege[0], selectedDivision[0], roll)) {
+                    int maximum = CollegeScheduleData.maximumRoll(
+                            selectedCollege[0], selectedDivision[0]);
                     rollInput.setError(maximum == Integer.MAX_VALUE
                             ? "Enter a valid roll number."
-                            : "For Division " + selectedDivision[0] + ", enter a roll from 1 to " + maximum + ".");
+                            : "For this division, enter a roll from 1 to " + maximum + ".");
                     shake(save);
                     return;
                 }
-
-                saveProfile(name, roll, selectedDivision[0]);
+                saveProfile(name, roll, selectedDivision[0], selectedCollege[0]);
                 weekSelectedDay = todayNameOrMonday();
                 NotificationScheduler.scheduleUpcoming(this);
                 NextClassWidgetProvider.refreshAll(this);
                 LiveStatusReceiver.updateNow(this);
                 hideKeyboard();
                 dialog.dismiss();
-                navigate("settings");
+                navigate("home");
             } catch (NumberFormatException ignored) {
                 rollInput.setError("Enter a valid roll number.");
                 shake(save);
@@ -4662,8 +4724,9 @@ public class MainActivity extends ComponentActivity {
     }
 
     private void updateWeekDayChips(LinearLayout row) {
-        for (int i = 0; i < TimetableData.DAYS.length; i++) {
-            String day = TimetableData.DAYS[i];
+        String[] scheduleDays = CollegeScheduleData.days(getCollegeId());
+        for (int i = 0; i < scheduleDays.length; i++) {
+            String day = scheduleDays[i];
             TextView chip = (TextView) row.getChildAt(i * 2);
             if (chip == null) continue;
 
@@ -5739,6 +5802,10 @@ public class MainActivity extends ComponentActivity {
     }
 
     private String todayNameOrMonday() {
+        if (CollegeCatalog.DYPIIT_PIMPRI.equals(getCollegeId())) {
+            LocalDate next = CollegeScheduleData.nextPublishedDate(getCollegeId(), LocalDate.now(zone));
+            return next == null ? "Tuesday" : CollegeScheduleData.dayName(next);
+        }
         String today = todayName();
         return today.isEmpty() ? "Monday" : today;
     }
