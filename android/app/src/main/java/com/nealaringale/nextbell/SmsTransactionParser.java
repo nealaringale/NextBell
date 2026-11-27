@@ -278,9 +278,21 @@ public final class SmsTransactionParser {
         }
     }
 
-    private static long extractTransactionAmountPaise(String body) {
+    private static final class AmountCandidate {
+        final long amountPaise;
+        final String context;
+        final int amountIndex;
+
+        AmountCandidate(long amountPaise, String context, int amountIndex) {
+            this.amountPaise = amountPaise;
+            this.context = context == null ? "" : context;
+            this.amountIndex = Math.max(0, amountIndex);
+        }
+    }
+
+    private static AmountCandidate extractTransactionAmount(String body) {
         Matcher amountMatcher = AMOUNT.matcher(body);
-        String bestAmount = null;
+        AmountCandidate best = null;
         int bestScore = Integer.MIN_VALUE;
 
         while (amountMatcher.find()) {
@@ -290,33 +302,90 @@ public final class SmsTransactionParser {
             boolean hasTransactionContext = TRANSACTION_CONTEXT.matcher(context).find();
             if (!hasTransactionContext && BALANCE.matcher(context).find()) continue;
 
-            int score = hasTransactionContext ? 10 : 0;
-            if (DEBIT_TERMS.matcher(context).find() || CREDIT_TERMS.matcher(context).find()) {
-                score += 4;
-            }
+            int amountIndex = Math.max(0, context.indexOf(amountMatcher.group()));
+            int debitDistance = nearestSignalDistance(context, amountIndex, HARD_DEBIT_AMOUNT_ACTION);
+            int creditDistance = nearestSignalDistance(context, amountIndex, CREDIT_AMOUNT_ACTION);
+            int score = hasTransactionContext ? 20 : 0;
+            if (debitDistance != Integer.MAX_VALUE) score += Math.max(1, 40 - Math.min(39, debitDistance));
+            if (creditDistance != Integer.MAX_VALUE) score += Math.max(1, 40 - Math.min(39, creditDistance));
+
             if (score > bestScore) {
-                bestScore = score;
-                bestAmount = amountMatcher.group(1);
+                try {
+                    best = new AmountCandidate(toPaise(amountMatcher.group(1)), context, amountIndex);
+                    bestScore = score;
+                } catch (RuntimeException ignored) {
+                    // Ignore malformed/overflowing currency values and keep searching.
+                }
             }
         }
 
-        if (bestAmount != null) {
-            try {
-                return toPaise(bestAmount);
-            } catch (RuntimeException ignored) {
-                return 0L;
-            }
-        }
+        if (best != null) return best;
 
         Matcher bare = BARE_TRANSACTION_AMOUNT.matcher(body);
         if (bare.find()) {
             try {
-                return toPaise(bare.group(1));
+                String context = sentenceContext(body, bare.start(), bare.end());
+                return new AmountCandidate(toPaise(bare.group(1)), context,
+                        Math.max(0, context.indexOf(bare.group())));
             } catch (RuntimeException ignored) {
-                return 0L;
+                return null;
             }
         }
-        return 0L;
+        return null;
+    }
+
+    private static long extractTransactionAmountPaise(String body) {
+        AmountCandidate candidate = extractTransactionAmount(body);
+        return candidate == null ? 0L : candidate.amountPaise;
+    }
+
+    private static String signedAmountContext(String body) {
+        Matcher matcher = SIGNED_DEBIT_AMOUNT.matcher(body);
+        return matcher.find() ? sentenceContext(body, matcher.start(), matcher.end()) : body;
+    }
+
+    private static String classifyDirection(String context, int amountIndex) {
+        int creditDistance = nearestSignalDistance(context, amountIndex, CREDIT_TERMS);
+        int debitDistance = nearestSignalDistance(context, amountIndex, HARD_DEBIT_AMOUNT_ACTION);
+
+        // "Refund of Rs X credited to your account" must stay CREDIT even if
+        // the same sentence also mentions the original purchase/transfer.
+        // Conversely, "debited ... and credited to VPA" stays DEBIT because
+        // recipient-side VPA wording is not an account-credit signal.
+        if (creditDistance != Integer.MAX_VALUE
+                && (debitDistance == Integer.MAX_VALUE || creditDistance <= debitDistance)) {
+            return CREDIT;
+        }
+        if (debitDistance != Integer.MAX_VALUE) return DEBIT;
+
+        // A completed "paid/sent/purchased to merchant" clause is outgoing;
+        // a bare "payment successful" is intentionally treated as ambiguous.
+        if (RAIL_SUCCESS.matcher(context).find()
+                && DEBIT_TERMS.matcher(context).find()) {
+            return DEBIT;
+        }
+        return "";
+    }
+
+    private static int nearestSignalDistance(String context, int amountIndex, Pattern signals) {
+        if (context == null || context.isEmpty()) return Integer.MAX_VALUE;
+        Matcher matcher = signals.matcher(context);
+        int nearest = Integer.MAX_VALUE;
+        int target = Math.max(0, Math.min(amountIndex, context.length()));
+        while (matcher.find()) {
+            nearest = Math.min(nearest, Math.abs(matcher.start() - target));
+        }
+        return nearest;
+    }
+
+    private static String extractReferenceId(String body) {
+        Matcher matcher = REFERENCE_ID.matcher(body);
+        return matcher.find() ? matcher.group(1).toUpperCase(Locale.ENGLISH) : "";
+    }
+
+    private static String extractAccountSuffix(String body) {
+        Matcher matcher = ACCOUNT_SUFFIX.matcher(body);
+        return matcher.find() ? matcher.group(1) : "";
     }
 
     private static boolean insideBalanceField(String body, int start, int end) {
