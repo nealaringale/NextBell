@@ -77,7 +77,7 @@ public final class SmsTransactionReceiver extends BroadcastReceiver {
                     if (SmsTransactionService.isEnabled(currentPreferences)
                             && SmsTransactionService.hasReceivePermission(appContext)) {
                         boolean imported = SmsTransactionService.processIncomingSms(
-                                currentPreferences, messageSender, messageBody, receivedDate
+                                currentPreferences, messageSender, messageBody, receivedDate, receivedAt
                         );
                         if (imported) ExpenseDailyAlertReceiver.maybeNotifyNow(appContext);
                     }
