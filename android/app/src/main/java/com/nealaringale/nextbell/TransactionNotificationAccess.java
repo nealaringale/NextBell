@@ -156,12 +156,16 @@ public final class TransactionNotificationAccess {
                 + "idfc|federal|canara|pnb|union bank|yes bank).*(?:[-−]\\s*(?:₹|inr|rs\\.?)).*")
                 || text.matches("(?s).*(?:[-−]\\s*(?:₹|inr|rs\\.?)).*(?:bank|icici|hdfc|"
                 + "sbi|axis|kotak|idfc|federal|canara|pnb|union bank|yes bank).*");
+        // Generic SMS apps can carry bank card alerts. Require both card context
+        // and a money-movement verb so ordinary card-related chats are excluded.
+        boolean cardTransaction = text.contains("card")
+                && text.matches("(?s).*(?:charged|debited|spent|purchase|transaction|txn).*");
 
         return accountOrRailContext || explicitBankMovement || completedPayTo
                 || (knownFinancialApp && (explicitBankMovement
                 || text.contains("paid") || text.contains("received")
                 || text.contains("transfer") || text.contains("payment")))
-                || signedBankPreview;
+                || signedBankPreview || cardTransaction;
     }
 
     private static boolean containsAny(String value, String... cues) {
