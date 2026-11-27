@@ -18,6 +18,7 @@ public class LiveStatusReceiver extends BroadcastReceiver {
     private static final String PREFS_NAME = "nextbell_profile";
     private static final String KEY_ROLL_NUMBER = "roll_number";
     private static final String KEY_DIVISION = "division";
+    private static final String KEY_COLLEGE_ID = "college_id";
     private static final String CHANNEL_ID = "nextbell_live_status";
     private static final ZoneId ZONE = ZoneId.of("Asia/Kolkata");
     private static final int NOTIFICATION_ID = 4201;
@@ -40,6 +41,8 @@ public class LiveStatusReceiver extends BroadcastReceiver {
 
         int roll = prefs.getInt(KEY_ROLL_NUMBER, -1);
         String division = prefs.getString(KEY_DIVISION, "B");
+        String collegeId = CollegeCatalog.normalize(
+                prefs.getString(KEY_COLLEGE_ID, CollegeCatalog.NMIET));
         if (roll < 1) return;
 
         NotificationScheduler.ensureLiveChannel(context);
@@ -51,10 +54,11 @@ public class LiveStatusReceiver extends BroadcastReceiver {
         TimetableData.ClassItem next = null;
         LocalDate nextDate = null;
 
-        String todayName = dayName(today);
+        String todayName = CollegeCatalog.DYPIIT_PIMPRI.equals(collegeId)
+                ? CollegeScheduleData.dayName(today) : dayName(today);
         if (!todayName.isEmpty()) {
             List<TimetableData.ClassItem> entries =
-                    TimetableData.forDivisionRollAndDay(division, roll, todayName);
+                    CollegeScheduleData.forDate(collegeId, division, roll, today);
 
             for (TimetableData.ClassItem item : entries) {
                 if (!item.isAcademic()) continue;
@@ -77,11 +81,12 @@ public class LiveStatusReceiver extends BroadcastReceiver {
         if (current == null && next == null) {
             for (int offset = 1; offset <= 7; offset++) {
                 LocalDate date = today.plusDays(offset);
-                String day = dayName(date);
+                String day = CollegeCatalog.DYPIIT_PIMPRI.equals(collegeId)
+                        ? CollegeScheduleData.dayName(date) : dayName(date);
                 if (day.isEmpty()) continue;
 
                 List<TimetableData.ClassItem> entries =
-                        TimetableData.forDivisionRollAndDay(division, roll, day);
+                        CollegeScheduleData.forDate(collegeId, division, roll, date);
 
                 for (TimetableData.ClassItem item : entries) {
                     if (item.isAcademic()) {
