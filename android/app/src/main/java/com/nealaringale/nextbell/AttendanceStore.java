@@ -22,15 +22,17 @@ public final class AttendanceStore {
         public final String end;
         public final LocalDate date;
         public final String status;
+        public final String collegeId;
 
         Session(String key, String subject, String start, String end,
-                LocalDate date, String status) {
+                LocalDate date, String status, String collegeId) {
             this.key = key;
             this.subject = subject;
             this.start = start;
             this.end = end;
             this.date = date;
             this.status = status;
+            this.collegeId = CollegeCatalog.normalize(collegeId);
         }
     }
 
@@ -79,13 +81,17 @@ public final class AttendanceStore {
                     String subject = value.optString("subject", "").trim();
                     LocalDate date = LocalDate.parse(value.optString("date", ""));
                     if (subject.isEmpty()) continue;
+                    String collegeId = CollegeCatalog.normalize(
+                            value.optString("collegeId", CollegeCatalog.NMIET));
                     sessions.add(new Session(
-                            value.optString("key", key(date, subject, value.optString("start", ""))),
+                            value.optString("key", key(date, subject,
+                                    value.optString("start", ""), collegeId)),
                             subject,
                             value.optString("start", ""),
                             value.optString("end", ""),
                             date,
-                            status
+                            status,
+                            collegeId
                     ));
                 } catch (Exception ignored) {
                     // A damaged meeting does not hide the other attendance records.
@@ -98,9 +104,15 @@ public final class AttendanceStore {
 
     public static void mark(SharedPreferences preferences, LocalDate date,
                             TimetableData.ClassItem item, String status) {
+        mark(preferences, date, item, status, CollegeCatalog.NMIET);
+    }
+
+    public static void mark(SharedPreferences preferences, LocalDate date,
+                            TimetableData.ClassItem item, String status, String collegeId) {
         if (item == null || !item.isAcademic() || date == null) return;
         if (!"PRESENT".equals(status) && !"ABSENT".equals(status)) return;
-        String meetingKey = key(date, item.subject, item.start);
+        String normalizedCollege = CollegeCatalog.normalize(collegeId);
+        String meetingKey = key(date, item.subject, item.start, normalizedCollege);
         JSONArray values = safeArray(preferences);
         JSONArray updated = new JSONArray();
         for (int i = 0; i < values.length(); i++) {
@@ -116,6 +128,7 @@ public final class AttendanceStore {
             record.put("end", item.end);
             record.put("date", date.toString());
             record.put("status", status);
+            record.put("collegeId", normalizedCollege);
             updated.put(record);
             preferences.edit().putString(KEY, updated.toString()).apply();
         } catch (Exception ignored) {}
@@ -123,8 +136,13 @@ public final class AttendanceStore {
 
     public static void clear(SharedPreferences preferences, LocalDate date,
                              TimetableData.ClassItem item) {
+        clear(preferences, date, item, CollegeCatalog.NMIET);
+    }
+
+    public static void clear(SharedPreferences preferences, LocalDate date,
+                             TimetableData.ClassItem item, String collegeId) {
         if (item == null || date == null) return;
-        String meetingKey = key(date, item.subject, item.start);
+        String meetingKey = key(date, item.subject, item.start, collegeId);
         JSONArray values = safeArray(preferences);
         JSONArray updated = new JSONArray();
         for (int i = 0; i < values.length(); i++) {
@@ -136,17 +154,33 @@ public final class AttendanceStore {
 
     public static String statusFor(List<Session> sessions, LocalDate date,
                                     TimetableData.ClassItem item) {
+        return statusFor(sessions, date, item, CollegeCatalog.NMIET);
+    }
+
+    public static String statusFor(List<Session> sessions, LocalDate date,
+                                    TimetableData.ClassItem item, String collegeId) {
         if (item == null || date == null) return "";
-        String meetingKey = key(date, item.subject, item.start);
-        for (Session session : sessions) if (meetingKey.equals(session.key)) return session.status;
+        String normalizedCollege = CollegeCatalog.normalize(collegeId);
+        String meetingKey = key(date, item.subject, item.start, normalizedCollege);
+        for (Session session : sessions) {
+            if (normalizedCollege.equals(session.collegeId) && meetingKey.equals(session.key)) {
+                return session.status;
+            }
+        }
         return "";
     }
 
     public static Stats stats(List<Session> sessions, String subject, int targetPercent) {
+        return stats(sessions, subject, targetPercent, CollegeCatalog.NMIET);
+    }
+
+    public static Stats stats(List<Session> sessions, String subject, int targetPercent,
+                              String collegeId) {
         int attended = 0;
         int held = 0;
+        String normalizedCollege = CollegeCatalog.normalize(collegeId);
         for (Session session : sessions) {
-            if (!session.subject.equals(subject)) continue;
+            if (!session.subject.equals(subject) || !normalizedCollege.equals(session.collegeId)) continue;
             held++;
             if ("PRESENT".equals(session.status)) attended++;
         }
@@ -170,8 +204,12 @@ public final class AttendanceStore {
         catch (Exception ignored) { return new JSONArray(); }
     }
 
-    private static String key(LocalDate date, String subject, String start) {
-        return date + "|" + subject.trim().toLowerCase(java.util.Locale.ENGLISH)
+    private static String key(LocalDate date, String subject, String start, String collegeId) {
+        String base = date + "|" + subject.trim().toLowerCase(java.util.Locale.ENGLISH)
                 + "|" + (start == null ? "" : start.trim());
+        String normalizedCollege = CollegeCatalog.normalize(collegeId);
+        // Preserve legacy NMIET keys; other colleges use their own namespace.
+        return CollegeCatalog.NMIET.equals(normalizedCollege)
+                ? base : normalizedCollege + "|" + base;
     }
 }
