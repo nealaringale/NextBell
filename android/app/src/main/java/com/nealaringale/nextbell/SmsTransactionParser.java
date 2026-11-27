@@ -30,6 +30,25 @@ public final class SmsTransactionParser {
                     + "(?:by|of|with|for|amount(?:\\s+of)?)\\s+"
                     + "(?:₹|INR|Rs\\.?\\s*)?\\s*([0-9][0-9,]*(?:\\.[0-9]{1,2})?)\\b"
     );
+    private static final Pattern REFERENCE_ID = Pattern.compile(
+            "(?i)\\b(?:UTR(?:\\s*(?:NO|NUMBER))?|RRN|"
+                    + "(?:UPI\\s*)?REF(?:ERENCE)?(?:\\s*(?:NO|NUMBER))?|"
+                    + "TXN(?:SACTION)?\\s*ID|TRANSACTION\\s*ID)\\b"
+                    + "\\s*[:#=\\-]?\\s*([A-Z0-9]{8,30})"
+    );
+    private static final Pattern ACCOUNT_SUFFIX = Pattern.compile(
+            "(?i)(?:\\b(?:a/c|acct|account|card)(?:\\s*(?:no\\.?|ending|xx))?"
+                    + "\\s*[:#-]?\\s*(?:[x*]{2,})?|[x*]{2,})"
+                    + "([0-9]{3,6})\\b"
+    );
+    private static final Pattern CREDIT_AMOUNT_ACTION = Pattern.compile(
+            "(?i)\\b(?:refund(?:ed)?|reversal|reversed|cashback|credited|received|"
+                    + "deposited|deposit)\\b"
+    );
+    private static final Pattern HARD_DEBIT_AMOUNT_ACTION = Pattern.compile(
+            "(?i)\\b(?:debited|deducted|withdrawn|withdrawal|spent|charged|paid|sent|"
+                    + "transferred|transfer)\\b"
+    );
     private static final Pattern EXPLICIT_DATE = Pattern.compile(
             "(?i)(?:on|dated|txn(?:\\s+date)?)\\s*[:\\-]?\\s*"
                     + "(\\d{1,2})[-/ ]([A-Za-z]{3,9}|\\d{1,2})[-/ ](\\d{2,4})"
@@ -89,10 +108,14 @@ public final class SmsTransactionParser {
         public final String paymentMode;
         public final float confidence;
         public final String fingerprint;
+        public final String referenceId;
+        public final String accountSuffix;
+        public final long eventTimestampMillis;
 
         ParsedTransaction(long amountPaise, long availableBalancePaise, LocalDate date,
                           String direction, String merchant, String category,
-                          String paymentMode, float confidence, String fingerprint) {
+                          String paymentMode, float confidence, String fingerprint,
+                          String referenceId, String accountSuffix, long eventTimestampMillis) {
             this.amountPaise = amountPaise;
             this.availableBalancePaise = availableBalancePaise;
             this.date = date;
@@ -102,43 +125,63 @@ public final class SmsTransactionParser {
             this.paymentMode = paymentMode;
             this.confidence = confidence;
             this.fingerprint = fingerprint;
+            this.referenceId = referenceId == null ? "" : referenceId;
+            this.accountSuffix = accountSuffix == null ? "" : accountSuffix;
+            this.eventTimestampMillis = Math.max(0L, eventTimestampMillis);
         }
     }
 
     private SmsTransactionParser() {}
 
     public static ParsedTransaction parse(String sender, String body, LocalDate receivedDate) {
-        return parseInternal(sender, body, receivedDate, false);
+        return parseInternal(sender, body, receivedDate, 0L, false);
     }
 
     /** Content-based incoming SMS parser; does not rely on sender-ID formats. */
     public static ParsedTransaction parseIncomingSms(
             String originatingAddress, String body, LocalDate receivedDate
     ) {
+        return parseIncomingSms(originatingAddress, body, receivedDate, 0L);
+    }
+
+    public static ParsedTransaction parseIncomingSms(
+            String originatingAddress, String body, LocalDate receivedDate,
+            long eventTimestampMillis
+    ) {
         if (body == null || body.trim().isEmpty() || receivedDate == null
                 || !TransactionNotificationAccess.isLikelyFinancialNotification(
                         originatingAddress, "", body)) return null;
-        return parseInternal("PAYMENT_EVENT", body, receivedDate, true);
+        return parseInternal("PAYMENT_EVENT", body, receivedDate, eventTimestampMillis, true);
     }
 
     /** Parses a transaction preview only when it came from a supported messaging/payment app. */
     public static ParsedTransaction parseNotification(String packageName, String title,
                                                        String body, LocalDate receivedDate) {
+        return parseNotification(packageName, title, body, receivedDate, 0L);
+    }
+
+    public static ParsedTransaction parseNotification(String packageName, String title,
+                                                       String body, LocalDate receivedDate,
+                                                       long eventTimestampMillis) {
         String cleanTitle = title == null ? "" : title.trim();
         String cleanBody = body == null ? "" : body.trim();
         if ((cleanTitle.isEmpty() && cleanBody.isEmpty()) || receivedDate == null
                 || !TransactionNotificationAccess.isLikelyFinancialNotification(
                         packageName, cleanTitle, cleanBody)) return null;
-        // Share a canonical fingerprint with direct SMS so the same event isn't double-added.
-        String message = cleanBody.isEmpty() ? cleanTitle : cleanBody;
-        ParsedTransaction parsed = parseInternal("PAYMENT_EVENT", message, receivedDate, true);
+        // Keep the title's bank/source and direction evidence with the transaction text.
+        String message = cleanTitle.isEmpty() ? cleanBody
+                : cleanBody.isEmpty() ? cleanTitle : cleanTitle + ". " + cleanBody;
+        ParsedTransaction parsed = parseInternal(
+                "PAYMENT_EVENT", message, receivedDate, eventTimestampMillis, true
+        );
         if (parsed == null) return null;
 
-        String merchant = parsed.merchant;
-        if (merchant.isEmpty()) merchant = "Unidentified merchant";
+        String merchant = parsed.merchant.isEmpty()
+                ? "Unidentified merchant" : parsed.merchant;
         return new ParsedTransaction(parsed.amountPaise, parsed.availableBalancePaise,
                 parsed.date, parsed.direction, merchant, parsed.category,
-                parsed.paymentMode, parsed.confidence, parsed.fingerprint);
+                parsed.paymentMode, parsed.confidence, parsed.fingerprint,
+                parsed.referenceId, parsed.accountSuffix, parsed.eventTimestampMillis);
     }
 
     /** Returns a safe, non-sensitive explanation for why a notification was not imported. */
