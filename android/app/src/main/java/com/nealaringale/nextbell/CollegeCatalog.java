@@ -18,8 +18,9 @@ public final class CollegeCatalog {
     }
 
     public static boolean isSupported(String collegeId) {
-        return NMIET.equals(normalize(collegeId))
-                || DYPIIT_PIMPRI.equals(normalize(collegeId));
+        if (collegeId == null) return false;
+        String value = collegeId.trim().toUpperCase(Locale.ENGLISH);
+        return NMIET.equals(value) || DYPIIT_PIMPRI.equals(value);
     }
 
     public static String[] ids() {
