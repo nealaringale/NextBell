@@ -202,17 +202,9 @@ public final class DypitTimetableData {
     }
 
     private static String subjectName(String code) {
-        switch (code) {
-            case "MATH": return "Mathematics";
-            case "PHY": return "Engineering Physics";
-            case "EM": return "Engineering Mechanics";
-            case "FPL": return "Fundamentals of Programming Languages";
-            case "BXE": return "Elements of Electronics";
-            case "CHEM": return "Engineering Chemistry";
-            case "BEE": return "Basic Electrical Engineering";
-            case "EG": return "Engineering Graphics";
-            default: return code;
-        }
+        // The supplied PDF contains only these course abbreviations and no legend.
+        // Keep the source codes intact rather than guessing their full titles.
+        return code;
     }
 
     public static List<TimetableData.ClassItem> forDate(String division, LocalDate date) {
