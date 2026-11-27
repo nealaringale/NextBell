@@ -45,10 +45,9 @@ public class CollegeTimetableDataTest {
         for (LocalDate date : dates) {
             assertEquals(20, DypitTimetableData.divisionCount(date));
             for (String division : DypitTimetableData.divisions()) {
-                assertEquals(6, DypitTimetableData.forDate(division, date).size()
-                        - (date.getDayOfMonth() == 6 ? 0 : 0));
                 List<TimetableData.ClassItem> items =
                         DypitTimetableData.forDate(division, date);
+                assertEquals(date.getDayOfMonth() == 6 ? 7 : 6, items.size());
                 int academic = 0;
                 int shortBreaks = 0;
                 int lunches = 0;
