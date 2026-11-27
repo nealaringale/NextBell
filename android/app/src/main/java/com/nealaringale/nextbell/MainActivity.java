@@ -4483,11 +4483,15 @@ public class MainActivity extends ComponentActivity {
 
         final TextView[] batchSummary = {null};
         Runnable updateBatchSummary = () -> {
+            int previewRoll = getRollNumber();
+            try {
+                previewRoll = Integer.parseInt(rollInput.getText().toString().trim());
+            } catch (NumberFormatException ignored) {}
             String batch = CollegeScheduleData.batchForRoll(
-                    selectedCollege[0], selectedDivision[0], getRollNumber());
+                    selectedCollege[0], selectedDivision[0], previewRoll);
             String description;
             if (CollegeCatalog.DYPIIT_PIMPRI.equals(selectedCollege[0])) {
-                description = "No practical-batch assignment is present in the uploaded PDF.";
+                description = "The uploaded PDF does not specify a practical batch.";
             } else {
                 description = batch.isEmpty()
                         ? "Enter a roll number within this division’s published range."
@@ -4559,6 +4563,12 @@ public class MainActivity extends ComponentActivity {
         });
         save.setOnClickListener(v -> {
             String name = nameInput.getText().toString().trim();
+            if (selectedDivision[0].isEmpty()) {
+                divisionPicker.setError("Select your division.");
+                Toast.makeText(this, "Select your division.", Toast.LENGTH_SHORT).show();
+                shake(save);
+                return;
+            }
             if (name.isEmpty()) {
                 nameInput.setError("Enter your name.");
                 shake(save);
