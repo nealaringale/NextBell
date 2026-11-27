@@ -882,11 +882,7 @@ public class MainActivity extends ComponentActivity {
         LinearLayout profileRow = new LinearLayout(this);
         profileRow.setGravity(Gravity.CENTER_VERTICAL);
 
-        profileBadge = text(
-                "Division " + getDivision() + "  •  " + getBatch() + "  •  Roll " + getRollNumber(),
-                10,
-                ACCENT
-        );
+        profileBadge = text(getStudentGroupLabel(), 10, ACCENT);
         profileBadge.setGravity(Gravity.CENTER);
         profileBadge.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
         profileBadge.setPadding(dp(13), dp(7), dp(13), dp(7));
@@ -1059,7 +1055,11 @@ public class MainActivity extends ComponentActivity {
         weekDayTitle.setLetterSpacing(0.09f);
         selectedHeader.addView(weekDayTitle, new LinearLayout.LayoutParams(0, -2, 1f));
 
-        TextView hours = text("08:20  →  15:30", 9, MUTED);
+        TextView hours = text(
+                CollegeCatalog.DYPIIT_PIMPRI.equals(getCollegeId())
+                        ? "09:00  →  15:30" : "08:20  →  15:30",
+                9, MUTED
+        );
         selectedHeader.addView(hours);
         page.addView(selectedHeader);
 
