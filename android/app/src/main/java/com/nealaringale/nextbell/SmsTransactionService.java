@@ -10,9 +10,7 @@ import android.provider.Telephony;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
 /** Locally parses transaction alerts and saves derived ledger fields, never alert text. */
 public final class SmsTransactionService {
@@ -81,27 +79,30 @@ public final class SmsTransactionService {
     public static synchronized boolean processIncomingSms(
             SharedPreferences preferences, String sender, String body, LocalDate receivedDate
     ) {
+        return processIncomingSms(preferences, sender, body, receivedDate, 0L);
+    }
+
+    public static synchronized boolean processIncomingSms(
+            SharedPreferences preferences, String sender, String body, LocalDate receivedDate,
+            long eventTimestampMillis
+    ) {
         SmsTransactionParser.ParsedTransaction parsed =
-                SmsTransactionParser.parseIncomingSms(sender, body, receivedDate);
+                SmsTransactionParser.parseIncomingSms(sender, body, receivedDate, eventTimestampMillis);
         if (parsed == null) {
             preferences.edit().putString(KEY_LAST_SMS_RESULT,
                     "SMS received; no completed financial transaction found").apply();
             return false;
         }
-        if (parsed.fingerprint.isEmpty()
-                || ExpenseStore.hasFingerprint(preferences, parsed.fingerprint)) {
+
+        ExpenseStore.Expense expense = toExpense(
+                preferences, parsed, ExpenseStore.nextId(preferences), "SMS"
+        );
+        if (!ExpenseStore.insertIfAbsent(preferences, expense)) {
             preferences.edit().putString(KEY_LAST_SMS_RESULT,
                     "Duplicate SMS transaction ignored").apply();
             return false;
         }
-        ExpenseStore.upsert(preferences, toExpense(
-                preferences, parsed, ExpenseStore.nextId(preferences), "SMS"
-        ));
-        if (!ExpenseStore.hasFingerprint(preferences, parsed.fingerprint)) {
-            preferences.edit().putString(KEY_LAST_SMS_RESULT,
-                    "SMS transaction save failed").apply();
-            return false;
-        }
+
         long count = preferences.getLong(KEY_SMS_IMPORTED_COUNT, 0L) + 1L;
         String amount = java.math.BigDecimal.valueOf(parsed.amountPaise, 2)
                 .stripTrailingZeros().toPlainString();
@@ -159,8 +160,17 @@ public final class SmsTransactionService {
             SharedPreferences preferences, String packageName, String title,
             String body, LocalDate receivedDate
     ) {
+        return processNotification(preferences, packageName, title, body, receivedDate, 0L);
+    }
+
+    public static synchronized boolean processNotification(
+            SharedPreferences preferences, String packageName, String title,
+            String body, LocalDate receivedDate, long eventTimestampMillis
+    ) {
         SmsTransactionParser.ParsedTransaction parsed =
-                SmsTransactionParser.parseNotification(packageName, title, body, receivedDate);
+                SmsTransactionParser.parseNotification(
+                        packageName, title, body, receivedDate, eventTimestampMillis
+                );
         if (parsed == null) {
             String reason = SmsTransactionParser.notificationFailureReason(
                     packageName, title, body, receivedDate
@@ -174,25 +184,17 @@ public final class SmsTransactionService {
                     .apply();
             return false;
         }
-        if (parsed.fingerprint.isEmpty()
-                || ExpenseStore.hasFingerprint(preferences, parsed.fingerprint)) {
+
+        ExpenseStore.Expense expense = toExpense(
+                preferences, parsed, ExpenseStore.nextId(preferences), "NOTIFICATION"
+        );
+        if (!ExpenseStore.insertIfAbsent(preferences, expense)) {
             preferences.edit()
                     .putString(KEY_LAST_NOTIFICATION_RESULT, "Duplicate ignored")
                     .putLong(KEY_LAST_NOTIFICATION_AMOUNT, parsed.amountPaise)
                     .putString(KEY_LAST_NOTIFICATION_DIRECTION, parsed.direction)
                     .putString(KEY_LAST_NOTIFICATION_MERCHANT, parsed.merchant)
                     .putString(KEY_LAST_NOTIFICATION_CATEGORY, parsed.category)
-                    .apply();
-            return false;
-        }
-
-        ExpenseStore.Expense expense = toExpense(
-                preferences, parsed, ExpenseStore.nextId(preferences), "NOTIFICATION"
-        );
-        ExpenseStore.upsert(preferences, expense);
-        if (!ExpenseStore.hasFingerprint(preferences, parsed.fingerprint)) {
-            preferences.edit()
-                    .putString(KEY_LAST_NOTIFICATION_RESULT, "Save failed: transaction was not persisted")
                     .apply();
             return false;
         }
@@ -240,11 +242,10 @@ public final class SmsTransactionService {
     private static boolean saveParsedTransaction(
             SharedPreferences preferences, SmsTransactionParser.ParsedTransaction parsed
     ) {
-        if (parsed == null || parsed.fingerprint.isEmpty()
-                || ExpenseStore.hasFingerprint(preferences, parsed.fingerprint)) return false;
-        ExpenseStore.upsert(preferences, toExpense(preferences, parsed,
-                ExpenseStore.nextId(preferences)));
-        return true;
+        if (parsed == null) return false;
+        return ExpenseStore.insertIfAbsent(preferences, toExpense(
+                preferences, parsed, ExpenseStore.nextId(preferences)
+        ));
     }
 
     private static ExpenseStore.Expense toExpense(
@@ -269,7 +270,8 @@ public final class SmsTransactionService {
         return new ExpenseStore.Expense(
                 id, parsed.amountPaise, parsed.date, category, "", parsed.paymentMode,
                 parsed.merchant, source, parsed.confidence, parsed.fingerprint,
-                parsed.direction, parsed.availableBalancePaise
+                parsed.direction, parsed.availableBalancePaise,
+                parsed.referenceId, parsed.accountSuffix, parsed.eventTimestampMillis
         );
     }
 
@@ -280,10 +282,6 @@ public final class SmsTransactionService {
         int imported = 0;
         int inspected = 0;
         List<ExpenseStore.Expense> expenses = ExpenseStore.load(preferences);
-        Set<String> fingerprints = new HashSet<>();
-        for (ExpenseStore.Expense expense : expenses) {
-            if (!expense.fingerprint.isEmpty()) fingerprints.add(expense.fingerprint);
-        }
         long nextId = ExpenseStore.nextId(preferences);
         try (Cursor cursor = context.getContentResolver().query(
                 Telephony.Sms.Inbox.CONTENT_URI,
@@ -303,10 +301,12 @@ public final class SmsTransactionService {
                 long timestamp = cursor.getLong(dateIndex);
                 LocalDate receivedDate = Instant.ofEpochMilli(timestamp).atZone(INDIA).toLocalDate();
                 SmsTransactionParser.ParsedTransaction parsed =
-                        SmsTransactionParser.parseIncomingSms(sender, body, receivedDate);
-                if (parsed == null || parsed.fingerprint.isEmpty()
-                        || !fingerprints.add(parsed.fingerprint)) continue;
-                expenses.add(toExpense(preferences, parsed, nextId++, "SMS"));
+                        SmsTransactionParser.parseIncomingSms(sender, body, receivedDate, timestamp);
+                if (parsed == null) continue;
+                ExpenseStore.Expense candidate = toExpense(preferences, parsed, nextId, "SMS");
+                if (ExpenseStore.isDuplicate(expenses, candidate)) continue;
+                expenses.add(candidate);
+                nextId++;
                 imported++;
             }
         } catch (SecurityException | IllegalArgumentException ignored) {
