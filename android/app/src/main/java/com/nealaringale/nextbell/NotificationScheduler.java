@@ -69,7 +69,7 @@ public final class NotificationScheduler {
         LocalDate today = LocalDate.now(ZONE);
         long nowMillis = System.currentTimeMillis();
 
-        for (int offset = 0; offset < 8; offset++) {
+        for (int offset = 0; offset < 15; offset++) {
             LocalDate date = today.plusDays(offset);
             String day = CollegeCatalog.DYPIIT_PIMPRI.equals(collegeId)
                     ? CollegeScheduleData.dayName(date) : dayName(date);
